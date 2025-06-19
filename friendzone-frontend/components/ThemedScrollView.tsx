@@ -15,6 +15,8 @@ const ThemedScrollView = ({ children, style, lightColor, darkColor, ...rest }: P
   return (
     <ScrollView
       contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
       style={[
         styles.scroll,
         {
@@ -37,5 +39,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
+    justifyContent: 'center'
   },
 });

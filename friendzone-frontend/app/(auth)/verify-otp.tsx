@@ -112,11 +112,11 @@ const VerifyOtpScreen = () => {
       </ThemedView>
 
       <ThemedView style={styles.centeredContent}>
-        <ThemedText style={[styles.timer, { color: colors.text }]}>
+        <ThemedText style={styles.timer}>
           {formatOtpTimer(timer)}
         </ThemedText>
 
-        <ThemedText style={[styles.instruction, { color: colors.text }]}>
+        <ThemedText style={styles.instruction}>
           Enter the 4-digit code sent to your email
         </ThemedText>
 
@@ -144,7 +144,7 @@ const VerifyOtpScreen = () => {
         <Button title="Verify OTP" onPress={handleVerify} />
 
         <TouchableOpacity onPress={handleResend}>
-          <ThemedText style={[styles.linkText, { color: colors.text }]}>
+          <ThemedText style={styles.linkText}>
             Didn’t receive the code? Send again
           </ThemedText>
         </TouchableOpacity>

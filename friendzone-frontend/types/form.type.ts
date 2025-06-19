@@ -5,15 +5,15 @@ export type TFormData = {
   confirmPassword?: string;
   firstName?: string;
   lastName?: string;
-  gender?: 'male' | 'female' | '';
+  gender?: string;
   dob?: Date | null;
-  profileImageUri?: string | null;
+  profileImage?: string | null;
 };
 
 export type ProfileDetailsForm = {
   firstName: string;
   lastName: string;
-  gender: 'male' | 'female' | '';
+  gender: string;
   dob: Date | null;
-  profileImageUri: string | null;
+  profileImage: string | null;
 };

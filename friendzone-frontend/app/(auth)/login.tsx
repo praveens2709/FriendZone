@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, TouchableOpacity, TextInput } from "react-native";
+import { StyleSheet, TouchableOpacity, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useForm, Controller } from "react-hook-form";
 import { ThemedText } from "@/components/ThemedText";
@@ -13,12 +13,22 @@ import AuthServices from "@/services/AuthService";
 import { HandleApiError, showToast } from "@/constants/Functions";
 import AuthFormLayout from "@/components/AuthFormLayout";
 
+interface LoginScreenProps {
+  isModal?: boolean;
+  onSwitchToSignup?: () => void;
+  onCloseModal?: () => void;
+}
+
 type TFormData = {
   email: string;
   password: string;
 };
 
-export default function LoginScreen() {
+export default function LoginScreen({
+  isModal = false,
+  onSwitchToSignup,
+  onCloseModal,
+}: LoginScreenProps) {
   const { colors } = useTheme();
   const router = useRouter();
   const auth = useAuth();
@@ -36,7 +46,8 @@ export default function LoginScreen() {
           theme: response.theme,
         });
         if (response.message) showToast("success", response.message);
-        router.replace("/(tabs)");
+        onCloseModal?.();
+        router.replace("/home");
       }
     } catch (error) {
       HandleApiError(error);
@@ -45,21 +56,45 @@ export default function LoginScreen() {
     }
   };
 
-  return (
-    <AuthFormLayout>
-      <ThemedView style={styles.container}>
-        <AppLogo showText text="Welcome Back" textStyle={styles.logoText} />
+  const loginContent = (
+    <ThemedView
+      style={[
+        styles.container,
+        isModal && styles.modalContainer,
+      ]}
+    >
+      <AppLogo showText text="Welcome Back" textStyle={styles.logoText} />
 
-        <ThemedView style={styles.formContainer}>
-          <Controller
-            control={control}
-            name="email"
-            rules={{ required: "Email is required" }}
-            render={({ field: { onChange, value } }) => (
+      <ThemedView style={styles.formContainer}>
+        <Controller
+          control={control}
+          name="email"
+          rules={{ required: "Email is required" }}
+          render={({ field: { onChange, value } }) => (
+            <TextInput
+              placeholder="Email"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              placeholderTextColor={colors.textDim}
+              style={[
+                styles.input,
+                { color: colors.text, borderColor: colors.border },
+              ]}
+              value={value}
+              onChangeText={onChange}
+            />
+          )}
+        />
+
+        <Controller
+          control={control}
+          name="password"
+          rules={{ required: "Password is required" }}
+          render={({ field: { onChange, value } }) => (
+            <>
               <TextInput
-                placeholder="Email"
-                keyboardType="email-address"
-                autoCapitalize="none"
+                placeholder="Password"
+                secureTextEntry
                 placeholderTextColor={colors.textDim}
                 style={[
                   styles.input,
@@ -68,65 +103,57 @@ export default function LoginScreen() {
                 value={value}
                 onChangeText={onChange}
               />
-            )}
-          />
-
-          <Controller
-            control={control}
-            name="password"
-            rules={{ required: "Password is required" }}
-            render={({ field: { onChange, value } }) => (
-              <>
-                <TextInput
-                  placeholder="Password"
-                  secureTextEntry
-                  placeholderTextColor={colors.textDim}
-                  style={[
-                    styles.input,
-                    { color: colors.text, borderColor: colors.border },
-                  ]}
-                  value={value}
-                  onChangeText={onChange}
-                />
-                <TouchableOpacity
-                  style={styles.forgotPassword}
-                  onPress={() => router.push("/(auth)/forget-password")}
+              <TouchableOpacity
+                style={styles.forgotPassword}
+                onPress={() => router.push("/(auth)/forget-password")}
+              >
+                <ThemedText
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                  }}
                 >
-                  <ThemedText style={{ color: colors.text, fontSize: 14, fontWeight: 600 }}>
-                    Forgot Password?
-                  </ThemedText>
-                </TouchableOpacity>
-              </>
-            )}
-          />
+                  Forgot Password?
+                </ThemedText>
+              </TouchableOpacity>
+            </>
+          )}
+        />
 
-          <Button
-            title="Login"
-            onPress={handleSubmit(onSubmit)}
-            style={styles.loginButton}
-          />
+        <Button
+          title="Login"
+          onPress={handleSubmit(onSubmit)}
+          style={styles.loginButton}
+        />
 
-          <TouchableOpacity onPress={() => router.push("/(auth)/signup")}>
-            <ThemedText style={[styles.linkText, { color: colors.text }]}>
-              Don’t have an account? Sign up
-            </ThemedText>
-          </TouchableOpacity>
-        </ThemedView>
+        <TouchableOpacity
+          onPress={() => {
+            if (isModal && onSwitchToSignup) {
+              onSwitchToSignup();
+            } else {
+              router.push("/(auth)/signup");
+            }
+          }}
+        >
+          <ThemedText style={styles.linkText}>
+            Don’t have an account? Sign up
+          </ThemedText>
+        </TouchableOpacity>
       </ThemedView>
-    </AuthFormLayout>
+    </ThemedView>
   );
+
+  return isModal ? loginContent : <AuthFormLayout>{loginContent}</AuthFormLayout>;
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    width: "95%",
-    margin: "auto",
-    paddingHorizontal: 20,
-  },
   container: {
     flex: 1,
     justifyContent: "center",
+  },
+  modalContainer: {
+    flexGrow: 1,
+    marginTop: -100
   },
   logoText: {
     fontSize: 28,

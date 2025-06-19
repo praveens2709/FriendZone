@@ -44,7 +44,6 @@ const AppLogo: React.FC<AppLogoProps> = ({
         <ThemedText
           style={[
             styles.text,
-            { color: colors.text },
             inline ? styles.inlineText : styles.verticalText,
             textStyle,
           ]}

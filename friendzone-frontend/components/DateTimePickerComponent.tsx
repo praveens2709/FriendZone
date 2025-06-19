@@ -45,7 +45,7 @@ export default function DateTimePickerComponent({
 
   return (
     <View style={styles.container}>
-      <ThemedText style={[styles.label, { color: colors.text }]}>
+      <ThemedText style={styles.label}>
         {label}
       </ThemedText>
 

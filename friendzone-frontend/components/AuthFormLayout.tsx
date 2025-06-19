@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
 import { LinearGradient } from "expo-linear-gradient";
-import ThemedSafeArea from "@/components/ThemedSafeArea"; // Your ThemedSafeArea component
+import ThemedSafeArea from "@/components/ThemedSafeArea"; 
 import { ThemedView } from "./ThemedView";
 
 type Props = {

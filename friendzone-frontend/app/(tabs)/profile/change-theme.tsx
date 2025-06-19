@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, FlatList, SafeAreaView, Dimensions, Platform } from 'react-native';
+import { StyleSheet, FlatList, Dimensions, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/context/ThemeContext';
 import { useThemeStore, ThemeType } from '@/store/themeStore';
 import { useRouter } from 'expo-router';
-import CommonHeader from '@/components/CommonHeader';
 import ThemeCard from '@/components/ThemeCard';
 import { ThemedText } from '@/components/ThemedText';
 import PhoneMockupPreview from '@/components/PhoneMockupPreview';
@@ -14,6 +13,9 @@ import { showToast, HandleApiError } from '@/constants/Functions';
 import { Colors } from '@/constants/Colors';
 import { useLoadingDialog } from '@/context/LoadingContext';
 import { ThemedView } from '@/components/ThemedView';
+import CommonHeader from '@/components/CommonHeader';
+import ThemedSafeArea from '@/components/ThemedSafeArea';
+import BackButton from '@/components/BackButton';
 
 
 const { width } = Dimensions.get('window');
@@ -21,7 +23,7 @@ const CARD_ITEM_WIDTH = (width / 3) - 20;
 
 export default function ChangeThemeScreen() {
   const router = useRouter();
-  const { colors: currentActiveThemeColors } = useTheme();
+  const { colors } = useTheme();
   const { availableThemes, theme: currentGlobalTheme } = useThemeStore();
   const { session, updateUserTheme } = useAuth();
   const loadingDialog = useLoadingDialog();
@@ -63,9 +65,9 @@ export default function ChangeThemeScreen() {
 
   return (
     <>
-      <LinearGradient colors={currentActiveThemeColors.gradient} style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <CommonHeader pageTitle="Choose Theme" />
+      <LinearGradient colors={colors.gradient} style={styles.container}>
+        <ThemedSafeArea style={styles.safeArea}>
+          <CommonHeader title="Choose Theme" leftContent={<BackButton/>} />
 
           <ThemedView style={styles.themeCardsHorizontalContainer}>
             <FlatList
@@ -86,7 +88,7 @@ export default function ChangeThemeScreen() {
           </ThemedView>
 
           <ThemedView style={styles.previewContentArea}>
-            <ThemedText type="default" style={[styles.previewHeading, { color: currentActiveThemeColors.text }]}>
+            <ThemedText type="default" style={styles.previewHeading}>
               Preview: {selectedThemeForPreview.charAt(0).toUpperCase() + selectedThemeForPreview.slice(1)}
             </ThemedText>
 
@@ -98,7 +100,7 @@ export default function ChangeThemeScreen() {
             onPress={handleConfirmThemeChange}
             style={styles.confirmButton}
           />
-        </SafeAreaView>
+        </ThemedSafeArea>
       </LinearGradient>
     </>
   );
@@ -110,10 +112,7 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    paddingTop: 40,
-    alignItems: 'center',
-    paddingHorizontal: 0,
-    justifyContent: 'space-between',
+    backgroundColor: 'transparent',
   },
   themeCardsHorizontalContainer: {
     height: CARD_ITEM_WIDTH + 40,
@@ -141,7 +140,7 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     width: '80%',
-    marginBottom: Platform.OS === 'ios' ? 68 : 20,
+    marginBottom: Platform.OS === 'ios' ? 68 : 0,
     alignSelf: 'center',
   },
 });

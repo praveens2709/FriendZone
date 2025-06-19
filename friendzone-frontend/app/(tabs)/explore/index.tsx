@@ -5,7 +5,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 
-export default function GamesScreen() {
+export default function ExploreScreen() {
   const { colors } = useTheme();
 
   return (
@@ -14,9 +14,9 @@ export default function GamesScreen() {
       style={styles.gradientContainer}
     >
       <ThemedView style={styles.contentContainer}>
-        <ThemedText style={[styles.text, { color: colors.text }]}>Games Screen</ThemedText>
+        <ThemedText style={styles.text}>Explore Screen</ThemedText>
         <ThemedText style={[styles.subText, { color: colors.textDim }]}>
-        Get ready to play some games here!
+        Explore here!
       </ThemedText>
       </ThemedView>
     </LinearGradient>

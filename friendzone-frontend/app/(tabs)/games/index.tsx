@@ -5,7 +5,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 
-export default function ChatScreen() {
+export default function GamesScreen() {
   const { colors } = useTheme();
 
   return (
@@ -14,10 +14,10 @@ export default function ChatScreen() {
       style={styles.gradientContainer}
     >
       <ThemedView style={styles.contentContainer}>
-        <ThemedText style={[styles.text, { color: colors.text }]}>Chat Screen</ThemedText>
+        <ThemedText style={styles.text}>Games Screen</ThemedText>
         <ThemedText style={[styles.subText, { color: colors.textDim }]}>
-          Start a conversation here!
-        </ThemedText>
+        Get ready to play some games here!
+      </ThemedText>
       </ThemedView>
     </LinearGradient>
   );

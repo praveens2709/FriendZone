@@ -1,5 +1,4 @@
-// app/_layout.tsx
-import { Slot } from "expo-router";
+import { Slot, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
 import "react-native-reanimated";
@@ -26,7 +25,11 @@ function RootLayoutContent() {
 
   return (
     <>
-      <Slot />
+      <Stack initialRouteName="index" screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(stories)" options={{ animation: 'fade' }} />
+        <Stack.Screen name="(chat)" options={{ animation: 'slide_from_right' }} />
+      </Stack>
       <StatusBar
         style={colors.isDark ? "light" : "dark"}
         translucent={true}
@@ -48,7 +51,10 @@ export default function RootLayout() {
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
 
-  if (!loaded) return null;
+  if (!loaded) {
+    console.log("Fonts not loaded yet.");
+    return null;
+  }
 
   return (
     <GestureHandlerRootView style={styles.container}>

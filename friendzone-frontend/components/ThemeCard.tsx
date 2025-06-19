@@ -28,14 +28,14 @@ const ThemeCard: React.FC<ThemeCardProps> = ({
   isSelected,
   style,
 }) => {
-  const { colors: currentActiveThemeColors } = useTheme();
+  const { colors } = useTheme();
   const themeColors = Colors[themeName] ?? Colors.light;
 
   return (
     <TouchableOpacity
       style={[
         styles.themeCard,
-        { borderColor: currentActiveThemeColors.border },
+        { borderColor: colors.border },
         isSelected && {
           borderColor: themeColors.primary,
           borderWidth: 3,
@@ -54,7 +54,7 @@ const ThemeCard: React.FC<ThemeCardProps> = ({
         ]}
       />
       <ThemedText
-        style={[styles.themeNameText, { color: currentActiveThemeColors.text }]}
+        style={styles.themeNameText}
       >
         {themeName.charAt(0).toUpperCase() + themeName.slice(1)}
       </ThemedText>

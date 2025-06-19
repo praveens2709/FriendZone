@@ -1,10 +1,10 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
-import { Platform, StyleSheet } from 'react-native';
-import { useTheme } from '@/context/ThemeContext';
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { HapticTab } from '@/components/HapticTab';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Tabs } from "expo-router";
+import React from "react";
+import { Platform, StyleSheet } from "react-native";
+import { useTheme } from "@/context/ThemeContext";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { HapticTab } from "@/components/HapticTab";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TabLayout() {
   const { colors } = useTheme();
@@ -21,8 +21,8 @@ export default function TabLayout() {
   });
 
   const contentHeight = 55;
-
-  const totalTabBarHeight = contentHeight + basePaddingTop + dynamicPaddingBottom;
+  const totalTabBarHeight =
+    contentHeight + basePaddingTop + dynamicPaddingBottom;
 
   return (
     <Tabs
@@ -40,7 +40,7 @@ export default function TabLayout() {
           },
           Platform.select({
             ios: {
-              position: 'absolute',
+              position: "absolute",
             },
             default: {},
           }),
@@ -48,14 +48,15 @@ export default function TabLayout() {
         tabBarActiveTintColor: colors.tabBarActive,
         tabBarInactiveTintColor: colors.tabBarInactive,
         tabBarLabelStyle: styles.tabBarLabel,
-      }}>
+      }}
+    >
       <Tabs.Screen
-        name="index"
+        name="home"
         options={{
-          title: 'Home',
+          title: "Home",
           tabBarIcon: ({ focused }) => (
             <Ionicons
-              name={focused ? 'home' : 'home-outline'}
+              name={focused ? "home" : "home-outline"}
               size={26}
               color={focused ? colors.tabBarActive : colors.tabBarInactive}
             />
@@ -63,12 +64,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="chat"
+        name="explore"
         options={{
-          title: 'Chat',
+          title: "Explore",
           tabBarIcon: ({ focused }) => (
             <Ionicons
-              name={focused ? 'chatbox' : 'chatbox-outline'}
+              name={focused ? "search" : "search-outline"}
               size={26}
               color={focused ? colors.tabBarActive : colors.tabBarInactive}
             />
@@ -78,10 +79,10 @@ export default function TabLayout() {
       <Tabs.Screen
         name="posts"
         options={{
-          title: 'Posts',
+          title: "Posts",
           tabBarIcon: ({ focused }) => (
             <Ionicons
-              name={focused ? 'image' : 'image-outline'}
+              name={focused ? "image" : "image-outline"}
               size={26}
               color={focused ? colors.tabBarActive : colors.tabBarInactive}
             />
@@ -91,10 +92,12 @@ export default function TabLayout() {
       <Tabs.Screen
         name="games"
         options={{
-          title: 'Games',
+          title: "Games",
           tabBarIcon: ({ focused }) => (
             <Ionicons
-              name={focused ? 'game-controller' : 'game-controller-outline'}
+              name={
+                focused ? "game-controller" : "game-controller-outline"
+              }
               size={26}
               color={focused ? colors.tabBarActive : colors.tabBarInactive}
             />
@@ -104,10 +107,10 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: "Profile",
           tabBarIcon: ({ focused }) => (
             <Ionicons
-              name={focused ? 'person' : 'person-outline'}
+              name={focused ? "person" : "person-outline"}
               size={26}
               color={focused ? colors.tabBarActive : colors.tabBarInactive}
             />
@@ -124,6 +127,6 @@ const styles = StyleSheet.create({
   },
   tabBarLabel: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });

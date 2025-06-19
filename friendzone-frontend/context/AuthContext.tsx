@@ -16,7 +16,7 @@ import { AuthSession } from "@/types/auth-session.type";
 import AuthServices from "@/services/AuthService";
 import { useThemeStore, ThemeType } from "@/store/themeStore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { UserProfile } from "@/types/user.type";
+import { User } from "@/types/user.type";
 import ProfileServices from "@/services/ProfileService";
 
 interface AuthContextType {
@@ -27,7 +27,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   updateUserTheme: (theme: ThemeType) => Promise<void>;
-  user: UserProfile | null;
+  user: User | null;
   loadUserProfile: () => Promise<void>;
   updateProfile: (data: any) => Promise<void>;
 }
@@ -46,7 +46,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [session, setSession] = useState<AuthSession | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   const setThemeFromStore = useThemeStore((state) => state.setTheme);
   const availableThemes = useThemeStore((state) => state.availableThemes);
@@ -100,6 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = async (sessionData: AuthSession) => {
     console.log("[AuthContext] Signing in with session data:", sessionData);
     await storeAuthSession(sessionData);
+    await AsyncStorage.setItem("userToken", sessionData.accessToken);
     const check = await getAuthSession();
     console.log("[AuthContext] Session written to storage?", !!check);
     setSession(sessionData);
@@ -157,9 +158,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loadUserProfile = async () => {
     try {
       const token = await AsyncStorage.getItem("userToken");
+      console.log("[AuthContext] userToken from AsyncStorage:", token);
       if (token) {
-        const profileData = await ProfileServices.getProfile();
-        setUser(profileData);
+        const user = await ProfileServices.getProfile();
+        console.log("[AuthContext] Loaded user profile:", user);
+        setUser(user);
       }
     } catch (error: any) {
       console.error("Failed to load user profile:", error);

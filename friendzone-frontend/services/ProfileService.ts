@@ -1,10 +1,10 @@
 // services/ProfileService.ts
-import { UserProfile } from "@/types/user.type";
+import { User, UserProfileResponse } from "@/types/user.type";
 import { _get, _post, _put } from "../configs/api-methods.config";
 
 interface IUpdateProfileResponse {
   message: string;
-  user: UserProfile;
+  user: User;
 }
 
 class ProfileServices {
@@ -12,10 +12,11 @@ class ProfileServices {
    * Fetches the user's profile details from the backend.
    * @returns Promise<UserProfile>
    */
-  static async getProfile(): Promise<UserProfile> {
+  static async getProfile(): Promise<User> {
     try {
-      const response = await _get<UserProfile>("profile");
-      return response;
+      const response = await _get<UserProfileResponse>("profile");
+      console.log("response", response);
+      return response.user;
     } catch (error) {
       console.error("Error while fetching profile: ", error);
       throw error;

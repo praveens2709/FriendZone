@@ -1,12 +1,14 @@
 import React from 'react';
-import { StyleSheet, SafeAreaView, StatusBar } from 'react-native';
+import { StyleSheet, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/context/ThemeContext';
 import Button from '@/components/Button';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
-import CommonHeader from '@/components/CommonHeader';
 import { ThemedView } from '@/components/ThemedView';
+import CommonHeader from '@/components/CommonHeader';
+import ThemedSafeArea from '@/components/ThemedSafeArea';
+import BackButton from '@/components/BackButton';
 
 export default function SettingsScreen() {
   const { colors } = useTheme();
@@ -22,8 +24,8 @@ export default function SettingsScreen() {
   return (
     <>
       <LinearGradient colors={colors.gradient} style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <CommonHeader pageTitle="Settings" />
+        <ThemedSafeArea style={styles.safeAreaTransparentBg}>
+          <CommonHeader title="Settings" leftContent={<BackButton/>}/>
 
           <ThemedView style={styles.settingsList}>
             <Button
@@ -61,7 +63,7 @@ export default function SettingsScreen() {
               textStyle={styles.logoutButtonText}
             />
           </ThemedView>
-        </SafeAreaView>
+        </ThemedSafeArea>
       </LinearGradient>
     </>
   );
@@ -71,9 +73,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  safeArea: {
+  safeAreaTransparentBg: {
     flex: 1,
     paddingTop: StatusBar.currentHeight || 0,
+    backgroundColor: "transparent"
   },
   settingsList: {
     flex: 1,

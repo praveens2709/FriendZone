@@ -14,7 +14,7 @@ export default function PostsScreen() {
       style={styles.gradientContainer}
     >
       <ThemedView style={styles.contentContainer}>
-        <ThemedText style={[styles.text, { color: colors.text }]}>Posts Screen</ThemedText>
+        <ThemedText style={styles.text}>Posts Screen</ThemedText>
         <ThemedText style={[styles.subText, { color: colors.textDim }]}>
           This is where your posts or feed will go!
         </ThemedText>

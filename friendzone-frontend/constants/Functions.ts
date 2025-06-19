@@ -66,3 +66,26 @@ export const formatOtpTimer = (time: number): string => {
     .toString()
     .padStart(2, '0')}`;
 };
+
+export const formatMessageDateLabel = (dateString: string): string => {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  const messageDate = new Date(dateString);
+
+  if (isNaN(messageDate.getTime())) {
+    return 'Invalid Date';
+  }
+
+  if (messageDate.toDateString() === today.toDateString()) {
+    return 'TODAY';
+  } else if (messageDate.toDateString() === yesterday.toDateString()) {
+    return 'YESTERDAY';
+  } else if (today.getTime() - messageDate.getTime() < 7 * 24 * 60 * 60 * 1000) {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return days[messageDate.getDay()].toUpperCase();
+  } else {
+    return messageDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase();
+  }
+};

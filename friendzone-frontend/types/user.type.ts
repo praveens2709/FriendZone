@@ -1,11 +1,23 @@
-// types/user.type.ts
-export interface UserProfile {
+// types.ts
+
+export interface User {
+  _id: string;
+  email: string;
   firstName: string;
   lastName: string;
-  gender: "male" | "female" | "";
-  dob: string;
-  profileImageUri: string | null;
-  email: string;
+  profileImage?: string;
+  additionalImages?: string[];
+  gender?: string;
+  dob?: string;
   bio?: string;
-  phone?: string;
+  theme: string;
+  isVerified: boolean;
+  createdAt: string;
+  updatedAt: string;
+  __v?: number;
+}
+
+export interface UserProfileResponse {
+  success: boolean;
+  user: User;
 }

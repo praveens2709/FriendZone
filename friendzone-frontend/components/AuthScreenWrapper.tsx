@@ -5,6 +5,7 @@ import {
   ViewStyle,
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
+import ThemedSafeArea from "./ThemedSafeArea";
 
 export default function AuthScreenWrapper({
   children,
@@ -18,7 +19,7 @@ export default function AuthScreenWrapper({
   return (
     <>
       <LinearGradient colors={colors.gradient} style={styles.container}>
-        <SafeAreaView style={[styles.safeArea, style]}>{children}</SafeAreaView>
+        <ThemedSafeArea style={[styles.safeArea, style]}>{children}</ThemedSafeArea>
       </LinearGradient>
     </>
   );
@@ -34,5 +35,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 24,
     paddingHorizontal: 20,
+    backgroundColor: "transparent",
   },
 });

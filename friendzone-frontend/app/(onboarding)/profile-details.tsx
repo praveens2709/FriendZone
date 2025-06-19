@@ -1,10 +1,5 @@
 import React, { useEffect } from "react";
-import {
-  StyleSheet,
-  TextInput,
-  Alert,
-  ScrollView,
-} from "react-native";
+import { StyleSheet, TextInput, Alert, ScrollView } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import Button from "@/components/Button";
@@ -19,6 +14,7 @@ import DateTimePickerComponent from "@/components/DateTimePickerComponent";
 import { ProfileDetailsForm } from "@/types/form.type";
 import { showToast } from "@/constants/Functions";
 import ModalComponent from "@/components/ModalComponent";
+import ThemedScrollView from "@/components/ThemedScrollView";
 
 export default function ProfileDetailsScreen() {
   const { colors } = useTheme();
@@ -38,11 +34,11 @@ export default function ProfileDetailsScreen() {
       lastName: user?.lastName || "",
       gender: user?.gender || "",
       dob: user?.dob ? new Date(user.dob) : null,
-      profileImageUri: user?.profileImageUri || null,
+      profileImage: user?.profileImage || null,
     },
   });
 
-  const selectedProfileImageUri = watch("profileImageUri");
+  const selectedProfileImageUri = watch("profileImage");
 
   const maxDate = new Date();
   maxDate.setFullYear(maxDate.getFullYear() - 18);
@@ -53,7 +49,7 @@ export default function ProfileDetailsScreen() {
       setValue("lastName", user.lastName || "");
       setValue("gender", user.gender || "");
       setValue("dob", user.dob ? new Date(user.dob) : null);
-      setValue("profileImageUri", user.profileImageUri || null);
+      setValue("profileImage", user.profileImage || null);
     }
   }, [user, setValue]);
 
@@ -63,7 +59,7 @@ export default function ProfileDetailsScreen() {
       console.log("Profile details submitted:", data);
       await updateProfile(data);
       showToast("success", "Profile details saved successfully!");
-      router.push("/(tabs)");
+      router.push("/home");
     } catch (err: any) {
       showToast("error", err.message || "Failed to save profile details.");
     } finally {
@@ -73,24 +69,25 @@ export default function ProfileDetailsScreen() {
 
   return (
     <AuthFormLayout>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+      <ThemedScrollView
+        style={{ backgroundColor: "transparent"}}
       >
         <ThemedView style={styles.container}>
-          <ThemedText style={[styles.title, {color: colors.text}]}>Profile Details</ThemedText>
+          <ThemedText style={styles.title}>
+            Profile Details
+          </ThemedText>
           <Controller
             control={control}
-            name="profileImageUri"
+            name="profileImage"
             render={({ field: { onChange, value } }) => (
               <ThemedView style={styles.textBoxContainer}>
                 <ImagePickerComponent
                   currentImageUri={selectedProfileImageUri}
                   onImageSelected={(uri) => onChange(uri)}
                 />
-                {errors.profileImageUri && (
+                {errors.profileImage && (
                   <ThemedText style={styles.errorText}>
-                    {errors.profileImageUri.message}
+                    {errors.profileImage.message}
                   </ThemedText>
                 )}
               </ThemedView>
@@ -103,7 +100,7 @@ export default function ProfileDetailsScreen() {
               rules={{ required: "First Name is required" }}
               render={({ field: { onChange, onBlur, value } }) => (
                 <ThemedView style={styles.textBoxContainer}>
-                  <ThemedText style={[styles.label, { color: colors.text }]}>
+                  <ThemedText style={styles.label}>
                     First Name
                   </ThemedText>
                   <TextInput
@@ -132,7 +129,7 @@ export default function ProfileDetailsScreen() {
               rules={{ required: "Last Name is required" }}
               render={({ field: { onChange, onBlur, value } }) => (
                 <ThemedView style={styles.textBoxContainer}>
-                  <ThemedText style={[styles.label, { color: colors.text }]}>
+                  <ThemedText style={styles.label}>
                     Last Name
                   </ThemedText>
                   <TextInput
@@ -215,16 +212,12 @@ export default function ProfileDetailsScreen() {
             style={styles.saveButton}
           />
         </ThemedView>
-      </ScrollView>
+      </ThemedScrollView>
     </AuthFormLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: "center",
-  },
   container: {
     width: "100%",
   },

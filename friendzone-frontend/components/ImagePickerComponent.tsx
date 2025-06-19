@@ -11,7 +11,8 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/context/ThemeContext";
-import { FontAwesome, Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import UserAvatar from "./UserAvatar";
 
 interface ImagePickerComponentProps {
   onImageSelected: (uri: string | null) => void;
@@ -90,21 +91,7 @@ export default function ImagePickerComponent({
         onPress={() => setModalVisible(true)}
         style={styles.touchWrapper}
       >
-        <View style={[styles.imageWrapper, { borderColor: colors.border }]}>
-          {currentImageUri ? (
-            <Image
-              source={{ uri: currentImageUri }}
-              style={styles.profileImage}
-            />
-          ) : (
-            <FontAwesome
-              name="user"
-              size={112}
-              color={colors.textDim}
-              style={{ width: "100%", textAlign: "center", marginTop: 10 }}
-            />
-          )}
-        </View>
+       <UserAvatar imageUri={currentImageUri} />
 
         <View
           style={[

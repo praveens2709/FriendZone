@@ -27,7 +27,6 @@ export default function AuthChoiceScreen() {
           <Button
             title="Login with Email"
             onPress={() => router.push("/(auth)/login")}
-            onLongPress={() => router.push("/(tabs)")}
           />
           <Divider text="or" />
           <Button
@@ -54,7 +53,6 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '95%',
     margin: 'auto',
-    paddingHorizontal: 20,
     justifyContent: "center",
   },
   logoHeader: {

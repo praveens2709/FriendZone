@@ -76,7 +76,7 @@ export default function ForgetPasswordScreen() {
             onPress={() => router.back()}
           >
             <ThemedText
-              style={{ color: colors.primary, fontSize: 14, fontWeight: 600 }}
+              style={{ fontSize: 14, fontWeight: 600 }}
             >
               Back to Login
             </ThemedText>

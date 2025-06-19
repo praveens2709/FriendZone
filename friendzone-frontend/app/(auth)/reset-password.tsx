@@ -125,7 +125,7 @@ export default function ResetPasswordScreen() {
             onPress={() => router.push("/(auth)/login")}
           >
             <ThemedText
-              style={{ color: colors.primary, fontSize: 14, fontWeight: 600 }}
+              style={{fontSize: 14, fontWeight: 600 }}
             >
               Back to Login
             </ThemedText>

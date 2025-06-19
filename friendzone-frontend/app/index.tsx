@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { StyleSheet, SafeAreaView, StatusBar } from "react-native";
+import { StyleSheet } from "react-native";
 import { Redirect, useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import LottieView from "lottie-react-native";
@@ -9,6 +9,7 @@ import { ThemeType } from "@/store/themeStore";
 import { useTheme } from "@/context/ThemeContext";
 import Button from "@/components/Button";
 import { useAuth } from "@/context/AuthContext";
+import ThemedSafeArea from "@/components/ThemedSafeArea";
 
 interface IndexScreenProps {
   theme?: ThemeType;
@@ -20,7 +21,7 @@ export default function IndexScreen({ theme }: IndexScreenProps) {
   const { isAuthenticated, authLoading } = useAuth();
 
   if (authLoading) return null;
-  if (isAuthenticated) return <Redirect href="/(tabs)" />;
+  if (isAuthenticated) return <Redirect href="/home" />;
 
   useEffect(() => {
     if (theme) {
@@ -32,17 +33,17 @@ export default function IndexScreen({ theme }: IndexScreenProps) {
   return (
     <>
       <LinearGradient colors={colors.gradient} style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
+        <ThemedSafeArea style={styles.safeArea}>
           <ThemedView style={styles.header}>
             <ThemedText
               type="title"
-              style={[styles.title, { color: colors.text }]}
+              style={styles.title}
             >
               FriendZone
             </ThemedText>
             <ThemedText
               type="default"
-              style={[styles.tagline, { color: colors.text }]}
+              style={styles.tagline}
             >
               Where friends chat, vibe & play
             </ThemedText>
@@ -61,7 +62,7 @@ export default function IndexScreen({ theme }: IndexScreenProps) {
               onPress={() => router.push("/(auth)/AuthChoice")}
             />
           </ThemedView>
-        </SafeAreaView>
+        </ThemedSafeArea>
       </LinearGradient>
     </>
   );
@@ -76,6 +77,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: 30,
+    backgroundColor: 'transparent',
   },
   header: {
     alignItems: "center",

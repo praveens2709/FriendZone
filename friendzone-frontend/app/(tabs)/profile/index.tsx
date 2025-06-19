@@ -1,139 +1,275 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   StyleSheet,
-  Image,
   TouchableOpacity,
-  FlatList,
-  Dimensions,
-  StatusBar,
-  SafeAreaView,
+  View,
+  Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemedText } from "@/components/ThemedText";
 import Button from "@/components/Button";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, Feather, FontAwesome5 } from "@expo/vector-icons";
 import { ThemedView } from "@/components/ThemedView";
-
-const { width } = Dimensions.get("window");
-const POST_ITEM_SIZE = (width - 6) / 3;
-
-const STATIC_USER_DATA = {
-  username: "Dogesh",
-  fullName: "Dogesh Bhai",
-  bio: "Exploring the world one photo at a time. 🌍📸",
-  profileImage:
-    "https://media.newyorker.com/photos/665f65409ad64d9e7a494208/4:3/w_1003,h_752,c_limit/Chayka-screenshot-06-05-24.jpg",
-  postsCount: 125,
-  followersCount: "1.2M",
-  followingCount: 500,
-};
-
-// const STATIC_POSTS = Array.from({ length: 15 }).map((_, i) => ({
-//   id: String(i),
-//   image: `https://picsum.photos/id/${100 + i}/200/200`,
-// }));
+import { useAuth } from "@/context/AuthContext";
+import UserAvatar from "@/components/UserAvatar";
+import LoadingDialog from "@/components/LoadingDialog";
+import ThemedModal from "@/components/ThemedModal";
+import AuthModalContent from "@/components/AuthModalContent";
+import ThemedSafeArea from "@/components/ThemedSafeArea";
+import CommonHeader from "@/components/CommonHeader";
 
 export default function ProfileScreen() {
   const { colors } = useTheme();
   const router = useRouter();
+  const { user, authLoading, signOut } = useAuth();
 
-  // const renderPostItem = ({ item }: { item: { id: string; image: string } }) => (
-  //   <TouchableOpacity style={styles.postItem}>
-  //     <Image source={{ uri: item.image }} style={styles.postImage} />
-  //   </TouchableOpacity>
-  // );
+  const [showMainModal, setShowMainModal] = useState(false);
+  const [showAddAccountModal, setShowAddAccountModal] = useState(false);
+  const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState(false);
+
+  const [showAuthFlowModal, setShowAuthFlowModal] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+
+  if (authLoading) {
+    return <LoadingDialog visible />;
+  }
+
+  if (!user) {
+    return (
+      <ThemedSafeArea style={[styles.centered, styles.safeAreaTransparentBg]}>
+        <ThemedText type="title">Couldn’t load your profile</ThemedText>
+        <ThemedText type="default" style={{ color: colors.textDim }}>
+          Please try again later.
+        </ThemedText>
+      </ThemedSafeArea>
+    );
+  }
+
+  const closeAuthFlowModal = () => {
+    setShowAuthFlowModal(false);
+    setAuthMode("login");
+  };
 
   return (
-    <>
-      <LinearGradient colors={colors.gradient} style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <ThemedView style={[styles.header, { borderBottomColor: colors.border }]}>
-            <ThemedText
-              type="subtitle"
-              style={[styles.username, { color: colors.text }]}
+    <LinearGradient colors={colors.gradient} style={styles.container}>
+      <ThemedSafeArea style={styles.safeAreaTransparentBg}>
+        <CommonHeader
+          leftContent={
+            <TouchableOpacity
+              style={styles.userHeader}
+              onPress={() => setShowMainModal(true)}
             >
-              {STATIC_USER_DATA.username}
-            </ThemedText>
+              <Feather
+                name="lock"
+                size={18}
+                color={colors.text}
+                style={{ marginRight: 5 }}
+              />
+              <ThemedText style={styles.username}>{user.firstName}</ThemedText>
+              <FontAwesome5
+                name="chevron-down"
+                size={14}
+                color={colors.text}
+                style={{ marginLeft: 5 }}
+              />
+            </TouchableOpacity>
+          }
+          rightContent1={
             <TouchableOpacity onPress={() => router.push("/profile/settings")}>
               <Ionicons name="menu" size={28} color={colors.text} />
             </TouchableOpacity>
-          </ThemedView>
-          <ThemedView style={styles.profileInfoContainer}>
-            <Image
-              source={{ uri: STATIC_USER_DATA.profileImage }}
-              style={styles.profileImage}
-            />
-            <ThemedText
-              type="title"
-              style={[styles.fullName, { color: colors.text }]}
-            >
-              {STATIC_USER_DATA.fullName}
-            </ThemedText>
+          }
+          showBottomBorder={true}
+        />
+        <ThemedView style={styles.profileInfoContainer}>
+          <UserAvatar imageUri={user.profileImage} size={100} />
+          <ThemedText type="title" style={styles.fullName}>
+            {user.firstName} {user.lastName}
+          </ThemedText>
+          {user.bio && (
             <ThemedText
               type="default"
               style={[styles.bio, { color: colors.textDim }]}
             >
-              {STATIC_USER_DATA.bio}
+              {user.bio}
             </ThemedText>
-            <Button
-              title="Edit Profile"
-              onPress={() => {
-                /* Navigate to Edit Profile Screen */
-              }}
-              style={styles.editProfileButton}
+          )}
+          <Button
+            title="Edit Profile"
+            onPress={() => router.push("/profile/settings")}
+            style={styles.editProfileButton}
+          />
+        </ThemedView>
+      </ThemedSafeArea>
+      <ThemedModal
+        visible={showMainModal}
+        onClose={() => setShowMainModal(false)}
+      >
+        <ThemedView
+          style={[styles.mainModal, { borderColor: colors.border }]}
+        >
+          <TouchableOpacity style={styles.modalItem} onPress={() => {}}>
+            <UserAvatar imageUri={user.profileImage} size={42} />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <ThemedText
+                type="defaultSemiBold"
+                style={{ color: colors.textSecondary }}
+              >
+                {user.firstName} {user.lastName}
+              </ThemedText>
+            </View>
+            <Ionicons
+              name="checkmark-circle"
+              size={22}
+              color={colors.textSecondary}
             />
-          </ThemedView>
-          {/* <FlatList
-            data={STATIC_POSTS}
-            keyExtractor={(item) => item.id}
-            numColumns={3}
-            renderItem={renderPostItem}
-            contentContainerStyle={styles.postsGrid}
-            showsVerticalScrollIndicator={false}
-          /> */}
-        </SafeAreaView>
-      </LinearGradient>
-    </>
+          </TouchableOpacity>
+          <View
+            style={[styles.divider, { backgroundColor: colors.border }]}
+          />
+          <TouchableOpacity
+            style={styles.modalItem}
+            onPress={() => {
+              setShowMainModal(false);
+              setShowAddAccountModal(true);
+            }}
+          >
+            <View
+              style={[
+                styles.iconCircle,
+                {
+                  backgroundColor: colors.backgroundSecondary,
+                  borderColor: colors.textSecondary,
+                },
+              ]}
+            >
+              <Ionicons name="add" size={28} color={colors.textSecondary} />
+            </View>
+            <ThemedText
+              type="defaultSemiBold"
+              style={{ marginLeft: 10, color: colors.textSecondary }}
+            >
+              Add FriendZone Account
+            </ThemedText>
+          </TouchableOpacity>
+        </ThemedView>
+
+        <View
+          style={{
+            marginTop: 20,
+            marginBottom: Platform.OS === "ios" ? 10 : 40,
+          }}
+        >
+          <Button
+            title="Sign Out"
+            onPress={() => {
+              setShowMainModal(false);
+              setShowLogoutConfirmModal(true);
+            }}
+          />
+        </View>
+      </ThemedModal>
+      <ThemedModal
+        visible={showAddAccountModal}
+        onClose={() => setShowAddAccountModal(false)}
+      >
+        <TouchableOpacity
+          style={[styles.modalItemCentered, { borderColor: colors.border }]}
+          onPress={() => {
+            setShowAddAccountModal(false);
+            setAuthMode("login");
+            setShowAuthFlowModal(true);
+          }}
+        >
+          <ThemedText
+            type="defaultSemiBold"
+            style={{ color: colors.textSecondary }}
+          >
+            Login to existing account
+          </ThemedText>
+        </TouchableOpacity>
+
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+        <TouchableOpacity
+          style={[styles.modalItemCentered, { borderColor: colors.border }]}
+          onPress={() => {
+            setShowAddAccountModal(false);
+            setAuthMode("signup");
+            setShowAuthFlowModal(true);
+          }}
+        >
+          <ThemedText
+            type="defaultSemiBold"
+            style={{ color: colors.textSecondary, marginBottom: Platform.OS === 'ios' ? 20 : 40 }}
+          >
+            Create a new account
+          </ThemedText>
+        </TouchableOpacity>
+      </ThemedModal>
+      <ThemedModal
+        visible={showAuthFlowModal}
+        onClose={closeAuthFlowModal}
+        fullHeight={true}
+        containerStyle={styles.authModalContainerStyle}
+      >
+        <AuthModalContent
+          initialMode={authMode}
+          onCloseModal={closeAuthFlowModal}
+        />
+      </ThemedModal>
+      <ThemedModal
+        visible={showLogoutConfirmModal}
+        onClose={() => setShowLogoutConfirmModal(false)}
+      >
+        <ThemedText
+          type="subtitle"
+          style={{ textAlign: "center", marginBottom: 25, color: colors.textSecondary }}
+        >
+          Are you sure you want to sign out?
+        </ThemedText>
+
+        <View style={styles.buttonRow}>
+          <Button
+            title="Cancel"
+            onPress={() => setShowLogoutConfirmModal(false)}
+            style={[styles.button, { marginRight: 8 }]}
+          />
+          <Button title="OK" onPress={signOut} style={styles.button} />
+        </View>
+      </ThemedModal>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  container: { flex: 1 },
+  safeAreaTransparentBg: {
     flex: 1,
+    backgroundColor: 'transparent',
   },
-  safeArea: {
+  centered: {
     flex: 1,
-    paddingTop: StatusBar.currentHeight || 0,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
+    gap: 10,
+  },
+  userHeader: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   username: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "bold",
   },
   profileInfoContainer: {
     alignItems: "center",
     paddingVertical: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.1)",
     marginBottom: 5,
-    paddingHorizontal: 20, // Horizontal padding for this container
-  },
-  profileImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 2,
-    borderColor: "#fff",
-    marginBottom: 10,
+    paddingHorizontal: 20,
   },
   fullName: {
     fontSize: 24,
@@ -145,22 +281,50 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 15,
   },
-  editProfileButton: {
-    // No specific width needed here as Button has width: '100%' default
-    // Any other styling for this specific button can go here, e.g. marginTop
+  editProfileButton: {},
+  mainModal: {
+    borderWidth: 1,
+    borderRadius: 14,
   },
-  postsGrid: {
-    paddingHorizontal: 2,
+  modalItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 10,
   },
-  postItem: {
-    width: POST_ITEM_SIZE,
-    height: POST_ITEM_SIZE,
-    margin: 1,
-    backgroundColor: "#333",
+  modalItemCentered: {
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "stretch",
   },
-  postImage: {
+  divider: {
+    height: 1,
     width: "100%",
-    height: "100%",
-    resizeMode: "cover",
+  },
+  iconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 30,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  authModalContainerStyle: {
+    borderRadius: 20,
+    marginTop: 120,
+    flexGrow: 1,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  buttonRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8,
+    marginBottom: Platform.OS === 'ios' ? 20 : 40
+  },
+  button: {
+    flex: 1,
   },
 });

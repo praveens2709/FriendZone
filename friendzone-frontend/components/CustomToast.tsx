@@ -25,7 +25,7 @@ const CustomToast = (props: ToastConfigParams<BaseToastProps>) => {
         },
       ]}
     >
-      <ThemedText style={[styles.text, { color: colors.text }]}>
+      <ThemedText style={styles.text}>
         {props.text1}
       </ThemedText>
     </ThemedView>

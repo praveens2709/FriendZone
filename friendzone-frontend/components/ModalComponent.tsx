@@ -3,14 +3,13 @@ import {
   StyleSheet,
   View,
   TouchableOpacity,
-  Modal,
-  Pressable,
-  ScrollView,
   Platform,
 } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { useTheme } from '@/context/ThemeContext';
-import Button from './Button'; // Assuming you have a Button component
+import Button from './Button';
+import ThemedModal from './ThemedModal';
+import { ThemedView } from './ThemedView';
 
 interface ModalItem {
   label: string;
@@ -40,22 +39,18 @@ export default function ModalComponent({
     setShowModal(false);
   };
 
-  const handleCancel = () => {
-    setShowModal(false);
-  };
-
   const selectedLabel = data.find(item => item.value === value)?.label || '';
 
   return (
     <View style={styles.container}>
-      <ThemedText style={[styles.label, { color: colors.text }]}>{label}</ThemedText>
+      <ThemedText style={styles.label}>{label}</ThemedText>
 
       <TouchableOpacity
         onPress={() => setShowModal(true)}
         style={[
           styles.modalTrigger,
           {
-            backgroundColor: 'transparent',
+            backgroundColor: "transparent",
             borderColor: colors.border,
           },
         ]}
@@ -65,90 +60,72 @@ export default function ModalComponent({
         </ThemedText>
       </TouchableOpacity>
 
-      <Modal
-        animationType="fade"
-        transparent
-        visible={showModal}
-        onRequestClose={handleCancel}
-      >
-        <Pressable style={[styles.modalOverlay, { backgroundColor: colors.overlay }]} onPress={handleCancel}>
-          <Pressable style={[styles.pickerWrapper, { backgroundColor: colors.backgroundSecondary }]}>
-            <ThemedText style={[styles.modalTitle, { color: colors.primary }]}>
-              {label || placeholder}
-            </ThemedText>
-            <ScrollView style={styles.optionsScrollView}>
-              {data.map((item, index) => (
-                <View key={item.value}>
-                  <TouchableOpacity
-                    style={[
-                      styles.optionItem,
-                      {
-                        backgroundColor: value === item.value ? colors.selectedItemBackground : 'transparent',
-                      },
-                    ]}
-                    onPress={() => handleSelect(item.value)}
-                  >
-                    <ThemedText
-                      style={[
-                        styles.optionText,
-                        {
-                          color: value === item.value ? colors.primary : colors.textSecondary,
-                          fontWeight: value === item.value ? 'bold' : 'normal',
-                        },
-                      ]}
-                    >
-                      {item.label}
-                    </ThemedText>
-                  </TouchableOpacity>
-                  {index < data.length - 1 && (
-                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
-                  )}
-                </View>
-              ))}
-            </ScrollView>
-            <Button title="Cancel" onPress={handleCancel} style={styles.modalButton} />
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <ThemedModal visible={showModal} onClose={() => setShowModal(false)}>
+        <ThemedText style={[styles.modalTitle, { color: colors.primary }]}>
+          {label || placeholder}
+        </ThemedText>
+        <ThemedView style={styles.optionsView}>
+          {data.map((item, index) => (
+            <View key={item.value}>
+              <TouchableOpacity
+                style={[
+                  styles.optionItem,
+                  {
+                    backgroundColor:
+                      value === item.value ? colors.selectedItemBackground : "transparent",
+                  },
+                ]}
+                onPress={() => handleSelect(item.value)}
+              >
+                <ThemedText
+                  style={[
+                    styles.optionText,
+                    {
+                      color: value === item.value ? colors.primary : colors.textSecondary,
+                      fontWeight: value === item.value ? "bold" : "normal",
+                    },
+                  ]}
+                >
+                  {item.label}
+                </ThemedText>
+              </TouchableOpacity>
+              {index < data.length - 1 && (
+                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              )}
+            </View>
+          ))}
+        </ThemedView>
+        <Button title="Cancel" onPress={() => setShowModal(false)} style={styles.modalButton} />
+      </ThemedModal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
+    width: "100%",
   },
   label: {
     fontSize: 14,
     marginBottom: 6,
     marginLeft: 5,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   modalTrigger: {
     height: 50,
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 15,
-    justifyContent: 'center',
+    justifyContent: "center",
     fontSize: 16,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  pickerWrapper: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '60%',
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 15,
-    textAlign: 'center',
+    textAlign: "center",
   },
-  optionsScrollView: {
+  optionsView: {
     maxHeight: 200,
     marginBottom: 15,
   },
@@ -163,7 +140,7 @@ const styles = StyleSheet.create({
     height: 1,
   },
   modalButton: {
-    width: '100%',
-    marginBottom: Platform.OS === 'ios' ? 15 : 40,
+    width: "100%",
+    marginBottom: Platform.OS === "ios" ? 15 : 40,
   },
 });
