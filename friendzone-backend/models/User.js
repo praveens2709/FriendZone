@@ -8,15 +8,20 @@ const userSchema = new mongoose.Schema({
   otpExpires: Date,
   theme: { type: String, default: 'light' },
 
-  // Profile Fields
   firstName: String,
   lastName: String,
   gender: String,
   dob: Date,
   bio: String,
   phone: String,
-  profileImage: String,        // Single main profile image
-  additionalImages: [String],  // Future support for gallery
+  profileImage: String,
+  additionalImages: [String],
+  isPrivate: { type: Boolean, default: false },
+
+  chats: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Chat',
+  }],
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

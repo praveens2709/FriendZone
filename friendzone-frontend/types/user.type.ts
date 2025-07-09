@@ -12,6 +12,7 @@ export interface User {
   bio?: string;
   theme: string;
   isVerified: boolean;
+  isPrivate: boolean;
   createdAt: string;
   updatedAt: string;
   __v?: number;

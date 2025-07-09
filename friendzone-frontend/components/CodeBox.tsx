@@ -22,7 +22,7 @@ const CodeBox = forwardRef<TextInput, CodeBoxProps>(
           styles.codeBox,
           {
             backgroundColor: showPlaceholder ? colors.background : colors.primary,
-            color: showPlaceholder ? colors.textSecondary : colors.text,
+            color: showPlaceholder ? colors.textSecondary : (colors.isDark ? colors.text : "#FFF"),
             borderColor: isActive ? colors.primary : `${colors.border}30`,
             borderWidth: 2,
           },

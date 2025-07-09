@@ -38,7 +38,7 @@ export default function ProfileDetailsScreen() {
     },
   });
 
-  const selectedProfileImageUri = watch("profileImage");
+  const selectedProfileImage = watch("profileImage");
 
   const maxDate = new Date();
   maxDate.setFullYear(maxDate.getFullYear() - 18);
@@ -82,7 +82,7 @@ export default function ProfileDetailsScreen() {
             render={({ field: { onChange, value } }) => (
               <ThemedView style={styles.textBoxContainer}>
                 <ImagePickerComponent
-                  currentImageUri={selectedProfileImageUri}
+                  currentImageUri={selectedProfileImage}
                   onImageSelected={(uri) => onChange(uri)}
                 />
                 {errors.profileImage && (

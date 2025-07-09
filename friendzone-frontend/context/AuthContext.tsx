@@ -1,4 +1,3 @@
-// context/AuthContext.tsx
 import React, {
   createContext,
   useState,
@@ -27,9 +26,10 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   updateUserTheme: (theme: ThemeType) => Promise<void>;
-  user: User | null;
+  user: User | null; // <-- Ensure user is here
   loadUserProfile: () => Promise<void>;
   updateProfile: (data: any) => Promise<void>;
+  accessToken: string | null; // <-- Ensure accessToken is here
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -47,6 +47,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   const setThemeFromStore = useThemeStore((state) => state.setTheme);
   const availableThemes = useThemeStore((state) => state.availableThemes);
@@ -56,41 +57,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const storedSessionString = await getAuthSession();
         if (!storedSessionString) {
-          console.log("[AuthContext] No stored session found.");
           setIsAuthenticated(false);
+          setAccessToken(null);
           return;
         }
 
         const parsedSession: AuthSession = JSON.parse(storedSessionString);
         setSession(parsedSession);
+        setAccessToken(parsedSession.accessToken || null);
 
         if (
           parsedSession.theme &&
           availableThemes.includes(parsedSession.theme as ThemeType)
         ) {
           setThemeFromStore(parsedSession.theme as ThemeType);
-          console.log(
-            `[AuthContext] Applied theme from stored session: ${parsedSession.theme}`
-          );
-        } else {
-          console.log(
-            "[AuthContext] Stored session has no theme or invalid theme. Keeping existing theme."
-          );
         }
 
         try {
-          await loadUserProfile();
-          console.log("[AuthContext] User profile loaded successfully.");
+          // Pass accessToken to loadUserProfile for consistency if it relies on it
+          await loadUserProfile(parsedSession.accessToken);
           setIsAuthenticated(true);
         } catch {
-          console.log(
-            "[AuthContext] Invalid session or user deleted. Logging out."
-          );
           await signOut();
         }
       } catch (err) {
-        console.error("Error loading auth session:", err);
         setIsAuthenticated(false);
+        setAccessToken(null);
       } finally {
         setAuthLoading(false);
       }
@@ -98,42 +90,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [setThemeFromStore, availableThemes]);
 
   const signIn = async (sessionData: AuthSession) => {
-    console.log("[AuthContext] Signing in with session data:", sessionData);
     await storeAuthSession(sessionData);
     await AsyncStorage.setItem("userToken", sessionData.accessToken);
-    const check = await getAuthSession();
-    console.log("[AuthContext] Session written to storage?", !!check);
     setSession(sessionData);
+    setAccessToken(sessionData.accessToken || null);
     setIsAuthenticated(true);
     if (
       sessionData.theme &&
       availableThemes.includes(sessionData.theme as ThemeType)
     ) {
       setThemeFromStore(sessionData.theme as ThemeType);
-      console.log(
-        `[AuthContext] Applied theme from sign-in: ${sessionData.theme}`
-      );
-    } else {
-      console.log(
-        "[AuthContext] Sign-in session has no theme or invalid theme. Keeping existing theme."
-      );
     }
-    await loadUserProfile();
+    // Pass accessToken to loadUserProfile for consistency
+    await loadUserProfile(sessionData.accessToken);
   };
 
   const signOut = async () => {
-    console.log("[AuthContext] Signing out.");
     await removeAuthSession();
     await removeFilterSettings();
     await AsyncStorage.removeItem("userToken");
     setSession(null);
+    setAccessToken(null);
     setIsAuthenticated(false);
     setUser(null);
   };
 
   const signUp = async (email: string, password: string) => {
     await AuthServices.signUp({ email, password });
-    console.log("[AuthContext] User signed up.");
   };
 
   const updateUserTheme = async (theme: ThemeType) => {
@@ -147,32 +130,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSession(updatedSession);
       await storeAuthSession(updatedSession);
       setThemeFromStore(theme);
-
-      console.log(`[AuthContext] User theme updated to: ${theme}`);
     } catch (error) {
-      console.error("Failed to update user theme:", error);
       throw error;
     }
   };
 
-  const loadUserProfile = async () => {
+  // --- MODIFIED loadUserProfile to accept token ---
+  const loadUserProfile = async (tokenOverride?: string | null) => {
+    const token = tokenOverride || (await AsyncStorage.getItem("userToken"));
     try {
-      const token = await AsyncStorage.getItem("userToken");
-      console.log("[AuthContext] userToken from AsyncStorage:", token);
       if (token) {
-        const user = await ProfileServices.getProfile();
-        console.log("[AuthContext] Loaded user profile:", user);
-        setUser(user);
+        const userProfile = await ProfileServices.getProfile(token);
+        setUser(userProfile);
       }
     } catch (error: any) {
-      console.error("Failed to load user profile:", error);
       await signOut();
       throw error;
     }
   };
+  // ------------------------------------------------
 
   const updateProfile = async (profileData: any) => {
     try {
+      if (!accessToken) {
+        throw new Error("No access token available for profile update.");
+      }
+
       const formData = new FormData();
       formData.append("firstName", profileData.firstName);
       formData.append("lastName", profileData.lastName);
@@ -183,20 +166,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           : new Date(profileData.dob);
       formData.append("dob", dob.toISOString().split("T")[0]);
 
-      if (profileData.profileImageUri) {
-        const uriParts = profileData.profileImageUri.split(".");
-        const fileType = uriParts[uriParts.length - 1];
+      if (profileData.profileImage) {
+        const uriParts = profileData.profileImage.split(".");
+        const fileType = uriParts[uriParts.length - 1]; // Typo fix: uriuriParts -> uriParts
         const fileName = `profile.${fileType}`;
         formData.append("profileImage", {
-          uri: profileData.profileImageUri,
+          uri: profileData.profileImage,
           name: fileName,
           type: `image/${fileType}`,
         } as any);
       }
 
-      const response = await ProfileServices.updateProfile(formData);
+      // --- PASS accessToken HERE ---
+      const response = await ProfileServices.updateProfile(formData, accessToken);
+      // -----------------------------
       setUser(response.user);
-      await loadUserProfile();
+      // Removed loadUserProfile() here to avoid redundant fetch, as response already has updated user.
     } catch (error) {
       console.error("Failed to update profile:", error);
       throw new Error("Failed to update profile");
@@ -213,9 +198,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signOut,
         signUp,
         updateUserTheme,
-        user,
+        user, // <-- Provided directly
         loadUserProfile,
         updateProfile,
+        accessToken, // <-- Provided directly
       }}
     >
       {children}

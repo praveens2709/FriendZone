@@ -38,7 +38,7 @@ export default function AuthChoiceScreen() {
         <Divider text="or continue with" />
 
         <ThemedView style={styles.buttonGroup}>
-          <Button title="Continue with Google" onPress={() => router.push("/(onboarding)/profile-details")} />
+          <Button title="Continue with Google" onPress={() => router.push("/(auth)/verify-otp")} />
           {Platform.OS === "ios" && (
             <Button title="Continue with Apple" onPress={handleAppleSignIn} />
           )}

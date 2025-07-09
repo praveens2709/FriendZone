@@ -26,10 +26,7 @@ export default function HomeScreen() {
       <CommonHeader
         leftContent={<ThemedText style={styles.title}>FriendZone</ThemedText>}
         rightContent1={
-          <TouchableOpacity
-            onPress={() => {
-            }}
-          >
+          <TouchableOpacity onPress={() => router.push("/(notifications)")}>
             <Ionicons name="heart-outline" size={24} color={colors.text} />
           </TouchableOpacity>
         }

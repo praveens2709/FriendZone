@@ -34,31 +34,30 @@ export default function CommonHeader({
         style,
       ]}
     >
-        <View style={styles.headerContent}>
-          <View style={styles.leftContainer}>{leftContent}</View>
-
-          <View
-            style={[
-              styles.centerContainer,
-              titleComponent ? styles.centerContainerLeftAligned : styles.centerContainerCentered,
-            ]}
-          >
-            {titleComponent ? (
-              titleComponent
-            ) : (
-              title && (
-                <ThemedText type="subtitle" style={[styles.titleText, { color: colors.text }]}>
-                  {title}
-                </ThemedText>
-              )
-            )}
-          </View>
-
-          <View style={styles.rightContainer}>
-            {rightContent1}
-            {rightContent2}
-          </View>
+      <View style={styles.headerContentWrapper}>
+        <View style={styles.leftContainer}>{leftContent}</View>
+        <View style={styles.rightContainer}>
+          {rightContent1}
+          {rightContent2}
         </View>
+      </View>
+      <View
+        style={[
+          styles.absoluteCenterContainer,
+          titleComponent ? styles.centerContainerLeftAligned : styles.centerContainerCentered,
+        ]}
+        pointerEvents="box-none"
+      >
+        {titleComponent ? (
+          titleComponent
+        ) : (
+          title && (
+            <ThemedText type="subtitle" style={[styles.titleText, { color: colors.text }]}>
+              {title}
+            </ThemedText>
+          )
+        )}
+      </View>
     </ThemedView>
   );
 }
@@ -68,15 +67,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     minHeight: 50,
-    overflow: 'visible',
+    overflow: 'hidden',
+    alignItems: 'center',
   },
   headerBorder: {
     borderBottomWidth: 1,
   },
-  headerContent: {
+  headerContentWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    width: '100%',
   },
   leftContainer: {
     flexDirection: 'row',
@@ -84,18 +85,6 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     flexGrow: 0,
     justifyContent: 'flex-start',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  centerContainerLeftAligned: {
-    alignItems: 'flex-start',
-    marginLeft: 15,
-    marginRight: 10,
-  },
-  centerContainerCentered: {
-    alignItems: 'center',
   },
   titleText: {
     fontWeight: 'bold',
@@ -107,5 +96,22 @@ const styles = StyleSheet.create({
     flexGrow: 0,
     justifyContent: 'flex-end',
     gap: 15,
+  },
+  absoluteCenterContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  centerContainerLeftAligned: {
+    alignItems: 'flex-start',
+    marginLeft: 60,
+    marginRight: 10,
+  },
+  centerContainerCentered: {
+    alignItems: 'center',
   },
 });

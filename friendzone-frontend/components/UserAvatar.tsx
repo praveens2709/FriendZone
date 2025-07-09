@@ -6,7 +6,7 @@ import { useTheme } from "@/context/ThemeContext";
 interface UserAvatarProps {
   imageUri?: string | null;
   size?: number;
-  style?: ViewStyle;
+  style?: ViewStyle | ViewStyle[];
 }
 
 const UserAvatar: React.FC<UserAvatarProps> = ({ imageUri, size = 112, style }) => {

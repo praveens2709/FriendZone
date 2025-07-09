@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+// app/(chat)/[id].tsx
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -8,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/context/ThemeContext';
@@ -18,32 +20,148 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import CommonHeader from '@/components/CommonHeader';
 import ThemedSafeArea from '@/components/ThemedSafeArea';
 import BackButton from '@/components/BackButton';
-import { mockChatPreviews, mockChatMessages, ChatMessage } from '@/utils/mockChats';
+import ChatService, { MessageResponse } from '@/services/ChatService';
+import { useAuth } from '@/context/AuthContext';
+import { useSocket } from '@/context/SocketContext';
+import { useLoadingDialog } from '@/context/LoadingContext';
 import { formatMessageDateLabel } from '@/constants/Functions';
 
 export default function ChatMessagesScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id: chatId, chatName, chatAvatar } = useLocalSearchParams<{ id: string; chatName?: string; chatAvatar?: string }>();
+  const { accessToken, user } = useAuth();
+  const { socket } = useSocket();
+  const loadingDialog = useLoadingDialog();
 
   const [messageText, setMessageText] = useState('');
-  const flatListRef = useRef<FlatList>(null);
-
-  const chatDetails = mockChatPreviews.find(chat => chat.id === id);
-  const [currentMessages, setCurrentMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<MessageResponse[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const flatListRef = useRef<FlatList<MessageResponse>>(null);
+  const isFetchingMoreRef = useRef(false);
+  const [chatHeaderName, setChatHeaderName] = useState(chatName || 'Chat');
+  const [chatHeaderAvatar, setChatHeaderAvatar] = useState(chatAvatar || 'https://i.pravatar.cc/100');
 
   useEffect(() => {
-    const messagesForChat = mockChatMessages[id as string] || [];
-    setCurrentMessages(messagesForChat);
-  }, [id]);
+    const fetchChatDetails = async () => {
+      if (!chatId || !accessToken) return;
+      try {
+        const chatDetail = await ChatService.getChatDetails(chatId, accessToken);
+        if (chatDetail) {
+          setChatHeaderName(chatDetail.name);
+          setChatHeaderAvatar(chatDetail.avatar || `https://ui-avatars.com/api/?name=${chatDetail.name}`);
+        }
+      } catch (error) {
+      }
+    };
 
-  useEffect(() => {
-    if (flatListRef.current) {
-      flatListRef.current.scrollToEnd({ animated: false });
+    if (!chatName || !chatAvatar) {
+      fetchChatDetails();
     }
-  }, [currentMessages.length]);
+  }, [chatId, accessToken, chatName, chatAvatar]);
 
-  if (!chatDetails) {
+  const fetchMessages = useCallback(async (pageNum: number, initialLoad: boolean = false) => {
+    if (!accessToken || !chatId) return;
+
+    if (initialLoad) loadingDialog.show();
+    isFetchingMoreRef.current = true;
+    try {
+      const response = await ChatService.getChatMessages(chatId, accessToken, pageNum);
+      if (pageNum === 1) {
+        setMessages(response.messages.reverse());
+      } else {
+        setMessages(prevMessages => [...response.messages.reverse(), ...prevMessages]);
+      }
+      setTotalPages(response.totalPages);
+    } catch (error) {
+    } finally {
+      if (initialLoad) loadingDialog.hide();
+      setRefreshing(false);
+      isFetchingMoreRef.current = false;
+    }
+  }, [accessToken, chatId, loadingDialog]);
+
+  useEffect(() => {
+    if (chatId) {
+      fetchMessages(1, true);
+      if (socket && user?._id) {
+        socket.emit('joinChat', chatId);
+        socket.emit('markMessagesRead', { chatId: chatId, userId: user._id });
+      }
+    }
+    return () => {
+      if (socket && chatId) {
+        socket.emit('leaveChat', chatId);
+      }
+    };
+  }, [chatId, fetchMessages, socket, user?._id]);
+
+  useEffect(() => {
+    if (socket) {
+      const handleNewMessage = (newMessage: any) => {
+        if (newMessage.chat.toString() === chatId) {
+          setMessages(prevMessages => {
+            const isDuplicate = prevMessages.some(msg => msg.id === newMessage._id);
+            if (!isDuplicate) {
+                const formattedMessage: MessageResponse = {
+                    id: newMessage._id,
+                    sender: newMessage.sender === user?._id ? 'me' : 'other',
+                    text: newMessage.text,
+                    timestamp: newMessage.timestamp,
+                    read: newMessage.readBy.includes(user?._id),
+                };
+                return [...prevMessages, formattedMessage];
+            }
+            return prevMessages;
+          });
+          if (user?._id) {
+            socket.emit('markMessagesRead', { chatId: chatId, userId: user._id });
+          }
+        }
+      };
+
+      const handleMessagesRead = ({ chatId: readChatId, userId: readerId }: { chatId: string, userId: string }) => {
+        if (readChatId === chatId) {
+          setMessages(prevMessages =>
+            prevMessages.map(msg =>
+              msg.sender === 'me' && msg.read === false ? { ...msg, read: true } : msg
+            )
+          );
+        }
+      };
+
+      socket.on('newMessage', handleNewMessage);
+      socket.on('messagesRead', handleMessagesRead);
+
+      return () => {
+        socket.off('newMessage', handleNewMessage);
+        socket.off('messagesRead', handleMessagesRead);
+      };
+    }
+  }, [socket, chatId, user?._id]);
+
+  useEffect(() => {
+    if (messages.length > 0 && !isFetchingMoreRef.current) {
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    }
+  }, [messages.length]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setPage(1);
+    fetchMessages(1);
+  }, [fetchMessages]);
+
+  const handleLoadOlderMessages = () => {
+    if (page < totalPages && !isFetchingMoreRef.current) {
+      setPage(prevPage => prevPage + 1);
+      fetchMessages(page + 1);
+    }
+  };
+
+  if (!chatId) {
     return (
       <LinearGradient colors={colors.gradient} style={styles.container}>
         <ThemedSafeArea style={styles.safeArea}>
@@ -59,20 +177,26 @@ export default function ChatMessagesScreen() {
   }
 
   const handleSendMessage = () => {
-    if (messageText.trim().length === 0) return;
+    if (messageText.trim().length === 0 || !socket || !user?._id || !chatId) return;
 
-    const newMessage: ChatMessage = {
-      id: `msg${Date.now()}`,
+    socket.emit('sendMessage', {
+      chatId: chatId,
+      senderId: user._id,
+      text: messageText.trim(),
+    });
+
+    const tempMessage: MessageResponse = {
+      id: `temp-${Date.now()}`,
       sender: 'me',
       text: messageText.trim(),
       timestamp: new Date().toISOString(),
       read: false,
     };
-    setCurrentMessages(prevMessages => [...prevMessages, newMessage]);
+    setMessages(prevMessages => [...prevMessages, tempMessage]);
     setMessageText('');
   };
 
-  const renderMessage = ({ item, index }: { item: ChatMessage; index: number }) => {
+  const renderMessage = ({ item, index }: { item: MessageResponse; index: number }) => {
     const isMyMessage = item.sender === 'me';
 
     let showDateLabel = false;
@@ -87,7 +211,7 @@ export default function ChatMessagesScreen() {
         showDateLabel = true;
         dateLabel = formatMessageDateLabel(item.timestamp);
       } else {
-        const prevMessage = currentMessages[index - 1];
+        const prevMessage = messages[index - 1];
         const prevMessageDate = new Date(prevMessage.timestamp);
         if (!isNaN(prevMessageDate.getTime()) && currentMessageDate.toDateString() !== prevMessageDate.toDateString()) {
           showDateLabel = true;
@@ -135,13 +259,13 @@ export default function ChatMessagesScreen() {
         leftContent={<BackButton color={colors.text}/>}
         titleComponent={
           <View style={styles.headerTitleContainer}>
-            <Image source={{ uri: chatDetails.avatar }} style={[styles.headerAvatar, {borderColor: colors.border}]} />
+            <Image source={{ uri: chatHeaderAvatar }} style={[styles.headerAvatar, {borderColor: colors.border}]} />
             <ThemedText
               style={[styles.headerTitleText, {color: colors.text}]}
               numberOfLines={1}
               ellipsizeMode="tail"
             >
-              {chatDetails.name}
+              {chatHeaderName}
             </ThemedText>
           </View>
         }
@@ -161,6 +285,7 @@ export default function ChatMessagesScreen() {
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <LinearGradient
           colors={colors.gradient}
@@ -168,14 +293,38 @@ export default function ChatMessagesScreen() {
         >
           <FlatList
             ref={flatListRef}
-            data={currentMessages}
+            data={messages}
             renderItem={renderMessage}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item, index) => item.id + index}
             contentContainerStyle={styles.messagesList}
+            onEndReached={handleLoadOlderMessages}
+            onEndReachedThreshold={0.5}
+            inverted={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={colors.primary}
+              />
+            }
+            ListEmptyComponent={() => (
+              <ThemedView style={styles.emptyListContainer}>
+                <ThemedText style={{ color: colors.textDim, fontSize: 16 }}>
+                  Say hello! 👋 No messages yet.
+                </ThemedText>
+              </ThemedView>
+            )}
+            ListHeaderComponent={() => (
+              !loadingDialog.visible && page < totalPages && (
+                <View style={styles.loadingMoreContainer}>
+                  <ThemedText style={{ color: colors.textDim }}>Loading older messages...</ThemedText>
+                </View>
+              )
+            )}
           />
         </LinearGradient>
 
-        <ThemedView style={[styles.inputArea, { backgroundColor: "transparent", borderColor: colors.border }]}>
+        <ThemedView style={[styles.inputArea, { backgroundColor: "transparent", borderTopColor: colors.border }]}>
           <TouchableOpacity style={styles.inputIconButton}>
             <Feather name="plus" size={24} color={colors.text} />
           </TouchableOpacity>
@@ -191,7 +340,7 @@ export default function ChatMessagesScreen() {
             <Ionicons
               name={messageText.trim().length > 0 ? "send" : "mic"}
               size={24}
-              color={messageText.trim().length > 0 ? colors.text : colors.text}
+              color={messageText.trim().length > 0 ? colors.primary : colors.text}
             />
           </TouchableOpacity>
         </ThemedView>
@@ -203,7 +352,6 @@ export default function ChatMessagesScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    // backgroundColor: 'transparent',
   },
   keyboardAvoidingContainer: {
     flex: 1,
@@ -218,6 +366,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  emptyListContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50,
     backgroundColor: 'transparent',
   },
   headerTitleContainer: {
@@ -313,5 +468,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     maxHeight: 120,
     marginHorizontal: 8,
+  },
+  loadingMoreContainer: {
+    alignItems: 'center',
+    paddingVertical: 10,
   },
 });

@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 import { LoadingDialogProvider } from "@/context/LoadingContext";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { SocketProvider } from "@/context/SocketContext"; // Import SocketProvider
 import { StyleSheet, View, ActivityIndicator } from "react-native";
 import React from "react";
 import Toast from "react-native-toast-message";
@@ -61,7 +62,10 @@ export default function RootLayout() {
       <ThemeProvider>
         <LoadingDialogProvider>
           <AuthProvider>
-            <RootLayoutContent />
+            {/* Wrap RootLayoutContent with SocketProvider */}
+            <SocketProvider>
+              <RootLayoutContent />
+            </SocketProvider>
           </AuthProvider>
         </LoadingDialogProvider>
       </ThemeProvider>

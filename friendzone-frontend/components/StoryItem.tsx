@@ -29,7 +29,9 @@ export default function StoryItem({
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
 
   const handlePress = () => {
-    if (!item.isOwnStory) {
+    if (item.isOwnStory) {
+      router.push(`/(stories)/${item.id}`);
+    } else {
       router.push(`/(stories)/${item.id}`);
     }
   };
@@ -40,7 +42,6 @@ export default function StoryItem({
 
   return (
     <Pressable
-      disabled={item.isOwnStory}
       onPressIn={() => {
         Animated.spring(scaleAnim, {
           toValue: 0.92,
