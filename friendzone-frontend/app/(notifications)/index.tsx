@@ -4,7 +4,6 @@ import {
   TouchableOpacity,
   FlatList,
   View,
-  Image,
   ActivityIndicator,
   RefreshControl,
   Alert,
@@ -14,27 +13,40 @@ import { useTheme } from "@/context/ThemeContext";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import CommonHeader from "@/components/CommonHeader";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import BackButton from "@/components/BackButton";
 import NotificationService, {
   NotificationResponse,
 } from "@/services/NotificationService";
+import KnockService, { KnockRequest } from "@/services/knockService";
 import { useSocket } from "@/context/SocketContext";
+import { useAuth } from "@/context/AuthContext";
 import {
   formatNotificationDateGroup,
   formatNotificationTimestamp,
+  getUserAvatar,
+  showToast,
 } from "@/constants/Functions";
 import UserAvatar from "@/components/UserAvatar";
-import KnockService, { KnockRequest } from "@/services/knockService";
-import { useAuth } from "@/context/AuthContext";
 
 type KnockNotification = NotificationResponse & {
-  type: "knock";
+  type: "knock" | "activity";
   user: { id: string; username: string; avatar: string };
-  knockStatus?: "pending" | "lockedIn";
+  knockStatus?: "pending" | "lockedIn" | "onesidedlock" | "declined";
   content: string;
+};
+
+const buildKnockRequestDisplay = (requests: KnockRequest[]) => {
+  const count = requests.length;
+  const avatar1Uri = requests[0]?.user?.avatar || null;
+  const avatar2Uri = requests[1]?.user?.avatar || null;
+  const message =
+    count === 0
+      ? "No new knocks yet."
+      : `${count} new knock${count > 1 ? "s" : ""}`;
+  return { count, avatar1Uri, avatar2Uri, message };
 };
 
 export default function NotificationsScreen() {
@@ -51,20 +63,20 @@ export default function NotificationsScreen() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [unreadCount, setUnreadCount] = useState(0);
-
   const [pendingKnockRequestsData, setPendingKnockRequestsData] = useState<
     KnockRequest[]
   >([]);
+
   const privateKnockRequestsCount = pendingKnockRequestsData.length;
 
+  const knockRequestDisplay = useMemo(
+    () => buildKnockRequestDisplay(pendingKnockRequestsData),
+    [pendingKnockRequestsData]
+  );
+
   const fetchNotifications = useCallback(
-    async (pageNum: number, isRefreshing: boolean = false) => {
-      if (!accessToken) {
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
+    async (pageNum: number, isRefreshing = false) => {
+      if (!accessToken) return;
 
       if (isRefreshing) {
         setRefreshing(true);
@@ -74,36 +86,32 @@ export default function NotificationsScreen() {
       }
 
       try {
-        const notificationResponse =
-          await NotificationService.getUserNotifications(accessToken, pageNum);
+        const res = await NotificationService.getUserNotifications(
+          accessToken,
+          pageNum
+        );
+        setNotifications((prev) =>
+          pageNum === 1
+            ? res.notifications
+            : [
+                ...prev,
+                ...res.notifications.filter(
+                  (n) => !prev.some((p) => p.id === n.id)
+                ),
+              ]
+        );
 
-        setNotifications((prev) => {
-          if (pageNum === 1) {
-            return notificationResponse.notifications;
-          }
-          const newNotifications = notificationResponse.notifications.filter(
-            (newNotif) =>
-              !prev.some((existingNotif) => existingNotif.id === newNotif.id)
-          );
-          return [...prev, ...newNotifications];
-        });
-        setTotalPages(notificationResponse.totalPages);
-        setHasMore(pageNum < notificationResponse.totalPages);
-
-        if (pageNum === 1) {
-          const initialUnread = notificationResponse.notifications.filter(
-            (n) => !n.isRead
-          ).length;
-          setUnreadCount(initialUnread);
-        }
+        setTotalPages(res.totalPages);
+        setHasMore(pageNum < res.totalPages);
 
         if (user?.isPrivate) {
-          const requests = await KnockService.getKnockers(accessToken);
-          setPendingKnockRequestsData(requests);
+          const knockers = await KnockService.getKnockers(accessToken);
+          setPendingKnockRequestsData(
+            knockers.filter((k) => k.status === "pending")
+          );
         }
       } catch (error) {
-        Alert.alert("Error", "Failed to load notifications.");
-        setHasMore(false);
+        showToast("error", "Failed to load notifications.");
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -112,228 +120,255 @@ export default function NotificationsScreen() {
     [accessToken, user?.isPrivate]
   );
 
-  useEffect(() => {
-    fetchNotifications(1, false);
-  }, [fetchNotifications]);
-
-  const onRefresh = useCallback(() => {
-    fetchNotifications(1, true);
-  }, [fetchNotifications]);
-
-  const handleLoadMore = () => {
-    if (hasMore && !loading && !refreshing) {
-      setPage((prevPage) => prevPage + 1);
-      fetchNotifications(page + 1);
+  const markAllNotificationsAsRead = useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      await NotificationService.markAllNotificationsAsRead(accessToken);
+      setNotifications((prev) => prev.map((notif) => ({ ...notif, isRead: true })));
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
     }
-  };
+  }, [accessToken]);
 
-  const markNotificationAsRead = useCallback(
-    async (notificationId: string) => {
-      if (!accessToken) {
-        return;
-      }
-      try {
-        await NotificationService.markNotificationAsRead(
-          notificationId,
-          accessToken
-        );
-        setNotifications((prev) =>
-          prev.map((n) =>
-            n.id === notificationId ? { ...n, isRead: true } : n
-          )
-        );
-        setUnreadCount((prev) => Math.max(0, prev - 1));
-      } catch (error) {
-        console.error(
-          `Failed to mark notification ${notificationId} as read:`,
-          error
-        );
-      }
-    },
-    [accessToken]
+  useFocusEffect(
+    useCallback(() => {
+      fetchNotifications(1);
+      markAllNotificationsAsRead();
+      return () => {};
+    }, [fetchNotifications, markAllNotificationsAsRead])
   );
 
   useEffect(() => {
-    setUnreadCount(notifications.filter((n) => !n.isRead).length);
-  }, [notifications]);
+    if (page > 1) {
+      fetchNotifications(page);
+    }
+  }, [page, fetchNotifications]);
 
   useEffect(() => {
-    if (socket) {
-      const handleNewNotification = (newNotification: NotificationResponse) => {
-        setNotifications((prev) => {
-          if (!prev.some((n) => n.id === newNotification.id)) {
-            return [newNotification, ...prev];
-          }
-          return prev;
-        });
+    if (!socket) return;
 
-        if (
-          newNotification.type === "knock" &&
-          user?.isPrivate &&
-          (newNotification as KnockNotification).knockStatus === "pending"
-        ) {
-          if (accessToken) {
-            KnockService.getKnockers(accessToken)
-              .then(setPendingKnockRequestsData)
-              .catch(console.error);
-          }
-        }
-      };
+    const handleNewNotification = (n: NotificationResponse) => {
+      setNotifications((prev) =>
+        prev.some((p) => p.id === n.id) ? prev : [n, ...prev]
+      );
+      if (
+        n.type === "activity" &&
+        n.relatedEntityType === "Knock" &&
+        n.knockStatus === "pending" &&
+        user?.isPrivate
+      ) {
+        KnockService.getKnockers(accessToken!)
+          .then((reqs) =>
+            setPendingKnockRequestsData(
+              reqs.filter((r) => r.status === "pending")
+            )
+          )
+          .catch(console.error);
+      }
+    };
 
-      socket.on("newNotification", handleNewNotification);
+    const handleNewKnockRequest = (knock: KnockRequest) => {
+      setPendingKnockRequestsData((prev) =>
+        knock.status === "pending" && !prev.some((r) => r.id === knock.id)
+          ? [knock, ...prev]
+          : prev
+      );
+    };
 
-      return () => {
-        socket.off("newNotification", handleNewNotification);
-      };
-    }
-  }, [socket, user?.isPrivate, accessToken]);
+    const handleKnockRequestRemoved = (id: string) =>
+      setPendingKnockRequestsData((prev) => prev.filter((r) => r.id !== id));
 
-  const knockRequestDisplay = useMemo(() => {
-    const count = privateKnockRequestsCount;
-    let avatar1Uri: string | null = null;
-    let avatar2Uri: string | null = null;
-    let message = "No new knocks yet.";
+    const handleKnockStatusUpdate = ({
+      knockId,
+      newStatus,
+    }: {
+      knockId: string;
+      newStatus: string;
+    }) => {
+      if (newStatus !== "pending") {
+        setPendingKnockRequestsData((prev) =>
+          prev.filter((r) => r.id !== knockId)
+        );
+      }
 
-    const pendingKnocksForAvatars = pendingKnockRequestsData;
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.relatedEntityId === knockId && n.relatedEntityType === "Knock"
+            ? ({ ...n, knockStatus: newStatus } as NotificationResponse)
+            : n
+        )
+      );
+    };
 
-    if (count === 1) {
-      avatar1Uri = pendingKnocksForAvatars[0]?.user?.avatar || null;
-      message = "1 new knock";
-    } else if (count > 1) {
-      avatar1Uri = pendingKnocksForAvatars[0]?.user?.avatar || null;
-      avatar2Uri = pendingKnocksForAvatars[1]?.user?.avatar || null;
-      message = `${count} new knocks`;
-    }
-    return { count, avatar1Uri, avatar2Uri, message };
-  }, [privateKnockRequestsCount, pendingKnockRequestsData]);
+    socket.on("newNotification", handleNewNotification);
+    socket.on("newKnockRequest", handleNewKnockRequest);
+    socket.on("knockRequestRemoved", handleKnockRequestRemoved);
+    socket.on("knockStatusUpdate", handleKnockStatusUpdate);
+
+    return () => {
+      socket.off("newNotification", handleNewNotification);
+      socket.off("newKnockRequest", handleNewKnockRequest);
+      socket.off("knockRequestRemoved", handleKnockRequestRemoved);
+      socket.off("knockStatusUpdate", handleKnockStatusUpdate);
+    };
+  }, [socket, accessToken, user?.isPrivate]);
 
   const groupedNotifications = useMemo(() => {
-    const filteredNotifications = notifications.filter(
-      (notif) =>
-        !(
-          notif.type === "knock" &&
-          (notif as KnockNotification).knockStatus === "pending"
-        )
-    );
-
-    const groups = filteredNotifications.reduce((acc, notif) => {
-      const group = formatNotificationDateGroup(notif.timestamp);
-      if (!acc[group]) {
-        acc[group] = [];
-      }
-      acc[group].push(notif);
-      return acc;
-    }, {} as Record<string, NotificationResponse[]>);
-    return groups;
+    return notifications
+      .filter(
+        (n) =>
+          !(
+            n.type === "activity" &&
+            n.relatedEntityType === "Knock" &&
+            n.knockStatus === "pending"
+          )
+      )
+      .reduce((acc, notif) => {
+        const group = formatNotificationDateGroup(notif.timestamp);
+        acc[group] = acc[group] || [];
+        acc[group].push(notif);
+        return acc;
+      }, {} as Record<string, NotificationResponse[]>);
   }, [notifications]);
 
   const sortedGroups = useMemo(() => {
-    const defaultOrder = [
+    const order = [
       "Today",
       "Yesterday",
       "Last 7 Days",
       "Last 30 Days",
       "Older",
     ];
-    let sorted = defaultOrder.filter(
-      (group) =>
-        groupedNotifications[group] && groupedNotifications[group].length > 0
+    const available = order.filter(
+      (group) => groupedNotifications[group]?.length
     );
-    if (
-      groupedNotifications["Invalid Date"] &&
-      groupedNotifications["Invalid Date"].length > 0
-    ) {
-      sorted.push("Invalid Date");
-    }
-    return sorted;
+    if (groupedNotifications["Invalid Date"]?.length)
+      available.push("Invalid Date");
+    return available;
   }, [groupedNotifications]);
 
-  const handleKnockBack = async (notificationId: string, knockId: string) => {
-    if (!accessToken) {
-      Alert.alert("Error", "Authentication token not found.");
-      return;
+  const onRefresh = () => fetchNotifications(1, true);
+  const handleLoadMore = () =>
+    hasMore && !loading && !refreshing && setPage((p) => p + 1);
+
+  const markNotificationAsRead = async (id: string) => {
+    if (!accessToken) return;
+    try {
+      await NotificationService.markNotificationAsRead(id, accessToken);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+      );
+    } catch (err) {
+      console.error("Mark as read failed", err);
     }
+  };
+
+  const handleKnockBack = async (notificationId: string, knockId: string) => {
+    if (!accessToken) return Alert.alert("Error", "Authentication required.");
 
     setNotifications((prev) =>
       prev.map((n) =>
         n.id === notificationId
-          ? { ...n, metadata: { ...n.metadata, knockBackState: 'knocking' } }
+          ? { ...n, metadata: { ...n.metadata, knockBackState: "knocking" } }
           : n
       )
     );
 
     try {
       await KnockService.knockBack(knockId, accessToken);
-      Alert.alert("Success", "You knocked them back! You are now LockedIn!");
-      onRefresh();
-    } catch (error: any) {
-      console.error("Error knocking back:", error);
-      Alert.alert(
-        "Error",
-        error.response?.data?.message || "Failed to knock back."
-      );
       setNotifications((prev) =>
         prev.map((n) =>
           n.id === notificationId
-            ? { ...n, metadata: { ...n.metadata, knockBackState: 'failed' } }
+            ? {
+                ...n,
+                knockStatus: "lockedIn",
+                metadata: { ...n.metadata, knockBackState: "initial" },
+              }
             : n
         )
-      )
+      );
+      showToast("success", "You knocked them back!");
+    } catch (error: any) {
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.id === notificationId
+            ? { ...n, metadata: { ...n.metadata, knockBackState: "failed" } }
+            : n
+        )
+      );
+      showToast(
+        "error",
+        error.response?.data?.message || "Failed to knock back."
+      );
     }
   };
 
-  const renderNotificationItem = ({ item }: { item: NotificationResponse }) => {
-    let message: React.ReactNode = null;
-    let avatarUrl = "";
-    let isNew = !item.isRead;
+  const renderKnockBackButton = (item: NotificationResponse) => {
+    const knockId = item.relatedEntityId;
+    const localState = item.metadata?.knockBackState || "initial";
+    const isKnocking = localState === "knocking";
+    const isLocked = item.knockStatus === "lockedIn";
+    const disabled = isKnocking || isLocked;
 
-    const sender = item.user;
-
-    if (!sender) {
-      return null;
-    }
-
-    avatarUrl = sender.avatar;
-
-    const isCurrentUserAction = user && sender.id === user._id;
-
-    const isKnockNotificationRelevantForButton =
-      item.type === "activity" && item.relatedEntityType === "Knock" &&
-      (item.content?.includes("knocked on you.") || item.content?.includes("accepted your knock request."));
-
-    const showKnockBackButton = isKnockNotificationRelevantForButton;
-
-    const localKnockBackState = item.metadata?.knockBackState || 'initial';
-    const isKnocking = localKnockBackState === 'knocking';
-    const isKnockedByBackend = item.knockStatus === 'lockedIn';
-    
-    const buttonText = isKnocking ? "Knocking..." : isKnockedByBackend ? "Knocked" : "Knock Back";
-    const isDisabled = isKnocking || isKnockedByBackend;
-    const buttonBackgroundColor = isDisabled ? colors.primary + '50' : colors.primary;
-
-
-    if (
-      item.type === "knock_accepted" ||
-      item.type === "activity" ||
-      item.type === "message"
-    ) {
-      message = (
-        <ThemedText style={styles.notificationText} numberOfLines={2} ellipsizeMode="tail">
-          {!isCurrentUserAction && (
-            <>
-              <ThemedText style={styles.notificationUsername}>
-                {sender.username}
-              </ThemedText>{" "}
-            </>
-          )}
-          <ThemedText style={styles.notificationText}>
-            {item.content}
-          </ThemedText>
+    return (
+      <TouchableOpacity
+        style={[
+          styles.knockBackButton,
+          {
+            backgroundColor: disabled ? colors.primary + "50" : colors.primary,
+          },
+        ]}
+        onPress={() => knockId && handleKnockBack(item.id, knockId)}
+        disabled={disabled}
+      >
+        <ThemedText
+          style={[styles.knockButtonText, { color: colors.buttonText }]}
+        >
+          {isKnocking ? "Knocking..." : isLocked ? "Knocked" : "Knock Back"}
         </ThemedText>
-      );
-    } else {
-      return null;
-    }
+      </TouchableOpacity>
+    );
+  };
+
+  const renderNotificationItem = ({ item }: { item: NotificationResponse }) => {
+    const sender = item.user;
+    if (!sender) return null;
+
+    const isNew = !item.isRead;
+    const isCurrentUserAction = user && sender.id === user._id;
+    const isKnockNotif =
+      item.type === "activity" &&
+      item.relatedEntityType === "Knock" &&
+      (item.content?.includes("knocked on you.") ||
+        item.content?.includes("accepted your knock request."));
+
+    const message = (
+      <ThemedText
+        style={styles.notificationText}
+        numberOfLines={2}
+        ellipsizeMode="tail"
+      >
+        {!isCurrentUserAction && (
+          <ThemedText style={styles.notificationUsername}>
+            {sender.username}
+          </ThemedText>
+        )}{" "}
+        <ThemedText style={styles.notificationText}>{item.content}</ThemedText>
+      </ThemedText>
+    );
+
+    const onPress = () => {
+      markNotificationAsRead(item.id);
+      if (item.type === "message" && item.relatedEntityId) {
+        router.push({
+          pathname: `/(chat)/${item.relatedEntityId}`,
+          params: {
+            chatName: sender.username,
+            chatAvatar: getUserAvatar(sender),
+          },
+        });
+      }
+    };
 
     return (
       <TouchableOpacity
@@ -341,50 +376,24 @@ export default function NotificationsScreen() {
           styles.notificationItem,
           isNew && { backgroundColor: colors.buttonBackgroundSecondary + "1A" },
         ]}
-        onPress={() => {
-          if (!showKnockBackButton || isDisabled) {
-            markNotificationAsRead(item.id);
-            if (item.type === "message" && item.relatedEntityId) {
-              router.push({
-                pathname: `/(chat)/${item.relatedEntityId}`,
-                params: {
-                  chatName: item.user?.username || "Chat",
-                  chatAvatar: item.user?.avatar || undefined,
-                },
-              });
-            }
-          }
-        }}
+        onPress={onPress}
       >
         <UserAvatar
-          imageUri={avatarUrl}
+          imageUri={getUserAvatar(sender)}
           size={45}
-          style={[styles.notificationAvatar, { borderColor: colors.border }]}
+          style={styles.notificationAvatar}
         />
-        <View style={styles.notificationContent}>
-          <View style={styles.notificationMessageWrapper}>
+        <ThemedView style={styles.notificationContent}>
+          <ThemedView style={styles.notificationMessageWrapper}>
             {message}
             <ThemedText
               style={[styles.notificationTimestamp, { color: colors.textDim }]}
             >
               {formatNotificationTimestamp(item.timestamp)}
             </ThemedText>
-          </View>
-          {showKnockBackButton && (
-            <TouchableOpacity
-              style={[
-                styles.knockBackButton,
-                { backgroundColor: buttonBackgroundColor },
-              ]}
-              onPress={() => item.relatedEntityId && handleKnockBack(item.id, item.relatedEntityId)}
-              disabled={isDisabled}
-            >
-              <ThemedText style={[styles.knockButtonText, {color: colors.buttonText}]}>
-                {buttonText}
-              </ThemedText>
-            </TouchableOpacity>
-          )}
-        </View>
+          </ThemedView>
+          {isKnockNotif && renderKnockBackButton(item)}
+        </ThemedView>
       </TouchableOpacity>
     );
   };
@@ -393,15 +402,15 @@ export default function NotificationsScreen() {
     <LinearGradient colors={colors.gradient} style={styles.gradientContainer}>
       <ThemedSafeArea style={styles.safeArea}>
         <CommonHeader
-          leftContent={<BackButton />}
           title="Notifications"
-          showBottomBorder={true}
+          leftContent={<BackButton />}
+          showBottomBorder
         />
 
         {loading && page === 1 && !refreshing ? (
           <ThemedView style={styles.initialLoadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <ThemedText style={{ color: colors.textDim, marginTop: 10 }}>
+            <ActivityIndicator size="small" color={colors.text} />
+            <ThemedText type="subtitle" style={{ color: colors.textDim }}>
               Loading notifications...
             </ThemedText>
           </ThemedView>
@@ -413,18 +422,13 @@ export default function NotificationsScreen() {
                   styles.friendRequestsContainer,
                   { backgroundColor: colors.buttonBackgroundSecondary },
                 ]}
-                onPress={() => {
-                  router.push("/(notifications)/requests");
-                }}
+                onPress={() => router.push("/(notifications)/requests")}
               >
-                <View
+                <ThemedView
                   style={[
                     styles.friendRequestAvatars,
                     knockRequestDisplay.count === 0 &&
                       styles.noRequestsAvatarWrapper,
-                    knockRequestDisplay.count === 1 &&
-                      styles.singleAvatarWrapper,
-                    knockRequestDisplay.count >= 2 && styles.multiAvatarMargin,
                   ]}
                 >
                   {knockRequestDisplay.count === 1 ? (
@@ -440,13 +444,11 @@ export default function NotificationsScreen() {
                         size={40}
                         style={styles.friendRequestAvatar1}
                       />
-                      {knockRequestDisplay.avatar2Uri ? (
-                        <UserAvatar
-                          imageUri={knockRequestDisplay.avatar2Uri}
-                          size={40}
-                          style={styles.friendRequestAvatar2}
-                        />
-                      ) : null}
+                      <UserAvatar
+                        imageUri={knockRequestDisplay.avatar2Uri}
+                        size={40}
+                        style={styles.friendRequestAvatar2}
+                      />
                     </>
                   ) : (
                     <UserAvatar
@@ -455,8 +457,8 @@ export default function NotificationsScreen() {
                       style={styles.noRequestsUserAvatar}
                     />
                   )}
-                </View>
-                <View style={styles.friendRequestTextContent}>
+                </ThemedView>
+                <ThemedView style={styles.friendRequestTextContent}>
                   <ThemedText style={styles.friendRequestTitle}>
                     Knock Requests
                   </ThemedText>
@@ -468,7 +470,7 @@ export default function NotificationsScreen() {
                   >
                     {knockRequestDisplay.message}
                   </ThemedText>
-                </View>
+                </ThemedView>
                 <Ionicons
                   name="chevron-forward"
                   size={24}
@@ -476,47 +478,41 @@ export default function NotificationsScreen() {
                 />
               </TouchableOpacity>
             )}
+
             <FlatList
               data={sortedGroups}
               keyExtractor={(item) => item}
-              renderItem={({ item: groupName }) => (
-                <View>
+              renderItem={({ item: group }) => (
+                <ThemedView>
                   <ThemedText
                     style={[styles.sectionHeader, { color: colors.text }]}
                   >
-                    {groupName}
+                    {group}
                   </ThemedText>
-                  {groupedNotifications[groupName]?.map((notificationItem) => (
-                    <View key={notificationItem.id}>
-                      {renderNotificationItem({ item: notificationItem })}
-                    </View>
+                  {groupedNotifications[group]?.map((n) => (
+                    <ThemedView key={n.id}>
+                      {renderNotificationItem({ item: n })}
+                    </ThemedView>
                   ))}
-                </View>
+                </ThemedView>
               )}
               contentContainerStyle={styles.notificationListContent}
-              ListEmptyComponent={() => {
-                const hasNoGeneralNotifications =
-                  Object.keys(groupedNotifications).length === 0;
-                if (
-                  hasNoGeneralNotifications &&
-                  (!user?.isPrivate || privateKnockRequestsCount === 0)
-                ) {
-                  return (
-                    <ThemedView style={styles.emptyListContainer}>
-                      <ThemedText
-                        style={{
-                          fontSize: 16,
-                          textAlign: "center",
-                          color: colors.textDim,
-                        }}
-                      >
-                        No notifications yet.
-                      </ThemedText>
-                    </ThemedView>
-                  );
-                }
-                return null;
-              }}
+              ListEmptyComponent={() =>
+                Object.keys(groupedNotifications).length === 0 &&
+                (!user?.isPrivate || privateKnockRequestsCount === 0) ? (
+                  <ThemedView style={styles.emptyListContainer}>
+                    <ThemedText
+                      style={{
+                        fontSize: 16,
+                        color: colors.textDim,
+                        textAlign: "center",
+                      }}
+                    >
+                      No notifications yet.
+                    </ThemedText>
+                  </ThemedView>
+                ) : null
+              }
               onEndReached={handleLoadMore}
               onEndReachedThreshold={0.5}
               refreshControl={
@@ -526,14 +522,14 @@ export default function NotificationsScreen() {
                   tintColor={colors.primary}
                 />
               }
-              ListFooterComponent={() =>
+              ListFooterComponent={
                 hasMore && !loading && !refreshing ? (
-                  <View style={styles.loadingMoreContainer}>
+                  <ThemedView style={styles.loadingMoreContainer}>
                     <ActivityIndicator size="small" color={colors.primary} />
                     <ThemedText style={{ color: colors.textDim, marginTop: 5 }}>
                       Loading more...
                     </ThemedText>
-                  </View>
+                  </ThemedView>
                 ) : null
               }
             />
@@ -556,7 +552,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "transparent",
+    gap: 10,
   },
   loadingMoreContainer: {
     alignItems: "center",
@@ -644,19 +640,19 @@ const styles = StyleSheet.create({
   },
   notificationContent: {
     flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   notificationMessageWrapper: {
     flex: 1,
     marginRight: 10,
   },
   notificationMessageAndButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
   },
   notificationText: {
     fontSize: 14,
@@ -695,8 +691,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 20,
     height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     minWidth: 90,
   },
   knockButtonText: {

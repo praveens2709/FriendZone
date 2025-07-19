@@ -3,8 +3,6 @@ import { Modal, StyleSheet, Dimensions } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { ThemedView } from './ThemedView';
 
-const { width, height } = Dimensions.get('window');
-
 const LoadingDialog = ({ visible }: { visible: boolean }) => {
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>

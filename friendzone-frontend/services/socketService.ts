@@ -1,23 +1,23 @@
 // services/socketService.ts
-import { API_BASE_URL } from '@/constants/const';
+ 
 import { io, Socket } from 'socket.io-client';
+import { API_BASE_URL } from '@/constants/const';
 
 let socket: Socket | null = null;
 
 export const connectSocket = (userId: string) => {
   if (socket && socket.connected) {
     console.log('Socket already connected.');
-    socket.emit('setUserId', userId); // Re-emit userId in case of reconnection or initial load
+    socket.emit('setUserId', userId);
     return socket;
   }
 
-  const socketUrl = API_BASE_URL.replace('/api', ''); // Your socket.io server might be at the root URL
+  const socketUrl = API_BASE_URL.replace('/api', '');
   socket = io(socketUrl, {
     transports: ['websocket'],
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
     timeout: 20000,
-    // auth: { token: accessToken } // If you implement token-based auth for socket connection
   });
 
   socket.on('connect', () => {
@@ -27,11 +27,6 @@ export const connectSocket = (userId: string) => {
 
   socket.on('disconnect', (reason) => {
     console.log('Socket disconnected:', reason);
-    // if (reason === 'io server disconnect') {
-    //   // the disconnection was initiated by the server, you need to reconnect manually
-    //   socket?.connect();
-    // }
-    // else the socket will automatically try to reconnect
   });
 
   socket.on('connect_error', (error) => {
@@ -53,9 +48,7 @@ export const connectSocket = (userId: string) => {
   return socket;
 };
 
-export const getSocket = (): Socket | null => {
-  return socket;
-};
+export const getSocket = (): Socket | null => socket;
 
 export const disconnectSocket = () => {
   if (socket && socket.connected) {

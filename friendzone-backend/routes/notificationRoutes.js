@@ -4,8 +4,10 @@ const notificationController = require('../controllers/notificationController');
 
 const router = express.Router();
 
-router.get('/', protect, notificationController.getUserNotifications);
-router.put('/:id/read', protect, notificationController.markNotificationAsRead);
-router.put('/read-all', protect, notificationController.markAllNotificationsAsRead);
-
-module.exports = router;
+module.exports = (io, userSocketMap) => {
+    router.get('/', protect, notificationController.getUserNotifications);
+    router.get('/unread-count', protect, notificationController.getUnreadNotificationCount);
+    router.put('/:id/read', protect, (req, res) => notificationController.markNotificationAsRead(req, res, io));
+    router.put('/read-all', protect, (req, res) => notificationController.markAllNotificationsAsRead(req, res, io));
+    return router;
+};

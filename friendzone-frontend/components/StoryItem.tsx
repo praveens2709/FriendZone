@@ -3,11 +3,11 @@ import {
   Image,
   StyleSheet,
   Pressable,
-  View,
   Animated,
 } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { AntDesign } from "@expo/vector-icons";
+import { ThemedView } from "./ThemedView";
 
 type Story = {
   id: string;
@@ -56,7 +56,7 @@ export default function StoryItem({
       }}
       onPress={handlePress}
     >
-      <View style={styles.itemContainer}>
+      <ThemedView style={styles.itemContainer}>
         <Animated.View
           style={[
             styles.storyRing,
@@ -84,7 +84,7 @@ export default function StoryItem({
               <AntDesign
                 name="pluscircleo"
                 size={18}
-                color={colors.border}
+                color={colors.text}
               />
             </Pressable>
           )}
@@ -92,7 +92,7 @@ export default function StoryItem({
         <ThemedText style={styles.nameText} numberOfLines={1}>
           {item.name}
         </ThemedText>
-      </View>
+      </ThemedView>
     </Pressable>
   );
 }

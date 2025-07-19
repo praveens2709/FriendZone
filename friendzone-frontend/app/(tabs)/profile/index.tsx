@@ -1,10 +1,5 @@
-import React, { useState } from "react";
-import {
-  StyleSheet,
-  TouchableOpacity,
-  View,
-  Platform,
-} from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { StyleSheet, TouchableOpacity, View, Platform, ActivityIndicator } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemedText } from "@/components/ThemedText";
@@ -14,16 +9,20 @@ import { Ionicons, Feather, FontAwesome5 } from "@expo/vector-icons";
 import { ThemedView } from "@/components/ThemedView";
 import { useAuth } from "@/context/AuthContext";
 import UserAvatar from "@/components/UserAvatar";
-import LoadingDialog from "@/components/LoadingDialog";
 import ThemedModal from "@/components/ThemedModal";
 import AuthModalContent from "@/components/AuthModalContent";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import CommonHeader from "@/components/CommonHeader";
+import KnockService, { KnockRequest } from "@/services/knockService";
+import { categorizeKnocks } from "@/utils/knock-utils";
+import { KnockListType } from "@/types/knock.type";
+import { useSocket } from "@/context/SocketContext";
 
 export default function ProfileScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const { user, authLoading, signOut } = useAuth();
+  const { user, authLoading, signOut, accessToken } = useAuth();
+  const { socket } = useSocket();
 
   const [showMainModal, setShowMainModal] = useState(false);
   const [showAddAccountModal, setShowAddAccountModal] = useState(false);
@@ -32,8 +31,80 @@ export default function ProfileScreen() {
   const [showAuthFlowModal, setShowAuthFlowModal] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
 
-  if (authLoading) {
-    return <LoadingDialog visible />;
+  const [knockersCount, setKnockersCount] = useState(0);
+  const [knockingCount, setKnockingCount] = useState(0);
+  const [lockedInCount, setLockedInCount] = useState(0);
+
+  const [knockersList, setKnockersList] = useState<KnockRequest[]>([]);
+  const [knockingList, setKnockingList] = useState<KnockRequest[]>([]);
+  const [lockedInList, setLockedInList] = useState<KnockRequest[]>([]);
+
+  const [loadingKnocks, setLoadingKnocks] = useState(true);
+
+  const fetchKnockData = useCallback(async () => {
+    if (!user || !accessToken) {
+      setLoadingKnocks(false);
+      return;
+    }
+
+    setLoadingKnocks(true);
+
+    try {
+      const [myReceivedKnocks, mySentKnocks] = await Promise.all([
+        KnockService.getKnockers(accessToken),
+        KnockService.getKnocked(accessToken),
+      ]);
+
+      const { knockers, knocking, lockedIn, lockedInCount } = categorizeKnocks(
+        myReceivedKnocks,
+        mySentKnocks,
+        user._id
+      );
+
+      setKnockersList(knockers);
+      setKnockingList(knocking);
+      setLockedInList(lockedIn);
+
+      setKnockersCount(knockers.length);
+      setKnockingCount(knocking.length);
+      setLockedInCount(lockedInCount);
+    } catch (error) {
+      console.error("Failed to fetch knock data:", error);
+      setKnockersCount(0);
+      setKnockingCount(0);
+      setLockedInCount(0);
+    } finally {
+      setLoadingKnocks(false);
+    }
+  }, [user, accessToken]);
+
+  useEffect(() => {
+    fetchKnockData();
+
+    if (socket && user) {
+      const handleKnockStatusChange = (data: { userId: string }) => {
+        if (data.userId === user._id) {
+          fetchKnockData();
+        }
+      };
+
+      socket.on('knockStatusChanged', handleKnockStatusChange);
+
+      return () => {
+        socket.off('knockStatusChanged', handleKnockStatusChange);
+      };
+    }
+  }, [fetchKnockData, socket, user]);
+
+  if (authLoading || loadingKnocks) {
+    return (
+      <ThemedSafeArea style={styles.centered}>
+        <ActivityIndicator size="small" color={colors.text} />
+        <ThemedText type="subtitle" style={{ color: colors.textDim }}>
+          Loading profile...
+        </ThemedText>
+      </ThemedSafeArea>
+    );
   }
 
   if (!user) {
@@ -51,6 +122,42 @@ export default function ProfileScreen() {
     setShowAuthFlowModal(false);
     setAuthMode("login");
   };
+
+  const navigateToKnockList = (type: KnockListType, data: KnockRequest[]) => {
+    router.push({
+      pathname: "/profile/knock-list",
+      params: {
+        listType: type,
+        data: JSON.stringify(data),
+      },
+    });
+  };
+
+  const renderStatItem = (
+    label: string,
+    count: number,
+    list: KnockRequest[],
+    type: KnockListType
+  ) => (
+    <TouchableOpacity
+      key={type}
+      style={styles.statItem}
+      onPress={() => navigateToKnockList(type, list)}
+    >
+      <ThemedText
+        type="subtitle"
+        style={[styles.statNumber, { color: colors.textDim }]}
+      >
+        {count}
+      </ThemedText>
+      <ThemedText
+        type="default"
+        style={[styles.statLabel, { color: colors.text }]}
+      >
+        {label}
+      </ThemedText>
+    </TouchableOpacity>
+  );
 
   return (
     <LinearGradient colors={colors.gradient} style={styles.container}>
@@ -96,6 +203,28 @@ export default function ProfileScreen() {
               {user.bio}
             </ThemedText>
           )}
+
+          <ThemedView style={styles.knockStatsContainer}>
+            {renderStatItem(
+              "Knockers",
+              knockersCount,
+              knockersList,
+              KnockListType.Knockers
+            )}
+            {renderStatItem(
+              "Knocking",
+              knockingCount,
+              knockingList,
+              KnockListType.Knocking
+            )}
+            {renderStatItem(
+              "LockedIn",
+              lockedInCount,
+              lockedInList,
+              KnockListType.LockedIn
+            )}
+          </ThemedView>
+
           <Button
             title="Edit Profile"
             onPress={() => router.push("/profile/settings")}
@@ -107,28 +236,24 @@ export default function ProfileScreen() {
         visible={showMainModal}
         onClose={() => setShowMainModal(false)}
       >
-        <ThemedView
-          style={[styles.mainModal, { borderColor: colors.border }]}
-        >
+        <ThemedView style={[styles.mainModal, { borderColor: colors.border }]}>
           <TouchableOpacity style={styles.modalItem} onPress={() => {}}>
             <UserAvatar imageUri={user.profileImage} size={42} />
-            <View style={{ flex: 1, marginLeft: 10 }}>
+            <ThemedView style={{ flex: 1, marginLeft: 10 }}>
               <ThemedText
                 type="defaultSemiBold"
                 style={{ color: colors.textSecondary }}
               >
                 {user.firstName} {user.lastName}
               </ThemedText>
-            </View>
+            </ThemedView>
             <Ionicons
               name="checkmark-circle"
               size={22}
               color={colors.textSecondary}
             />
           </TouchableOpacity>
-          <View
-            style={[styles.divider, { backgroundColor: colors.border }]}
-          />
+          <ThemedView style={[styles.divider, { backgroundColor: colors.border }]} />
           <TouchableOpacity
             style={styles.modalItem}
             onPress={() => {
@@ -136,7 +261,7 @@ export default function ProfileScreen() {
               setShowAddAccountModal(true);
             }}
           >
-            <View
+            <ThemedView
               style={[
                 styles.iconCircle,
                 {
@@ -146,7 +271,7 @@ export default function ProfileScreen() {
               ]}
             >
               <Ionicons name="add" size={28} color={colors.textSecondary} />
-            </View>
+            </ThemedView>
             <ThemedText
               type="defaultSemiBold"
               style={{ marginLeft: 10, color: colors.textSecondary }}
@@ -156,7 +281,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </ThemedView>
 
-        <View
+        <ThemedView
           style={{
             marginTop: 20,
             marginBottom: Platform.OS === "ios" ? 10 : 40,
@@ -169,7 +294,7 @@ export default function ProfileScreen() {
               setShowLogoutConfirmModal(true);
             }}
           />
-        </View>
+        </ThemedView>
       </ThemedModal>
       <ThemedModal
         visible={showAddAccountModal}
@@ -191,7 +316,7 @@ export default function ProfileScreen() {
           </ThemedText>
         </TouchableOpacity>
 
-        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+        <ThemedView style={[styles.divider, { backgroundColor: colors.border }]} />
 
         <TouchableOpacity
           style={[styles.modalItemCentered, { borderColor: colors.border }]}
@@ -203,7 +328,10 @@ export default function ProfileScreen() {
         >
           <ThemedText
             type="defaultSemiBold"
-            style={{ color: colors.textSecondary, marginBottom: Platform.OS === 'ios' ? 20 : 40 }}
+            style={{
+              color: colors.textSecondary,
+              marginBottom: Platform.OS === "ios" ? 20 : 40,
+            }}
           >
             Create a new account
           </ThemedText>
@@ -226,19 +354,23 @@ export default function ProfileScreen() {
       >
         <ThemedText
           type="subtitle"
-          style={{ textAlign: "center", marginBottom: 25, color: colors.textSecondary }}
+          style={{
+            textAlign: "center",
+            marginBottom: 25,
+            color: colors.textSecondary,
+          }}
         >
           Are you sure you want to sign out?
         </ThemedText>
 
-        <View style={styles.buttonRow}>
+        <ThemedView style={styles.buttonRow}>
           <Button
             title="Cancel"
             onPress={() => setShowLogoutConfirmModal(false)}
             style={[styles.button, { marginRight: 8 }]}
           />
           <Button title="OK" onPress={signOut} style={styles.button} />
-        </View>
+        </ThemedView>
       </ThemedModal>
     </LinearGradient>
   );
@@ -248,7 +380,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   safeAreaTransparentBg: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
   centered: {
     flex: 1,
@@ -322,9 +454,27 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 8,
-    marginBottom: Platform.OS === 'ios' ? 20 : 40
+    marginBottom: Platform.OS === "ios" ? 20 : 40,
   },
   button: {
     flex: 1,
+  },
+  knockStatsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    width: "100%",
+    paddingVertical: 10,
+    marginBottom: 20,
+  },
+  statItem: {
+    alignItems: "center",
+    flex: 1,
+  },
+  statNumber: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  statLabel: {
+    fontSize: 14,
   },
 });

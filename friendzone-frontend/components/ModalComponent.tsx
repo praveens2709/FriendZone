@@ -42,7 +42,7 @@ export default function ModalComponent({
   const selectedLabel = data.find(item => item.value === value)?.label || '';
 
   return (
-    <View style={styles.container}>
+    <ThemedView style={styles.container}>
       <ThemedText style={styles.label}>{label}</ThemedText>
 
       <TouchableOpacity
@@ -66,7 +66,7 @@ export default function ModalComponent({
         </ThemedText>
         <ThemedView style={styles.optionsView}>
           {data.map((item, index) => (
-            <View key={item.value}>
+            <ThemedView key={item.value}>
               <TouchableOpacity
                 style={[
                   styles.optionItem,
@@ -90,14 +90,14 @@ export default function ModalComponent({
                 </ThemedText>
               </TouchableOpacity>
               {index < data.length - 1 && (
-                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                <ThemedView style={[styles.divider, { backgroundColor: colors.border }]} />
               )}
-            </View>
+            </ThemedView>
           ))}
         </ThemedView>
         <Button title="Cancel" onPress={() => setShowModal(false)} style={styles.modalButton} />
       </ThemedModal>
-    </View>
+    </ThemedView>
   );
 }
 

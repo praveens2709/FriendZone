@@ -23,6 +23,25 @@ const chatSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  isRestricted: {
+    type: Boolean,
+    default: false,
+  },
+  firstMessageByKnockerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+  },
+  unreadCounts: [{
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    count: {
+      type: Number,
+      default: 0,
+    },
+  }],
 }, { timestamps: true });
 
 chatSchema.pre('save', async function(next) {

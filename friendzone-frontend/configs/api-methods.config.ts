@@ -1,28 +1,25 @@
-// configs/api-methods.config.ts
 import { AxiosResponse } from 'axios';
 import httpClient from './axios.config';
 
-export const _get = async <T>(url: string, data?: any, headers?: any): Promise<T> => {
-  const endpoint = url.split('/').filter(Boolean).pop();
-  console.log(endpoint);
+export const _get = async <T>(url: string, accessToken?: string, params?: any): Promise<T> => {
+  const config: { headers?: any; params?: any } = {};
 
-  if (data) {
-    const params = new URLSearchParams();
-    for (const [key, value] of Object.entries(data)) {
-      if (value !== null) {
-        Array.isArray(value)
-          ? params.append(key, JSON.stringify(value))
-          : params.append(key, (value as string | number).toString());
-      }
-    }
-    url += `?${params}`;
+  if (accessToken) {
+    config.headers = {
+      Authorization: `Bearer ${accessToken}`,
+    };
+  }
+
+  if (params) {
+    config.params = params;
   }
 
   try {
-    const response: AxiosResponse<T, any> = await httpClient.get<T>(url, headers && headers);
+    const response: AxiosResponse<T, any> = await httpClient.get<T>(url, config);
     return response.data;
   } catch (error) {
-    console.error(`${endpoint} fetching error:`, error);
+    const endpoint = url.split('/').filter(Boolean).pop();
+    console.error(`_get ${endpoint} fetching error:`, error);
     throw error;
   }
 };
@@ -33,8 +30,6 @@ export const _post = async <T>(
   accessToken?: string
 ): Promise<T> => {
   const endpoint = url.split('/').filter(Boolean).pop();
-  console.log(endpoint);
-
   const headers: any = {};
 
   headers.Authorization = accessToken ? `Bearer ${accessToken}` : '';
@@ -56,8 +51,6 @@ export const _put = async <T>(
   accessToken?: string
 ): Promise<T> => {
   const endpoint = url.split('/').filter(Boolean).pop();
-  console.log(endpoint);
-
   const headers: any = {};
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
   if (data instanceof FormData) headers['Content-Type'] = 'multipart/form-data';
@@ -74,13 +67,11 @@ export const _put = async <T>(
 export const _patch = async <T>(
   url: string,
   data?: any,
-  accessToken?: string // ADD THIS PARAMETER
+  accessToken?: string
 ): Promise<T> => {
   const endpoint = url.split('/').filter(Boolean).pop();
-  console.log(endpoint);
-
   const headers: any = {};
-  if (accessToken) headers.Authorization = `Bearer ${accessToken}`; // ADD THIS LINE
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
   if (data instanceof FormData) headers['Content-Type'] = 'multipart/form-data';
 
   try {
@@ -94,8 +85,6 @@ export const _patch = async <T>(
 
 export const _delete = async <T>(url: string, data?: any, headers?: any): Promise<T> => {
   const endpoint = url.split('/').filter(Boolean).pop();
-  console.log(endpoint);
-
   if (data) {
     url += '?';
     for (let key in data) {

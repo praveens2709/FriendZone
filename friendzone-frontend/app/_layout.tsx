@@ -1,4 +1,4 @@
-import { Slot, Stack } from "expo-router";
+import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
 import "react-native-reanimated";
@@ -6,11 +6,12 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 import { LoadingDialogProvider } from "@/context/LoadingContext";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
-import { SocketProvider } from "@/context/SocketContext"; // Import SocketProvider
-import { StyleSheet, View, ActivityIndicator } from "react-native";
+import { SocketProvider } from "@/context/SocketContext";
+import { StyleSheet, ActivityIndicator } from "react-native";
 import React from "react";
 import Toast from "react-native-toast-message";
 import CustomToast from "@/components/CustomToast";
+import { ThemedView } from "@/components/ThemedView";
 
 function RootLayoutContent() {
   const { colors } = useTheme();
@@ -18,9 +19,9 @@ function RootLayoutContent() {
 
   if (authLoading) {
     return (
-      <View style={styles.loaderContainer}>
+      <ThemedView style={styles.loaderContainer}>
         <ActivityIndicator size="large" />
-      </View>
+      </ThemedView>
     );
   }
 

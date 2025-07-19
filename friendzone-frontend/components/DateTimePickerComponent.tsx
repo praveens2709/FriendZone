@@ -3,7 +3,6 @@ import {
   Platform,
   TouchableOpacity,
   StyleSheet,
-  View,
   Modal,
   Pressable,
 } from "react-native";
@@ -11,6 +10,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/context/ThemeContext";
 import Button from "./Button";
+import { ThemedView } from "./ThemedView";
 
 interface DateTimePickerComponentProps {
   label: string;
@@ -44,7 +44,7 @@ export default function DateTimePickerComponent({
   };
 
   return (
-    <View style={styles.container}>
+    <ThemedView style={styles.container}>
       <ThemedText style={styles.label}>
         {label}
       </ThemedText>
@@ -102,15 +102,15 @@ export default function DateTimePickerComponent({
                 style={{ width: "100%" }}
                 textColor={colors.textSecondary}
               />
-              <View style={styles.modalButtonRow}>
+              <ThemedView style={styles.modalButtonRow}>
                 <Button title="Cancel" onPress={handleCancel} style={styles.modalButton} />
                 <Button title="Confirm" onPress={handleConfirm} style={styles.modalButton} />
-              </View>
+              </ThemedView>
             </Pressable>
           </Pressable>
         </Modal>
       )}
-    </View>
+    </ThemedView>
   );
 }
 

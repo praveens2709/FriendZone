@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/context/ThemeContext';
 import Button from '@/components/Button';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@/context/AuthContext'; // Use useAuth directly
+import { useAuth } from '@/context/AuthContext';
 import { ThemedView } from '@/components/ThemedView';
 import CommonHeader from '@/components/CommonHeader';
 import ThemedSafeArea from '@/components/ThemedSafeArea';
@@ -15,14 +15,9 @@ import { ThemedText } from '@/components/ThemedText';
 export default function SettingsScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  // --- DIRECTLY DESTRUCTURE accessToken and user ---
   const { signOut, accessToken, user } = useAuth();
-  // ------------------------------------------------
-
   const [isPrivateAccount, setIsPrivateAccount] = useState<boolean>(false);
   const [loadingPrivacy, setLoadingPrivacy] = useState(true);
-
-  // Function to fetch current privacy status
   const fetchUserPrivacyStatus = useCallback(async () => {
     if (!accessToken) {
       setLoadingPrivacy(false);
@@ -40,21 +35,19 @@ export default function SettingsScreen() {
     }
   }, [accessToken]);
 
-  // Effect to load privacy status on component mount
   useEffect(() => {
     fetchUserPrivacyStatus();
   }, [fetchUserPrivacyStatus]);
 
-  // Handler for toggling the switch
   const handleTogglePrivateAccount = async (newValue: boolean) => {
     if (!accessToken) return;
-    setIsPrivateAccount(newValue); // Optimistic update
+    setIsPrivateAccount(newValue);
     try {
       const response = await ProfileServices.togglePrivacy(newValue, accessToken);
       Alert.alert("Success", `Account is now ${response.isPrivate ? 'Private' : 'Public'}.`);
     } catch (error) {
       console.error("Failed to toggle private account status:", error);
-      setIsPrivateAccount(!newValue); // Revert on error
+      setIsPrivateAccount(!newValue);
       Alert.alert("Error", "Failed to update privacy settings.");
     }
   };
@@ -88,13 +81,13 @@ export default function SettingsScreen() {
 
             {/* Privacy Section with Toggle */}
             {loadingPrivacy ? (
-              <View style={styles.loadingPrivacyContainer}>
+              <ThemedView style={styles.loadingPrivacyContainer}>
                 <ActivityIndicator size="small" color={colors.primary} />
                 <ThemedText style={{ color: colors.textDim, marginLeft: 10 }}>Loading privacy...</ThemedText>
-              </View>
+              </ThemedView>
             ) : (
-              <View style={[styles.settingItem, {backgroundColor: 'transparent'}]}>
-                <View style={styles.settingTextContainer}>
+              <ThemedView style={[styles.settingItem, {backgroundColor: 'transparent'}]}>
+                <ThemedView style={styles.settingTextContainer}>
                   <ThemedText style={styles.settingText}>Private Account</ThemedText>
                   <ThemedText style={[styles.settingDescription, {color: colors.textDim}]}>
                     {isPrivateAccount
@@ -102,7 +95,7 @@ export default function SettingsScreen() {
                       : "Anyone can knock you directly without approval."
                     }
                   </ThemedText>
-                </View>
+                </ThemedView>
                 <Switch
                   onValueChange={handleTogglePrivateAccount}
                   value={isPrivateAccount}
@@ -110,15 +103,8 @@ export default function SettingsScreen() {
                   thumbColor={colors.buttonText}
                   ios_backgroundColor={colors.textDim}
                 />
-              </View>
+              </ThemedView>
             )}
-
-            <Button
-              title="Notifications"
-              onPress={() => { /* navigate to Notifications screen */ }}
-              variant="setting-item"
-              iconName="notifications-outline"
-            />
 
             <Button
               title="Log Out"

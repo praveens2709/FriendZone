@@ -10,3 +10,9 @@ export interface Knock {
   status: KnockStatus;
   timestamp: string;
 }
+
+export enum KnockListType {
+  Knockers = "Knockers",
+  Knocking = "Knocking",
+  LockedIn = "LockedIn",
+}

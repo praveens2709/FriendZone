@@ -104,7 +104,7 @@ export default function StoryViewer({ user, stories, onClose, onNextUser, onPrev
   }, [currentIndex, isPaused, story.type, story.duration, stories]);
 
   if (!story) {
-    return <View style={styles.container} />;
+    return <ThemedView style={styles.container} />;
   }
 
   const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
@@ -120,7 +120,7 @@ export default function StoryViewer({ user, stories, onClose, onNextUser, onPrev
   };
 
   return (
-    <View style={styles.container}>
+    <ThemedView style={styles.container}>
       <Pressable
         style={styles.mediaContainer}
         onPress={handlePress}
@@ -164,7 +164,7 @@ export default function StoryViewer({ user, stories, onClose, onNextUser, onPrev
       />
 
       <ThemedView style={styles.headerWrapper}>
-        <View style={styles.progressBarContainer}>
+        <ThemedView style={styles.progressBarContainer}>
           {stories.map((_, idx) => {
             const isActive = idx === currentIndex;
             const barWidth = isActive
@@ -177,22 +177,22 @@ export default function StoryViewer({ user, stories, onClose, onNextUser, onPrev
               : "0%";
 
             return (
-              <View key={idx} style={styles.progressBarBackground}>
+              <ThemedView key={idx} style={styles.progressBarBackground}>
                 <Animated.View style={[styles.progressBar, { width: barWidth }]} />
-              </View>
+              </ThemedView>
             );
           })}
-        </View>
+        </ThemedView>
 
-        <View style={styles.userInfoContainer}>
+        <ThemedView style={styles.userInfoContainer}>
           <Image source={{ uri: user.profilePic }} style={styles.userAvatar} />
           <ThemedText style={styles.userNameText}>{user.name}</ThemedText>
           <Pressable onPress={onClose} style={styles.closeButton}>
             <Ionicons name="close" size={24} color="white" />
           </Pressable>
-        </View>
+        </ThemedView>
       </ThemedView>
-    </View>
+    </ThemedView>
   );
 }
 

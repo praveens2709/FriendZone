@@ -34,14 +34,14 @@ export default function CommonHeader({
         style,
       ]}
     >
-      <View style={styles.headerContentWrapper}>
-        <View style={styles.leftContainer}>{leftContent}</View>
-        <View style={styles.rightContainer}>
+      <ThemedView style={styles.headerContentWrapper}>
+        <ThemedView style={styles.leftContainer}>{leftContent}</ThemedView>
+        <ThemedView style={styles.rightContainer}>
           {rightContent1}
           {rightContent2}
-        </View>
-      </View>
-      <View
+        </ThemedView>
+      </ThemedView>
+      <ThemedView
         style={[
           styles.absoluteCenterContainer,
           titleComponent ? styles.centerContainerLeftAligned : styles.centerContainerCentered,
@@ -57,7 +57,7 @@ export default function CommonHeader({
             </ThemedText>
           )
         )}
-      </View>
+      </ThemedView>
     </ThemedView>
   );
 }
@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     flexGrow: 0,
     justifyContent: 'flex-end',
-    gap: 15,
+    gap: 20,
   },
   absoluteCenterContainer: {
     position: 'absolute',

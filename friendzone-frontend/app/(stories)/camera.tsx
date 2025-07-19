@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   StyleSheet,
-  View,
   TouchableOpacity,
-  Text,
   Button,
   Image,
 } from "react-native";
@@ -16,6 +14,8 @@ import ThemedSafeArea from "@/components/ThemedSafeArea";
 import * as MediaLibrary from "expo-media-library";
 import TextStoryEditor from "@/components/TextStoryEditor";
 import { useAuth } from "@/context/AuthContext";
+import { ThemedView } from "@/components/ThemedView";
+import { ThemedText } from "@/components/ThemedText";
 
 export default function CameraScreen() {
   const { colors } = useTheme();
@@ -69,22 +69,22 @@ export default function CameraScreen() {
 
   if (authLoading) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: colors.text }}>Loading user data...</Text>
-      </View>
+      <ThemedView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <ThemedText style={{ color: colors.text }}>Loading user data...</ThemedText>
+      </ThemedView>
     );
   }
 
   if (!user) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: colors.text }}>User not authenticated.</Text>
-      </View>
+      <ThemedView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <ThemedText style={{ color: colors.text }}>User not authenticated.</ThemedText>
+      </ThemedView>
     );
   }
 
   if (!cameraPermission) {
-    return <View style={{ flex: 1, backgroundColor: colors.background }} />;
+    return <ThemedView style={{ flex: 1, backgroundColor: colors.background }} />;
   }
 
   if (!cameraPermission.granted) {
@@ -99,10 +99,10 @@ export default function CameraScreen() {
           },
         ]}
       >
-        <Text style={[styles.message, { color: colors.text }]}>
+        <ThemedText style={[styles.message, { color: colors.text }]}>
           We need your permission to show the camera and record audio for
           stories.
-        </Text>
+        </ThemedText>
         <Button
           onPress={requestCameraPermission}
           title="Grant Camera & Microphone Permission"
@@ -161,9 +161,9 @@ export default function CameraScreen() {
   return (
     <ThemedSafeArea style={styles.container}>
       {!showTextEditor && (
-        <View style={styles.fullScreenContent}>
+        <ThemedView style={styles.fullScreenContent}>
           <CameraView style={styles.camera} facing={facing} ref={cameraRef} />
-          <View style={styles.topBarOverlay}>
+          <ThemedView style={styles.topBarOverlay}>
             <TouchableOpacity
               onPress={() => router.back()}
               style={styles.iconButton}
@@ -174,10 +174,10 @@ export default function CameraScreen() {
               onPress={() => setShowTextEditor(true)}
               style={styles.iconButton}
             >
-              <Text style={styles.aaIcon}>Aa</Text>
+              <ThemedText style={styles.aaIcon}>Aa</ThemedText>
             </TouchableOpacity>
-          </View>
-          <View style={styles.bottomBarOverlay}>
+          </ThemedView>
+          <ThemedView style={styles.bottomBarOverlay}>
             {lastGalleryImage ? (
               <TouchableOpacity
                 onPress={pickImage}
@@ -200,7 +200,7 @@ export default function CameraScreen() {
               onPress={takePicture}
               style={styles.captureButton}
             >
-              <View style={styles.innerCaptureButton} />
+              <ThemedView style={styles.innerCaptureButton} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={toggleCameraFacing}
@@ -208,9 +208,9 @@ export default function CameraScreen() {
             >
               <Ionicons name="camera-reverse-outline" size={30} color="white" />
             </TouchableOpacity>
-          </View>
-          <Text style={styles.storyTextOverlay}>STORY</Text>
-        </View>
+          </ThemedView>
+          <ThemedText style={styles.storyTextOverlay}>STORY</ThemedText>
+        </ThemedView>
       )}
 
       {showTextEditor && (

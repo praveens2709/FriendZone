@@ -1,12 +1,12 @@
 import React from "react";
 import {
   FlatList,
-  View,
   StyleSheet,
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
 import { useRouter } from "expo-router";
 import StoryItem from "./StoryItem";
+import { ThemedView } from "./ThemedView";
 
 type Story = {
   id: string;
@@ -60,7 +60,7 @@ export default function StoryRingList() {
   ];
 
   return (
-    <View style={styles.listContainer}>
+    <ThemedView style={styles.listContainer}>
       <FlatList
         data={sortedStories}
         horizontal
@@ -70,7 +70,7 @@ export default function StoryRingList() {
           <StoryItem item={item} colors={colors} router={router} />
         )}
       />
-    </View>
+    </ThemedView>
   );
 }
 

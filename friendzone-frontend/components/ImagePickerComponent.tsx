@@ -1,9 +1,7 @@
 import React, { useState, useRef } from "react";
 import {
-  View,
   Modal,
   StyleSheet,
-  Image,
   TouchableOpacity,
   TouchableWithoutFeedback,
   Alert,
@@ -13,6 +11,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/context/ThemeContext";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import UserAvatar from "./UserAvatar";
+import { ThemedView } from "./ThemedView";
 
 interface ImagePickerComponentProps {
   onImageSelected: (uri: string | null) => void;
@@ -86,14 +85,14 @@ export default function ImagePickerComponent({
   };
 
   return (
-    <View style={styles.container}>
+    <ThemedView style={styles.container}>
       <TouchableOpacity
         onPress={() => setModalVisible(true)}
         style={styles.touchWrapper}
       >
        <UserAvatar imageUri={currentImageUri} />
 
-        <View
+        <ThemedView
           style={[
             styles.cameraIconWrapper,
             {
@@ -103,7 +102,7 @@ export default function ImagePickerComponent({
           ]}
         >
           <Ionicons name="camera" size={22} color={colors.text} />
-        </View>
+        </ThemedView>
       </TouchableOpacity>
 
       <Modal
@@ -117,9 +116,9 @@ export default function ImagePickerComponent({
         }}
       >
         <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
-          <View style={styles.modalOverlay}>
+          <ThemedView style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
-              <View
+              <ThemedView
                 style={[
                   styles.modalContent,
                   { backgroundColor: colors.backgroundSecondary },
@@ -164,12 +163,12 @@ export default function ImagePickerComponent({
                     Cancel
                   </ThemedText>
                 </TouchableOpacity>
-              </View>
+              </ThemedView>
             </TouchableWithoutFeedback>
-          </View>
+          </ThemedView>
         </TouchableWithoutFeedback>
       </Modal>
-    </View>
+    </ThemedView>
   );
 }
 

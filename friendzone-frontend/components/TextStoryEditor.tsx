@@ -1,10 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
-  View,
   TextInput,
   StyleSheet,
   TouchableOpacity,
-  Text,
   Keyboard,
   TouchableWithoutFeedback,
   Image,
@@ -18,6 +16,7 @@ import ThemedSafeArea from "@/components/ThemedSafeArea";
 import { ColorValue } from "react-native";
 import { Colors, AppColors } from "@/constants/Colors";
 import { ThemedText } from "./ThemedText";
+import { ThemedView } from "./ThemedView";
 
 interface TextStoryEditorProps {
   onGoToCamera: () => void;
@@ -121,11 +120,11 @@ export default function TextStoryEditor({
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         />
-        <View style={styles.header}>
+        <ThemedView style={styles.header}>
           <TouchableOpacity onPress={onCloseScreen}>
             <Ionicons name="close" size={28} color={activeThemeColors.textSecondary} />
           </TouchableOpacity>
-          <View style={styles.headerRightButtons}>
+          <ThemedView style={styles.headerRightButtons}>
             <TouchableOpacity onPress={onGoToCamera}>
               <Ionicons
                 name="camera-outline"
@@ -153,15 +152,15 @@ export default function TextStoryEditor({
                 end={{ x: 1, y: 1 }}
               />
             </TouchableOpacity>
-          </View>
-        </View>
+          </ThemedView>
+        </ThemedView>
         <KeyboardAvoidingView
           style={styles.keyboardAvoidingContainer}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           keyboardVerticalOffset={Platform.OS === "ios" ? 0 : -keyboardHeight}
         >
           <TouchableWithoutFeedback onPress={dismissKeyboard}>
-            <View style={styles.textInputWrapper}>
+            <ThemedView style={styles.textInputWrapper}>
               <TextInput
                 style={[
                   styles.textInput,
@@ -175,10 +174,10 @@ export default function TextStoryEditor({
                 onChangeText={setText}
                 textAlign={"center"}
               />
-            </View>
+            </ThemedView>
           </TouchableWithoutFeedback>
         </KeyboardAvoidingView>
-        <View style={styles.footer}>
+        <ThemedView style={styles.footer}>
           <TouchableOpacity
             onPress={() => handleUpload("public")}
             style={[
@@ -203,14 +202,14 @@ export default function TextStoryEditor({
                 style={{ color: activeThemeColors.textSecondary }}
               />
             )}
-            <Text
+            <ThemedText
               style={[
                 styles.footerButtonText,
                 { color: activeThemeColors.textSecondary }
               ]}
             >
               Your Story
-            </Text>
+            </ThemedText>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -236,7 +235,7 @@ export default function TextStoryEditor({
               Friends Only
             </ThemedText>
           </TouchableOpacity>
-        </View>
+        </ThemedView>
       </ThemedSafeArea>
     </Animated.View>
   );

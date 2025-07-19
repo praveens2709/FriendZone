@@ -4,10 +4,8 @@ import {
   TouchableOpacity,
   FlatList,
   View,
-  Image,
   ActivityIndicator,
   RefreshControl,
-  Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
@@ -18,8 +16,13 @@ import CommonHeader from "@/components/CommonHeader";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import BackButton from "@/components/BackButton";
 import KnockService, { KnockRequest } from "@/services/knockService";
-import { useAuth } from '@/context/AuthContext';
-import { formatNotificationTimestamp } from "@/constants/Functions";
+import { useAuth } from "@/context/AuthContext";
+import {
+  formatNotificationTimestamp,
+  getUserAvatar,
+  showToast,
+} from "@/constants/Functions";
+import UserAvatar from "@/components/UserAvatar";
 
 export default function KnockRequestsScreen() {
   const { colors } = useTheme();
@@ -30,30 +33,38 @@ export default function KnockRequestsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchPendingRequests = useCallback(async (isRefreshing: boolean = false) => {
-    if (!accessToken) {
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
+  const fetchPendingRequests = useCallback(
+    async (isRefreshing: boolean = false) => {
+      if (!accessToken) {
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
 
-    if (isRefreshing) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
+      if (isRefreshing) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
 
-    try {
-      const requests = await KnockService.getKnockers(accessToken);
-      setPendingRequests(requests);
-    } catch (error) {
-      console.error("[KnockRequestsScreen] Error fetching knock requests:", error);
-      Alert.alert("Error", "Failed to load knock requests.");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [accessToken]);
+      try {
+        const requests = await KnockService.getPendingKnockRequests(
+          accessToken
+        );
+        setPendingRequests(requests);
+      } catch (error) {
+        console.error(
+          "[KnockRequestsScreen] Error fetching knock requests:",
+          error
+        );
+        showToast("error", "Failed to load knock requests.");
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [accessToken]
+  );
 
   useEffect(() => {
     fetchPendingRequests();
@@ -63,56 +74,69 @@ export default function KnockRequestsScreen() {
     fetchPendingRequests(true);
   }, [fetchPendingRequests]);
 
-const handleAccept = useCallback(async (requestId: string) => {
-  if (!accessToken) return;
-  try {
-    console.log(`Attempting to accept knock request: ${requestId}`);
-    
-    // Call KnockService to accept the knock and update the status to 'onesidedlock'
-    await KnockService.acceptKnock(requestId, accessToken);  // Use acceptKnock here to handle acceptance
+  const handleAccept = useCallback(
+    async (requestId: string) => {
+      if (!accessToken) return;
+      try {
+        console.log(`Attempting to accept knock request: ${requestId}`);
 
-    // Update local state to remove the accepted request
-    setPendingRequests((prev) => {
-      const newRequests = prev.filter((req) => req.id !== requestId);
-      if (newRequests.length === 0) {
-        router.back(); // Navigate back if no more requests
+        await KnockService.acceptKnock(requestId, accessToken);
+
+        setPendingRequests((prev) => {
+          const newRequests = prev.filter((req) => req.id !== requestId);
+          if (newRequests.length === 0) {
+            router.back();
+          }
+          return newRequests;
+        });
+
+        showToast("success", "Knock request accepted.");
+      } catch (error) {
+        console.error(
+          `[KnockRequestsScreen] Error accepting knock request ${requestId}:`,
+          error
+        );
+        showToast("error", "Failed to accept knock request.");
       }
-      return newRequests;
-    });
+    },
+    [accessToken, router]
+  );
 
-    Alert.alert("Success", "Knock request accepted.");
-  } catch (error) {
-    console.error(`[KnockRequestsScreen] Error accepting knock request ${requestId}:`, error);
-    Alert.alert("Error", "Failed to accept knock request.");
-  }
-}, [accessToken, router]);
-
-  const handleDecline = useCallback(async (requestId: string) => {
-    if (!accessToken) return;
-    try {
-      await KnockService.declineKnock(requestId, accessToken);
-      setPendingRequests((prev) => {
-        const newRequests = prev.filter((req) => req.id !== requestId);
-        if (newRequests.length === 0) {
-          // If no more requests, navigate back
-          router.back(); // or router.push('/(tabs)/notifications');
-        }
-        return newRequests;
-      });
-      Alert.alert("Success", "Knock request declined.");
-    } catch (error) {
-      console.error(`[KnockRequestsScreen] Error declining knock request ${requestId}:`, error);
-      Alert.alert("Error", "Failed to decline knock request.");
-    }
-  }, [accessToken, router]); // Add router to dependencies
+  const handleDecline = useCallback(
+    async (requestId: string) => {
+      if (!accessToken) return;
+      try {
+        await KnockService.declineKnock(requestId, accessToken);
+        setPendingRequests((prev) => {
+          const newRequests = prev.filter((req) => req.id !== requestId);
+          if (newRequests.length === 0) {
+            router.back();
+          }
+          return newRequests;
+        });
+        showToast("success", "Knock request declined.");
+      } catch (error) {
+        console.error(
+          `[KnockRequestsScreen] Error declining knock request ${requestId}:`,
+          error
+        );
+        showToast("error", "Failed to decline knock request.");
+      }
+    },
+    [accessToken, router]
+  );
 
   const renderRequestItem = ({ item }: { item: KnockRequest }) => (
-    <View style={[styles.requestItem]}>
-      <Image
-        source={{ uri: item.user.avatar || `https://ui-avatars.com/api/?name=${item.user.username.replace(/\s/g, '+')}` }}
-        style={[styles.requestAvatar, { borderColor: colors.border }]}
+    <ThemedView style={[styles.requestItem]}>
+      <UserAvatar
+        imageUri={getUserAvatar({
+          avatar: item.user.avatar,
+          username: item.user.username,
+        })}
+        size={50}
+        style={styles.requestAvatar}
       />
-      <View style={styles.requestContent}>
+      <ThemedView style={styles.requestContent}>
         <ThemedText
           style={styles.requestUsername}
           numberOfLines={1}
@@ -125,8 +149,8 @@ const handleAccept = useCallback(async (requestId: string) => {
         >
           {formatNotificationTimestamp(item.timestamp)} ago
         </ThemedText>
-      </View>
-      <View style={styles.requestActions}>
+      </ThemedView>
+      <ThemedView style={styles.requestActions}>
         <TouchableOpacity
           style={[
             styles.actionButton,
@@ -153,8 +177,8 @@ const handleAccept = useCallback(async (requestId: string) => {
             Decline
           </ThemedText>
         </TouchableOpacity>
-      </View>
-    </View>
+      </ThemedView>
+    </ThemedView>
   );
 
   return (
@@ -168,8 +192,10 @@ const handleAccept = useCallback(async (requestId: string) => {
 
         {loading && !refreshing ? (
           <ThemedView style={styles.initialLoadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <ThemedText style={{ color: colors.textDim, marginTop: 10 }}>Loading requests...</ThemedText>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <ThemedText type="subtitle" style={{ color: colors.textDim }}>
+              Loading requests...
+            </ThemedText>
           </ThemedView>
         ) : (
           <FlatList
@@ -214,9 +240,9 @@ const styles = StyleSheet.create({
   },
   initialLoadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 10,
   },
   emptyListContainer: {
     flex: 1,

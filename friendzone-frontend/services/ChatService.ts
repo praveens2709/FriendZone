@@ -1,4 +1,3 @@
-// services/chatService.ts (Updated)
 import { _get, _post } from "../configs/api-methods.config";
 
 export interface ChatPreviewResponse {
@@ -8,8 +7,10 @@ export interface ChatPreviewResponse {
   lastMessage: string;
   timestamp: string;
   unreadCount: number;
-  type: 'private' | 'group';
-  otherParticipantId?: string;
+  type: "private" | "group";
+  otherParticipantId: string | null;
+  isRestricted: boolean;
+  firstMessageByKnockerId: string | null;
 }
 
 export interface GetChatsResponse {
@@ -21,10 +22,11 @@ export interface GetChatsResponse {
 
 export interface MessageResponse {
   id: string;
-  sender: string; // Changed to string to store actual sender ID
+  sender: string;
   text: string;
   timestamp: string;
   read: boolean;
+  isTemp?: boolean;
 }
 
 export interface GetMessagesResponse {
@@ -32,70 +34,143 @@ export interface GetMessagesResponse {
   currentPage: number;
   totalPages: number;
   totalMessages: number;
+  isRestricted: boolean;
+  firstMessageByKnockerId: string | null;
 }
 
-// Define the expected structure of a raw message from the API before formatting
 interface RawApiMessage {
-  _id: string;
-  sender: { _id: string; [key: string]: any }; // Assuming sender is an object with an _id
+  id: string;
+  chat: string;
+  sender: string;
   text: string;
-  createdAt: string; // Assuming timestamp is named 'createdAt' from backend
-  readBy: string[]; // Assuming readBy is an array of user IDs
-  [key: string]: any; // Allow other properties
+  readBy?: string[];
+  timestamp: string;
+  updatedAt: string;
+  __v: number;
+  read?: boolean;
 }
 
-// Define the expected structure of the raw API response for messages
 interface RawApiGetMessagesResponse {
   messages: RawApiMessage[];
   currentPage: number;
   totalPages: number;
   totalMessages: number;
-  [key: string]: any; // Allow other properties
+  isRestricted: boolean;
+  firstMessageByKnockerId: string | null;
 }
 
 export interface CreateChatResponse {
   message: string;
   chatId: string;
+  isRestricted: boolean;
+  firstMessageByKnockerId: string | null;
 }
 
 export interface ChatDetailsResponse {
   id: string;
   name: string;
   avatar: string | null;
-  participants: { _id: string; firstName: string; lastName?: string; profileImage?: string; }[];
-  type: 'private' | 'group';
+  participants: {
+    _id: string;
+    firstName: string;
+    lastName?: string;
+    profileImage?: string;
+  }[];
+  type: "private" | "group";
+  isRestricted: boolean;
+  firstMessageByKnockerId: string | null;
 }
 
 class ChatService {
-  static async getUserChats(token: string, page: number = 1, limit: number = 10): Promise<GetChatsResponse> {
-    return await _get(`chats?page=${page}&limit=${limit}`, token);
+  static async getUserChats(
+    token: string,
+    page: number = 1,
+    limit: number = 10
+  ): Promise<GetChatsResponse> {
+    try {
+      const data: GetChatsResponse = await _get(
+        `chats?page=${page}&limit=${limit}`,
+        token
+      );
+      return data;
+    } catch (error: any) {
+      throw error;
+    }
   }
 
-  static async getChatMessages(chatId: string, token: string, page: number = 1, limit: number = 20): Promise<GetMessagesResponse> {
-    const data: RawApiGetMessagesResponse = await _get(`chats/${chatId}/messages?page=${page}&limit=${limit}`, token);
-    
-    const formattedMessages: MessageResponse[] = data.messages.map((msg: RawApiMessage) => ({
-        id: msg._id,
-        sender: msg.sender._id, // This will be compared to current user._id in component
-        text: msg.text,
-        timestamp: msg.createdAt, // Assuming your backend returns 'createdAt' for message timestamp
-        read: msg.readBy && msg.readBy.length > 0 ? true : false,
-    }));
-    
-    return {
+  static async getChatMessages(
+    chatId: string,
+    token: string,
+    currentUserId: string,
+    page: number = 1,
+    limit: number = 20
+  ): Promise<GetMessagesResponse> {
+    try {
+      const data: RawApiGetMessagesResponse = await _get(
+        `chats/${chatId}/messages?page=${page}&limit=${limit}`,
+        token
+      );
+
+      if (!data.messages || !Array.isArray(data.messages)) {
+        return {
+          messages: [],
+          currentPage: data.currentPage || 1,
+          totalPages: data.totalPages || 0,
+          totalMessages: data.totalMessages || 0,
+          isRestricted: data.isRestricted || false,
+          firstMessageByKnockerId: data.firstMessageByKnockerId || null,
+        };
+      }
+
+      const formattedMessages: MessageResponse[] = data.messages.map(
+        (msg: RawApiMessage) => {
+          return {
+            id: msg.id,
+            sender: msg.sender,
+            text: msg.text,
+            timestamp: msg.timestamp || new Date().toISOString(),
+            read: msg.read ?? false,
+            isTemp: false,
+          };
+        }
+      );
+
+      return {
         messages: formattedMessages,
         currentPage: data.currentPage,
         totalPages: data.totalPages,
         totalMessages: data.totalMessages,
-    };
+        isRestricted: data.isRestricted,
+        firstMessageByKnockerId: data.firstMessageByKnockerId,
+      };
+    } catch (error: any) {
+      throw error;
+    }
   }
 
-  static async getChatDetails(chatId: string, token: string): Promise<ChatDetailsResponse> {
+  static async getChatDetails(
+    chatId: string,
+    token: string
+  ): Promise<ChatDetailsResponse> {
     return await _get(`chats/${chatId}`, token);
   }
 
-  static async createChat(token: string, recipientId: string): Promise<CreateChatResponse> {
-    return await _post('chats', { recipientId }, token);
+  static async createChat(
+    token: string,
+    recipientId: string
+  ): Promise<CreateChatResponse> {
+    return await _post("chats", { recipientId }, token);
+  }
+
+  static async markMessagesAsRead(
+    chatId: string,
+    token: string
+  ): Promise<void> {
+    try {
+      await _post(`chats/${chatId}/read`, {}, token);
+    } catch (error: any) {
+      console.error("Failed to mark messages as read:", error);
+    }
   }
 }
 

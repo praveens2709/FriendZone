@@ -1,7 +1,8 @@
 import React from "react";
-import { Image, StyleSheet, View, ViewStyle } from "react-native";
+import { Image, ViewStyle } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 import { useTheme } from "@/context/ThemeContext";
+import { ThemedView } from "./ThemedView";
 
 interface UserAvatarProps {
   imageUri?: string | null;
@@ -13,7 +14,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({ imageUri, size = 112, style }) 
   const { colors } = useTheme();
 
   return (
-    <View
+    <ThemedView
       style={[
         {
           width: size,
@@ -38,7 +39,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({ imageUri, size = 112, style }) 
           style={{ width: "100%", textAlign: "center", marginTop: size * 0.10 }}
         />
       )}
-    </View>
+    </ThemedView>
   );
 };
 

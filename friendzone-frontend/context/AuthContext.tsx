@@ -26,10 +26,10 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   updateUserTheme: (theme: ThemeType) => Promise<void>;
-  user: User | null; // <-- Ensure user is here
+  user: User | null;
   loadUserProfile: () => Promise<void>;
   updateProfile: (data: any) => Promise<void>;
-  accessToken: string | null; // <-- Ensure accessToken is here
+  accessToken: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -74,7 +74,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
 
         try {
-          // Pass accessToken to loadUserProfile for consistency if it relies on it
           await loadUserProfile(parsedSession.accessToken);
           setIsAuthenticated(true);
         } catch {
@@ -101,7 +100,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     ) {
       setThemeFromStore(sessionData.theme as ThemeType);
     }
-    // Pass accessToken to loadUserProfile for consistency
     await loadUserProfile(sessionData.accessToken);
   };
 
@@ -135,7 +133,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // --- MODIFIED loadUserProfile to accept token ---
   const loadUserProfile = async (tokenOverride?: string | null) => {
     const token = tokenOverride || (await AsyncStorage.getItem("userToken"));
     try {
@@ -148,7 +145,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw error;
     }
   };
-  // ------------------------------------------------
 
   const updateProfile = async (profileData: any) => {
     try {
@@ -168,7 +164,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (profileData.profileImage) {
         const uriParts = profileData.profileImage.split(".");
-        const fileType = uriParts[uriParts.length - 1]; // Typo fix: uriuriParts -> uriParts
+        const fileType = uriParts[uriParts.length - 1];
         const fileName = `profile.${fileType}`;
         formData.append("profileImage", {
           uri: profileData.profileImage,
@@ -177,11 +173,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } as any);
       }
 
-      // --- PASS accessToken HERE ---
       const response = await ProfileServices.updateProfile(formData, accessToken);
-      // -----------------------------
       setUser(response.user);
-      // Removed loadUserProfile() here to avoid redundant fetch, as response already has updated user.
     } catch (error) {
       console.error("Failed to update profile:", error);
       throw new Error("Failed to update profile");
@@ -198,10 +191,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signOut,
         signUp,
         updateUserTheme,
-        user, // <-- Provided directly
+        user,
         loadUserProfile,
         updateProfile,
-        accessToken, // <-- Provided directly
+        accessToken,
       }}
     >
       {children}

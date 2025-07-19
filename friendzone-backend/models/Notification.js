@@ -15,7 +15,7 @@ const notificationSchema = new mongoose.Schema({
   },
   relatedEntityType: {
     type: String,
-    enum: ['User', 'Chat', 'Post', 'Knock'],
+    enum: ['User', 'Post', 'Story', 'Comment', 'Knock'],
   },
   isRead: { type: Boolean, default: false },
   metadata: { type: mongoose.Schema.Types.Mixed, default: {} },

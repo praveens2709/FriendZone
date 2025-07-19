@@ -1,4 +1,3 @@
-// components/common/ThemedModal.tsx
 import React from "react";
 import {
   Modal,

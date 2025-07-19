@@ -18,7 +18,12 @@ export interface NotificationResponse {
     status?: 'pending' | 'accepted' | 'declined';
     [key: string]: any;
   };
-  knockStatus?: 'pending' | 'lockedIn' | 'onesidedlock' | null;
+  knockStatus?: 'pending' | 'lockedIn' | 'onesidedlock' | 'declined' | null;
+  relatedEntityDetails?: {
+    id: string;
+    username: string;
+    avatar: string | null;
+  } | null;
 }
 
 export interface GetNotificationsResponse {
@@ -33,9 +38,17 @@ export interface MarkNotificationReadResponse {
   notificationId: string;
 }
 
+export interface UnreadNotificationCountResponse {
+    count: number;
+}
+
 class NotificationService {
   static async getUserNotifications(token: string, page: number = 1, limit: number = 15): Promise<GetNotificationsResponse> {
     return await _get(`notifications?page=${page}&limit=${limit}`, token);
+  }
+
+  static async getUnreadNotificationCount(token: string): Promise<UnreadNotificationCountResponse> { // New method
+    return await _get(`notifications/unread-count`, token);
   }
 
   static async markNotificationAsRead(notificationId: string, token: string): Promise<MarkNotificationReadResponse> {

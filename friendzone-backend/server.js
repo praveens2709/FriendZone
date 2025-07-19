@@ -1,21 +1,23 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const http = require('http');
-const socketIo = require('socket.io');
-const connectDB = require('./config/db');
+// server.js
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const http = require("http");
+const socketIo = require("socket.io");
+const connectDB = require("./config/db");
 
-const authRoutes = require('./routes/authRoutes');
-const profileRoutes = require('./routes/profileRoutes');
-const chatRoutes = require('./routes/chatRoutes');
-const notificationRoutes = require('./routes/notificationRoutes');
-const knockRoutes = require('./routes/knockRoutes');
+const authRoutes = require("./routes/authRoutes");
+const profileRoutes = require("./routes/profileRoutes");
+const chatRoutes = require("./routes/chatRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
+const knockRoutes = require("./routes/knockRoutes");
 
-const chatController = require('./controllers/chatController');
-const notificationController = require('./controllers/notificationController');
+const chatController = require("./controllers/chatController");
+const notificationController = require("./controllers/notificationController");
 
-const User = require('./models/User');
-const Chat = require('./models/Chat');
+const User = require("./models/User");
+const Chat = require("./models/Chat");
+const Notification = require("./models/Notification");
 
 connectDB();
 
@@ -23,114 +25,152 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT'],
+    origin: "*",
+    methods: ["GET", "POST", "PUT"],
   },
 });
 
 app.use(cors());
 app.use(express.json());
 
-app.use('/api/auth', authRoutes);
-app.use('/api/profile', profileRoutes);
-app.use('/api/chats', chatRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/knock', knockRoutes);
-
 const userSocketMap = new Map();
 
-io.on('connection', (socket) => {
+app.set("socketio", io);
+app.set("userSocketMap", userSocketMap);
+
+app.use("/api/auth", authRoutes);
+app.use("/api/profile", profileRoutes);
+app.use("/api/chats", chatRoutes(io, userSocketMap));
+app.use("/api/notifications", notificationRoutes(io, userSocketMap));
+app.use("/api/knock", knockRoutes(io, userSocketMap));
+
+io.on("connection", (socket) => {
   console.log(`User connected: ${socket.id}`);
 
-  socket.on('setUserId', async (userId) => {
+  socket.on("setUserId", async (userId) => {
+    if (!userId) {
+      console.warn(
+        `setUserId received with empty userId from socket ${socket.id}.`
+      );
+      return;
+    }
     userSocketMap.set(userId, socket.id);
     console.log(`User ${userId} mapped to socket ${socket.id}`);
 
     try {
-      const user = await User.findById(userId).select('chats');
-      if (user && user.chats.length > 0) {
-        user.chats.forEach(chatId => {
-          socket.join(chatId.toString());
-          console.log(`User ${userId} joined chat room ${chatId.toString()}`);
+      const chats = await Chat.find({ participants: userId }).select("_id");
+      if (chats.length > 0) {
+        chats.forEach((chat) => {
+          socket.join(chat._id.toString());
+          console.log(`User ${userId} joined chat room ${chat._id.toString()}`);
         });
+      } else {
+        console.log(`User ${userId} has no chats to join.`);
+      }
+
+      socket.join(`notifications-${userId}`);
+      console.log(`User ${userId} joined notifications room notifications-${userId}`);
+
+    } catch (error) {
+      console.error(
+        `Error joining user ${userId} to chats/notifications on setUserId:`,
+        error
+      );
+    }
+  });
+
+  socket.on("joinChat", (chatId) => {
+    socket.join(chatId);
+    console.log(`Socket ${socket.id} joined chat room ${chatId}`);
+  });
+
+  socket.on("leaveChat", (chatId) => {
+    socket.leave(chatId);
+    console.log(`Socket ${socket.id} left chat room ${chatId}`);
+  });
+
+  socket.on(
+    "sendMessage",
+    async ({ chatId, senderId, text, isNewChatFromCreation, clientTempId }) => {
+      const message = await chatController.saveMessage({
+        chatId,
+        senderId,
+        text,
+        isNewChatFromCreation,
+        clientTempId,
+        io: io,
+        userSocketMap: userSocketMap,
+      });
+
+      if (!message) {
+        console.log(
+          `Message failed for chat ${chatId}, clientTempId ${clientTempId}. saveMessage likely handled failure.`
+        );
+      }
+    }
+  );
+
+  socket.on("markMessagesAsRead", async ({ chatId, userId }) => {
+    try {
+      const success = await chatController.markMessagesAsRead({ chatId, userId });
+      if (success) {
+        const chat = await Chat.findById(chatId).populate("participants", "firstName lastName profileImage")
+          .populate({
+            path: "lastMessage",
+            select: "text sender createdAt",
+            populate: {
+              path: "sender",
+              select: "firstName lastName",
+            },
+          }).lean();
+
+        if (chat) {
+          const userSocketId = userSocketMap.get(userId.toString());
+          if (userSocketId) {
+            const unreadCountForUser = chat.unreadCounts.find(uc => uc.user.toString() === userId.toString())?.count || 0;
+            const otherParticipantFromTheirView = chat.participants.find(p => p._id.toString() !== userId.toString());
+
+            const lastMessageText = chat.lastMessage ? chat.lastMessage.text : "No messages yet";
+            const lastMessageSenderPrefix = chat.lastMessage && chat.lastMessage.sender ?
+              (chat.lastMessage.sender._id.toString() === userId ? "You: " : `${chat.lastMessage.sender.firstName}: `) : "";
+
+            const chatPreviewData = {
+              id: chat._id.toString(),
+              name: chat.type === "group" ? chat.name : (otherParticipantFromTheirView ? `${otherParticipantFromTheirView.firstName} ${otherParticipantFromTheirView.lastName || ""}`.trim() : "Unknown User"),
+              avatar: chat.type === "group" ? null : (otherParticipantFromTheirView ? chatController.getUserAvatar(otherParticipantFromTheirView) : null),
+              lastMessage: `${lastMessageSenderPrefix}${lastMessageText}`,
+              timestamp: chat.lastMessageAt ? chat.lastMessageAt.toISOString() : (chat.createdAt ? chat.createdAt.toISOString() : new Date().toISOString()),
+              unreadCount: unreadCountForUser,
+              type: chat.type,
+              otherParticipantId: otherParticipantFromTheirView ? otherParticipantFromTheirView._id.toString() : null,
+              isRestricted: chat.isRestricted,
+              firstMessageByKnockerId: chat.firstMessageByKnockerId?.toString() || null,
+            };
+
+            io.to(userSocketId).emit("chatPreviewUpdate", chatPreviewData);
+          }
+          io.to(chatId).emit("messagesRead", { chatId, userId });
+        }
       }
     } catch (error) {
-      console.error(`Error joining user ${userId} to chats on setUserId:`, error);
+      console.error("Error handling markMessagesAsRead socket event:", error);
     }
   });
 
-  socket.on('joinChat', (chatId) => {
-    socket.join(chatId);
-    console.log(`Socket ${socket.id} joined chat room: ${chatId}`);
+  socket.on("typing", ({ chatId, userId }) => {
+    socket.to(chatId).emit("typing", { chatId, userId });
   });
 
-  socket.on('leaveChat', (chatId) => {
-    socket.leave(chatId);
-    console.log(`Socket ${socket.id} left chat room: ${chatId}`);
+  socket.on("stopTyping", ({ chatId, userId }) => {
+    socket.to(chatId).emit("stopTyping", { chatId, userId });
   });
 
-  socket.on('sendMessage', async ({ chatId, senderId, text }) => {
-    const message = await chatController.saveMessage({ chatId, senderId, text });
-    if (message) {
-      io.to(chatId).emit('newMessage', message);
-      console.log(`Message sent to chat ${chatId}: ${message.text}`);
-
-      try {
-        const chat = await Chat.findById(chatId).select('participants');
-        const senderUser = await User.findById(senderId).select('firstName lastName profileImage');
-
-        if (chat && senderUser) {
-          for (const participantId of chat.participants) {
-            if (participantId.toString() !== senderId.toString()) {
-              const recipientSocketId = userSocketMap.get(participantId.toString());
-              const content = `${senderUser.firstName} ${senderUser.lastName || ''} sent you a message: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`;
-
-              const notification = await notificationController.createNotification({
-                recipientId: participantId,
-                senderId: senderId,
-                type: 'message',
-                content: content,
-                relatedEntityId: chatId,
-                relatedEntityType: 'Chat',
-              });
-
-              if (notification) {
-                if (recipientSocketId) {
-                  io.to(recipientSocketId).emit('newNotification', notification);
-                }
-                io.to(participantId.toString()).emit('chatPreviewUpdate', {
-                  chatId: chatId,
-                  lastMessage: `${senderUser.firstName}: ${text}`,
-                  timestamp: message.timestamp,
-                  unreadCountChange: 1,
-                });
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error handling message notifications:', error);
-      }
-    }
-  });
-
-  socket.on('markMessagesRead', async ({ chatId, userId }) => {
-    const success = await chatController.markMessagesAsRead({ chatId, userId });
-    if (success) {
-      io.to(chatId).emit('messagesRead', { chatId, userId });
-      console.log(`Messages in chat ${chatId} marked as read by ${userId}`);
-    }
-  });
-
-  socket.on('markNotificationRead', async ({ notificationId, userId }) => {
-    console.log(`Received request to mark notification ${notificationId} as read by user ${userId}`);
-  });
-
-
-  socket.on('disconnect', () => {
+  socket.on("disconnect", () => {
     console.log(`User disconnected: ${socket.id}`);
+    let disconnectedUserId = null;
     for (let [key, value] of userSocketMap.entries()) {
       if (value === socket.id) {
+        disconnectedUserId = key;
         userSocketMap.delete(key);
         console.log(`User ${key} unmapped from socket ${socket.id}`);
         break;
@@ -140,6 +180,6 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on http://0.0.0.0:${PORT}`);
 });

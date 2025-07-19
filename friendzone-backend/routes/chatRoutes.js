@@ -4,8 +4,17 @@ const chatController = require('../controllers/chatController');
 
 const router = express.Router();
 
-router.get('/', protect, chatController.getUserChats);
-router.get('/:id/messages', protect, chatController.getChatMessages);
-router.post('/', protect, chatController.createChat); // To initiate a chat
+module.exports = (io, userSocketMap) => {
+  router.get('/', protect, chatController.getUserChats);
+  router.get('/:id/messages', protect, chatController.getChatMessages);
 
-module.exports = router;
+  router.post('/:id/read', protect, (req, res) => {
+    chatController.markMessagesAsReadRest(req, res, io, userSocketMap);
+  });
+
+  router.post('/', protect, (req, res) => {
+    chatController.createChat(req, res, io, userSocketMap);
+  });
+
+  return router;
+};
