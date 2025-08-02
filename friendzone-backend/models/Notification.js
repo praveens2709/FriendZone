@@ -1,3 +1,4 @@
+// models/Notification.js
 const mongoose = require('mongoose');
 
 const notificationSchema = new mongoose.Schema({
@@ -5,7 +6,8 @@ const notificationSchema = new mongoose.Schema({
   sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   type: {
     type: String,
-    enum: ['knock', 'knock_accepted', 'activity', 'message'],
+    // ADDED 'game_invite' and 'game_activity'
+    enum: ['knock', 'knock_accepted', 'activity', 'message', 'game_invite', 'game_activity'],
     required: true,
   },
   content: { type: String, required: true },
@@ -15,7 +17,8 @@ const notificationSchema = new mongoose.Schema({
   },
   relatedEntityType: {
     type: String,
-    enum: ['User', 'Post', 'Story', 'Comment', 'Knock'],
+    // ADDED 'GameSession'
+    enum: ['User', 'Post', 'Story', 'Comment', 'Knock', 'GameSession'],
   },
   isRead: { type: Boolean, default: false },
   metadata: { type: mongoose.Schema.Types.Mixed, default: {} },

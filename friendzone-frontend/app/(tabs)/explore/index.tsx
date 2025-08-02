@@ -14,9 +14,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import CommonHeader from "@/components/CommonHeader";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import { useAuth } from "@/context/AuthContext";
 import { getUserAvatar, showToast, getUserStatusLabel } from "@/constants/Functions";
@@ -246,7 +245,7 @@ export default function ExploreScreen() {
       case "stranger":
       default:
         buttonText = "Knock";
-        buttonBackgroundColor = colors.primary;
+        buttonBackgroundColor = colors.buttonBackgroundSecondary;
         buttonBorderColor = colors.border;
         buttonTextColor = colors.text;
         break;

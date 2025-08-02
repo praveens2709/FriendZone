@@ -232,3 +232,28 @@ exports.deleteNotificationsByKnockId = async (recipientId, knockId) => {
         throw new Error(`Error deleting notifications: ${err.message}`);
     }
 };
+
+exports.markNotificationAsReadAndProcessGameInvite = async (gameSessionId, userId, status) => {
+    try {
+        await Notification.updateMany(
+            {
+                recipient: userId,
+                relatedEntityId: gameSessionId,
+                relatedEntityType: 'GameSession',
+                type: 'game_invite',
+                'metadata.status': 'pending' // Only update pending invites
+            },
+            {
+                $set: {
+                    isRead: true,
+                    'metadata.status': status // 'accepted' or 'declined'
+                }
+            }
+        );
+        // Also ensure unread count is updated
+        // You might call emitUnreadNotificationCount here if needed
+    } catch (error) {
+        console.error(`Error processing game invite notification for user ${userId} and session ${gameSessionId}:`, error);
+        // Do not throw, as this is a background update
+    }
+};

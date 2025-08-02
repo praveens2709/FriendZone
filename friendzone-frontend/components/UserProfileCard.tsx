@@ -1,6 +1,7 @@
 import React from "react";
 import {
   StyleSheet,
+  View,
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
@@ -8,7 +9,6 @@ import { useTheme } from "@/context/ThemeContext";
 import { ThemedText } from "@/components/ThemedText";
 import UserAvatar from "@/components/UserAvatar";
 import { getUserAvatar } from "@/constants/Functions";
-import { ThemedView } from "./ThemedView";
 
 interface UserProfileCardProps {
   userId: string;
@@ -18,6 +18,8 @@ interface UserProfileCardProps {
   rightActionComponent: React.ReactNode;
   onPress?: () => void;
   isLoading?: boolean;
+  usernameColor?: string;
+  descriptionColor?: string;
 }
 
 export default function UserProfileCard({
@@ -28,6 +30,8 @@ export default function UserProfileCard({
   rightActionComponent,
   onPress,
   isLoading = false,
+  usernameColor,
+  descriptionColor,
 }: UserProfileCardProps) {
   const { colors } = useTheme();
 
@@ -42,21 +46,23 @@ export default function UserProfileCard({
         size={45}
         style={[styles.avatar, { borderColor: colors.border }]}
       />
-      <ThemedView style={styles.userInfo}>
-        <ThemedText style={styles.username}>{username}</ThemedText>
+      <View style={styles.userInfo}>
+        <ThemedText style={[styles.username, { color: usernameColor || colors.text }]}>
+          {username}
+        </ThemedText>
         {description && (
-          <ThemedText style={[styles.description, { color: colors.textDim }]}>
+          <ThemedText style={[styles.description, { color: descriptionColor || colors.textDim }]}>
             {description}
           </ThemedText>
         )}
-      </ThemedView>
-      <ThemedView style={styles.actionContainer}>
+      </View>
+      <View style={styles.actionContainer}>
         {isLoading ? (
           <ActivityIndicator size="small" color={colors.primary} />
         ) : (
           rightActionComponent
         )}
-      </ThemedView>
+      </View>
     </TouchableOpacity>
   );
 }
@@ -89,6 +95,6 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     justifyContent: "center",
     alignItems: "center",
-    minWidth: 110,
+    minWidth: 60,
   },
 });

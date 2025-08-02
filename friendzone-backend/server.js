@@ -1,4 +1,4 @@
-// server.js
+// server.js (main file)
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
@@ -11,6 +11,7 @@ const profileRoutes = require("./routes/profileRoutes");
 const chatRoutes = require("./routes/chatRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const knockRoutes = require("./routes/knockRoutes");
+const gameRoutes = require("./routes/gameRoutes"); // Already present
 
 const chatController = require("./controllers/chatController");
 const notificationController = require("./controllers/notificationController");
@@ -18,6 +19,9 @@ const notificationController = require("./controllers/notificationController");
 const User = require("./models/User");
 const Chat = require("./models/Chat");
 const Notification = require("./models/Notification");
+
+// NEW: Import the game socket handlers
+const registerGameSocketHandlers = require('./socketHandlers/gameSocketHandlers'); // Adjust path as needed
 
 connectDB();
 
@@ -43,10 +47,13 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/chats", chatRoutes(io, userSocketMap));
 app.use("/api/notifications", notificationRoutes(io, userSocketMap));
 app.use("/api/knock", knockRoutes(io, userSocketMap));
+app.use("/api/games", gameRoutes(io, userSocketMap));
 
 io.on("connection", (socket) => {
   console.log(`User connected: ${socket.id}`);
 
+  // It's crucial to set socket.userId right after authentication/connection
+  // This example assumes 'setUserId' is your method for this.
   socket.on("setUserId", async (userId) => {
     if (!userId) {
       console.warn(
@@ -54,6 +61,7 @@ io.on("connection", (socket) => {
       );
       return;
     }
+    socket.userId = userId; // Store userId directly on the socket object
     userSocketMap.set(userId, socket.id);
     console.log(`User ${userId} mapped to socket ${socket.id}`);
 
@@ -165,6 +173,10 @@ io.on("connection", (socket) => {
     socket.to(chatId).emit("stopTyping", { chatId, userId });
   });
 
+  // NEW: Register game socket handlers for this specific socket connection
+  registerGameSocketHandlers(io, userSocketMap, socket);
+
+
   socket.on("disconnect", () => {
     console.log(`User disconnected: ${socket.id}`);
     let disconnectedUserId = null;
@@ -173,6 +185,8 @@ io.on("connection", (socket) => {
         disconnectedUserId = key;
         userSocketMap.delete(key);
         console.log(`User ${key} unmapped from socket ${socket.id}`);
+        // Optional: Handle user leaving mid-game if they disconnect
+        // You might need to check active game sessions and mark players as offline/forfeit
         break;
       }
     }

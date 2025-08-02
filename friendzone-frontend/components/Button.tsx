@@ -14,9 +14,10 @@ interface ButtonProps {
   onLongPress?: () => void;
   children?: React.ReactNode;
   iconName?: keyof typeof Ionicons.glyphMap;
+  disabled?: boolean;
 }
 
-const Button: React.FC<ButtonProps> = ({ title, onPress, onLongPress, style, textStyle, variant = 'default', children, iconName }) => {
+const Button: React.FC<ButtonProps> = ({ title, onPress, onLongPress, style, textStyle, variant = 'default', children, iconName, disabled = false, }) => {
   const { colors } = useTheme();
 
   let buttonBackgroundColor: string;
@@ -55,6 +56,7 @@ const Button: React.FC<ButtonProps> = ({ title, onPress, onLongPress, style, tex
         style,
       ]}
       onLongPress={onLongPress}
+      disabled={disabled}
     >
       {children ? (
         children

@@ -12,6 +12,7 @@ interface CommonHeaderProps {
   titleComponent?: React.ReactNode;
   showBottomBorder?: boolean;
   style?: any;
+  titleColor?: string; 
 }
 
 export default function CommonHeader({
@@ -22,6 +23,7 @@ export default function CommonHeader({
   titleComponent,
   showBottomBorder = true,
   style,
+  titleColor, 
 }: CommonHeaderProps) {
   const { colors } = useTheme();
 
@@ -52,7 +54,7 @@ export default function CommonHeader({
           titleComponent
         ) : (
           title && (
-            <ThemedText type="subtitle" style={[styles.titleText, { color: colors.text }]}>
+            <ThemedText style={[styles.titleText, { color: titleColor || colors.text }]}>
               {title}
             </ThemedText>
           )
@@ -87,6 +89,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   titleText: {
+    fontSize: 18,
     fontWeight: 'bold',
   },
   rightContainer: {

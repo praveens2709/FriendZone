@@ -340,7 +340,6 @@ exports.getKnockers = async (req, res) => {
       status: k.status,
       timestamp: k.createdAt.toISOString()
     })));
-
   } catch (err) {
     console.error('Error getting knockers:', err);
     res.status(500).json({ message: 'Server error' });

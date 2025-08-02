@@ -123,7 +123,7 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabBarBase: {
-    borderTopWidth: 0.5,
+    // borderTopWidth: 0.5,
   },
   tabBarLabel: {
     fontSize: 12,

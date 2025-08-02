@@ -13,9 +13,12 @@ const httpClient = axios.create({
   timeout: 10000,
 });
 
-// Request Interceptor: Add Authorization header
 httpClient.interceptors.request.use(
   async (config: AxiosRequestConfig): Promise<InternalAxiosRequestConfig> => {
+    if (config.url?.includes('/refresh-token')) {
+      return config as InternalAxiosRequestConfig;
+    }
+
     const storedSession = await AsyncStorage.getItem('AuthSession');
     if (storedSession) {
       const session: AuthSession = JSON.parse(storedSession);
@@ -24,6 +27,7 @@ httpClient.interceptors.request.use(
         Authorization: `Bearer ${session.accessToken}`,
       };
     }
+
     return config as InternalAxiosRequestConfig;
   },
   (error: AxiosError) => {
@@ -32,7 +36,6 @@ httpClient.interceptors.request.use(
   }
 );
 
-// Response Interceptor: Handle expired tokens
 httpClient.interceptors.response.use(
   response => response,
   async (error: AxiosError) => {
@@ -52,6 +55,8 @@ httpClient.interceptors.response.use(
         const newAccessToken = await AuthServices.refreshAccessToken();
 
         console.log('[Interceptor] New access token:', newAccessToken);
+
+        originalRequest.timeout = 15000;
 
         originalRequest.headers = {
           ...originalRequest.headers,

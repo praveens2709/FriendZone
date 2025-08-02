@@ -12,6 +12,7 @@ import React from "react";
 import Toast from "react-native-toast-message";
 import CustomToast from "@/components/CustomToast";
 import { ThemedView } from "@/components/ThemedView";
+import { GameProvider } from "@/context/GameContext";
 
 function RootLayoutContent() {
   const { colors } = useTheme();
@@ -63,9 +64,10 @@ export default function RootLayout() {
       <ThemeProvider>
         <LoadingDialogProvider>
           <AuthProvider>
-            {/* Wrap RootLayoutContent with SocketProvider */}
             <SocketProvider>
-              <RootLayoutContent />
+              <GameProvider>
+                <RootLayoutContent />
+              </GameProvider>
             </SocketProvider>
           </AuthProvider>
         </LoadingDialogProvider>

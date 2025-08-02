@@ -32,6 +32,7 @@ import ChatService, {
 } from "@/services/ChatService";
 import { useAuth } from "@/context/AuthContext";
 import { useSocket } from "@/context/SocketContext";
+import TypingIndicator from "@/components/TypingIndicator";
 
 export default function ChatMessagesScreen() {
   const { colors } = useTheme();
@@ -68,9 +69,11 @@ export default function ChatMessagesScreen() {
   const [knockerId, setKnockerId] = useState<string | null>(
     firstMessageByKnockerId || null
   );
+  const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
 
-  const flatListRef = useRef<FlatList>(null);
+  const flatListRef = useRef<FlatList<MessageResponse>>(null);
   const loadingMoreRef = useRef(false);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchMessages = useCallback(
     async (pageNum: number, initialLoad: boolean = false) => {
@@ -91,21 +94,11 @@ export default function ChatMessagesScreen() {
       }
 
       try {
-        console.log("Fetching messages for page:", pageNum);
         const response: GetMessagesResponse = await ChatService.getChatMessages(
           chatId,
           accessToken,
           currentUserId,
           pageNum
-        );
-        console.log(
-          "API Response messages:",
-          response.messages.map((m) => ({
-            id: m.id,
-            sender: m.sender,
-            read: m.read,
-            isTemp: m.isTemp,
-          }))
         );
 
         const sortedMessages = response.messages.sort(compareMessageTimestamps);
@@ -132,7 +125,6 @@ export default function ChatMessagesScreen() {
         setChatIsRestricted(response.isRestricted);
         setKnockerId(response.firstMessageByKnockerId || null);
       } catch (error: any) {
-        console.error("Error fetching messages:", error);
         showToast("error", "Failed to load messages. Please try again.");
       } finally {
         if (initialLoad) {
@@ -146,7 +138,6 @@ export default function ChatMessagesScreen() {
 
   useEffect(() => {
     if (chatId) {
-      console.log("Joining chat:", chatId);
       socket?.emit("joinChat", chatId);
       setPage(1);
       setCurrentMessages([]);
@@ -155,11 +146,16 @@ export default function ChatMessagesScreen() {
 
     return () => {
       if (chatId) {
-        console.log("Leaving chat:", chatId);
         socket?.emit("leaveChat", chatId);
+        if (user?._id) {
+          socket?.emit("stopTyping", { chatId, userId: user._id.toString() });
+        }
+      }
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
       }
     };
-  }, [chatId, fetchMessages, socket]);
+  }, [chatId, fetchMessages, socket, user?._id]);
 
   useEffect(() => {
     if (!isLoadingMessages && currentMessages.length > 0 && page === 1) {
@@ -175,27 +171,26 @@ export default function ChatMessagesScreen() {
 
       const handleNewMessage = (message: any) => {
         if (message.chat === chatId) {
-          console.log("Received new message via socket:", message);
+          let messageSenderId: string;
+          if (typeof message.sender === "string") {
+            messageSenderId = message.sender;
+          } else if (message.sender && typeof message.sender === "object") {
+            messageSenderId =
+              message.sender._id?.toString() || message.sender.id?.toString();
+          } else {
+            messageSenderId = "unknown";
+          }
+
+          const formattedMessage: MessageResponse = {
+            id: message.id || message._id,
+            sender: messageSenderId,
+            text: message.text,
+            timestamp: message.timestamp || new Date().toISOString(),
+            read: false,
+            isTemp: false,
+          };
+
           setCurrentMessages((prevMessages) => {
-            let messageSenderId: string | undefined;
-            if (typeof message.sender === "string") {
-              messageSenderId = message.sender;
-            } else if (message.sender && typeof message.sender === "object") {
-              messageSenderId =
-                message.sender._id?.toString() || message.sender.id?.toString();
-            }
-
-            let initialReadStatus = false;
-
-            const formattedMessage: MessageResponse = {
-              id: message.id || message._id,
-              sender: messageSenderId || "unknown",
-              text: message.text,
-              timestamp: message.timestamp || new Date().toISOString(),
-              read: initialReadStatus,
-              isTemp: false,
-            };
-
             let updatedMessages = [...prevMessages];
             let messageReplaced = false;
 
@@ -204,9 +199,7 @@ export default function ChatMessagesScreen() {
                 (msg) => msg.id === message.clientTempId && msg.isTemp
               );
               if (tempMessageIndex !== -1) {
-                console.log("Replacing temp message with confirmed message.");
-                const existingReadStatus =
-                  updatedMessages[tempMessageIndex].read;
+                const existingReadStatus = updatedMessages[tempMessageIndex].read;
                 updatedMessages[tempMessageIndex] = {
                   ...formattedMessage,
                   read:
@@ -235,15 +228,19 @@ export default function ChatMessagesScreen() {
             }
 
             if (accessToken && chatId && messageSenderId !== currentUserId) {
-              console.log(
-                "Marking messages as read due to new incoming message."
-              );
               ChatService.markMessagesAsRead(chatId, accessToken);
             }
             return updatedMessages;
           });
           setIsSendingMessage(false);
           flatListRef.current?.scrollToEnd({ animated: true });
+          setTypingUsers((prev) => {
+            const newSet = new Set(prev);
+            if (messageSenderId) {
+              newSet.delete(messageSenderId);
+            }
+            return newSet;
+          });
         }
       };
 
@@ -255,18 +252,12 @@ export default function ChatMessagesScreen() {
         userId: string;
       }) => {
         if (readChatId === chatId) {
-          console.log(
-            `Messages read event: Chat ID ${readChatId}, Reader ID ${readerId}`
-          );
           setCurrentMessages((prevMessages) =>
             prevMessages.map((msg) => {
-              const isMyMessage = msg.sender?.toString() === currentUserId;
+              const isMyMessage = msg.sender === currentUserId;
               const isReaderOtherParticipant = readerId !== currentUserId;
 
               if (isMyMessage && isReaderOtherParticipant) {
-                console.log(
-                  `My message ID ${msg.id} marked as read by other participant.`
-                );
                 return { ...msg, read: true };
               }
               return msg;
@@ -282,7 +273,6 @@ export default function ChatMessagesScreen() {
         clientTempId: string;
         error: string;
       }) => {
-        console.error(`Message failed: ${clientTempId}, Error: ${error}`);
         setCurrentMessages((prevMessages) =>
           prevMessages.filter((msg) => msg.id !== clientTempId)
         );
@@ -290,17 +280,63 @@ export default function ChatMessagesScreen() {
         setIsSendingMessage(false);
       };
 
+      const handleTyping = ({ chatId: typingChatId, userId: typingUserId }: { chatId: string, userId: string }) => {
+        if (typingChatId === chatId && typingUserId !== currentUserId) {
+          setTypingUsers((prev) => new Set(prev).add(typingUserId));
+        }
+      };
+
+      const handleStopTyping = ({ chatId: stopTypingChatId, userId: stopTypingUserId }: { chatId: string, userId: string }) => {
+        if (stopTypingChatId === chatId && stopTypingUserId !== currentUserId) {
+          setTypingUsers((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(stopTypingUserId);
+            return newSet;
+          });
+        }
+      };
+
       socket.on("message", handleNewMessage);
       socket.on("messagesRead", handleMessagesRead);
       socket.on("messageFailed", handleMessageFailed);
+      socket.on("typing", handleTyping);
+      socket.on("stopTyping", handleStopTyping);
 
       return () => {
         socket.off("message", handleNewMessage);
         socket.off("messagesRead", handleMessagesRead);
         socket.off("messageFailed", handleMessageFailed);
+        socket.off("typing", handleTyping);
+        socket.off("stopTyping", handleStopTyping);
       };
     }
   }, [socket, chatId, user?._id, accessToken]);
+
+  const handleMessageTextChange = (text: string) => {
+    const currentUserId = user?._id?.toString();
+    if (!socket || !chatId || !currentUserId) return;
+
+    setMessageText(text);
+
+    if (text.length > 0) {
+      socket.emit("typing", { chatId, userId: currentUserId });
+
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
+      typingTimeoutRef.current = setTimeout(() => {
+        socket.emit("stopTyping", { chatId, userId: currentUserId });
+        typingTimeoutRef.current = null;
+      }, 2000);
+    } else {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      socket.emit("stopTyping", { chatId, userId: currentUserId });
+    }
+  };
 
   const handleSendMessage = async () => {
     const currentUserId = user?._id?.toString();
@@ -311,13 +347,11 @@ export default function ChatMessagesScreen() {
       !currentUserId ||
       isSendingMessage
     ) {
-      console.log("Send message conditions not met.");
       return;
     }
 
     const isCurrentUserKnocker = currentUserId === knockerId;
     if (chatIsRestricted && knockerId && isCurrentUserKnocker) {
-      console.warn("User is knocker in restricted chat, cannot send.");
       showToast(
         "error",
         "You've already sent your first message in this restricted chat. The recipient needs to reply to unlock it."
@@ -338,7 +372,6 @@ export default function ChatMessagesScreen() {
       isTemp: true,
     };
 
-    console.log("Adding temporary message:", newMessage);
     setCurrentMessages((prevMessages) => {
       const newMessages = [...prevMessages, newMessage];
       newMessages.sort(compareMessageTimestamps);
@@ -347,8 +380,15 @@ export default function ChatMessagesScreen() {
     setMessageText("");
     flatListRef.current?.scrollToEnd({ animated: true });
 
+    if (user?._id) {
+      socket?.emit("stopTyping", { chatId, userId: user._id.toString() });
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+    }
+
     try {
-      console.log("Emitting sendMessage event to socket.");
       socket?.emit("sendMessage", {
         chatId,
         senderId: currentUserId,
@@ -357,7 +397,6 @@ export default function ChatMessagesScreen() {
         clientTempId: clientTempId,
       });
     } catch (error: any) {
-      console.error("Error emitting sendMessage:", error);
       showToast("error", "Failed to send message. Please try again.");
       setCurrentMessages((prevMessages) =>
         prevMessages.filter((msg) => msg.id !== clientTempId)
@@ -369,7 +408,6 @@ export default function ChatMessagesScreen() {
 
   const handleLoadOlderMessages = () => {
     if (hasMoreMessages && !loadingMoreRef.current && page < totalPages) {
-      console.log("Loading older messages, incrementing page to:", page + 1);
       setPage((prevPage) => prevPage + 1);
       fetchMessages(page + 1);
     }
@@ -378,7 +416,6 @@ export default function ChatMessagesScreen() {
   useEffect(() => {
     if (socket && user?._id && chatId) {
       socket.emit("markMessagesAsRead", { chatId, userId: user._id });
-      console.log(`[ChatScreen] Emitted markMessagesAsRead for chat ${chatId}`);
     }
   }, [chatId, socket, user?._id]);
 
@@ -513,6 +550,8 @@ export default function ChatMessagesScreen() {
     );
   };
 
+  const showTypingIndicator = typingUsers.size > 0;
+
   return (
     <ThemedSafeArea style={styles.safeArea}>
       <CommonHeader
@@ -592,6 +631,8 @@ export default function ChatMessagesScreen() {
           )}
         </LinearGradient>
 
+        <TypingIndicator isTyping={showTypingIndicator} />
+
         <ThemedView
           style={[
             styles.inputArea,
@@ -616,7 +657,7 @@ export default function ChatMessagesScreen() {
             }
             placeholderTextColor={colors.text}
             value={messageText}
-            onChangeText={setMessageText}
+            onChangeText={handleMessageTextChange}
             multiline
             editable={!(chatIsRestricted && user?._id === knockerId)}
           />
