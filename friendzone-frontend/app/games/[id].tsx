@@ -242,7 +242,7 @@ export default function GameSessionScreen() {
   return (
     <ImageBackground source={GAMING_BACKGROUND_IMAGE} style={styles.container}>
       <ThemedSafeArea style={styles.safeArea}>
-        <View style={styles.gameContent}>
+        <ThemedView style={styles.gameContent}>
           {renderGameSpecificUI()}
           {isMakingMove && (
             <ThemedText
@@ -251,19 +251,19 @@ export default function GameSessionScreen() {
               Sending move...
             </ThemedText>
           )}
-        </View>
+        </ThemedView>
       </ThemedSafeArea>
       {gameState?.status === "pending" && (
-        <View style={styles.fullScreenOverlay}>
-          <View style={styles.overlayContent}>
+        <ThemedView style={styles.fullScreenOverlay}>
+          <ThemedView style={styles.overlayContent}>
             <ActivityIndicator size="small" color="#fff" />
             <ThemedText style={styles.overlayText}>
               {gameIdentifier === "snake_ladder"
                 ? "Waiting for all players to accept the invite..."
                 : "Waiting for opponent to accept the invite..."}
             </ThemedText>
-          </View>
-        </View>
+          </ThemedView>
+        </ThemedView>
       )}
     </ImageBackground>
   );

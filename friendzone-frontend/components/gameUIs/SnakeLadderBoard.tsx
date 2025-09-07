@@ -5,6 +5,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/context/ThemeContext";
 import Button from '@/components/Button';
 import ThemedModal from '@/components/ThemedModal';
+import { ThemedView } from "../ThemedView";
 
 const { width: screenWidth } = Dimensions.get("window");
 const BOARD_DIM = screenWidth - 10;
@@ -186,7 +187,7 @@ const SnakeLadderBoard: React.FC<SnakeLadderBoardProps> = ({
     return Object.entries(positionMap).map(([pos, playersAtPos]) => {
       const coords = getCellCoordinates(Number(pos));
       return (
-        <View
+        <ThemedView
           key={pos}
           style={{
             position: 'absolute',
@@ -233,7 +234,7 @@ const SnakeLadderBoard: React.FC<SnakeLadderBoardProps> = ({
               </Animated.View>
             );
           })}
-        </View>
+        </ThemedView>
       );
     });
   }, [gameState.players, currentUserId, colors, playerTokenSize]);
@@ -243,7 +244,7 @@ const SnakeLadderBoard: React.FC<SnakeLadderBoardProps> = ({
   const isGameOver = gameState.status === "gameOver" || gameState.status === "completed" || gameState.status === "draw";
 
   return (
-    <View style={styles.boardContainer}>
+    <ThemedView style={styles.boardContainer}>
       <ImageBackground
         source={require("@/assets/images/snakeandladder.webp")}
         style={styles.boardGrid}
@@ -251,7 +252,7 @@ const SnakeLadderBoard: React.FC<SnakeLadderBoardProps> = ({
       >
         {renderPlayers()}
       </ImageBackground>
-      <View style={styles.controlsContainer}>
+      <ThemedView style={styles.controlsContainer}>
         {gameState.status === "playing" && (
           <ThemedText style={[styles.currentPlayerText, { color: colors.textDim }]}> {isMyTurn ? "It's your turn!" : `Waiting for ${gameState.players.find((p) => p.userId === gameState.currentPlayer)?.username || "opponent"}'s turn`} </ThemedText>
         )}
@@ -295,8 +296,8 @@ const SnakeLadderBoard: React.FC<SnakeLadderBoardProps> = ({
               : "It's a draw!"}
           </ThemedText>
         ) : null}
-      </View>
-      <View style={styles.bottomButtonsRow}>
+      </ThemedView>
+      <ThemedView style={styles.bottomButtonsRow}>
         {isGameOver ? (
           <Button title="Play Again" onPress={onPlayAgain} style={styles.fullWidthButton} />
         ) : (
@@ -305,7 +306,7 @@ const SnakeLadderBoard: React.FC<SnakeLadderBoardProps> = ({
             <Button title="Quit" onPress={() => setShowQuitModal(true)} style={styles.actionButton} />
           </>
         )}
-      </View>
+      </ThemedView>
       {showQuitModal && (
         <ThemedModal visible={showQuitModal} onClose={() => setShowQuitModal(false)}>
           <ThemedText
@@ -314,7 +315,7 @@ const SnakeLadderBoard: React.FC<SnakeLadderBoardProps> = ({
           >
             Are you sure you want to quit the game?
           </ThemedText>
-          <View style={styles.modalButtonRow}>
+          <ThemedView style={styles.modalButtonRow}>
             <Button
               title="Cancel"
               onPress={() => setShowQuitModal(false)}
@@ -325,10 +326,10 @@ const SnakeLadderBoard: React.FC<SnakeLadderBoardProps> = ({
               onPress={() => { onQuit(); setShowQuitModal(false); }}
               style={styles.actionButton}
             />
-          </View>
+          </ThemedView>
         </ThemedModal>
       )}
-    </View>
+    </ThemedView>
   );
 };
 

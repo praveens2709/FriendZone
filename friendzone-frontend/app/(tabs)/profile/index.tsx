@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { StyleSheet, TouchableOpacity, View, Platform, ActivityIndicator } from "react-native";
+import { StyleSheet, TouchableOpacity, View, Platform, ActivityIndicator, ScrollView } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemedText } from "@/components/ThemedText";
@@ -14,9 +14,12 @@ import AuthModalContent from "@/components/AuthModalContent";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import CommonHeader from "@/components/CommonHeader";
 import KnockService, { KnockRequest } from "@/services/knockService";
+import PostService from "@/services/PostService";
 import { categorizeKnocks } from "@/utils/knock-utils";
 import { KnockListType } from "@/types/knock.type";
 import { useSocket } from "@/context/SocketContext";
+import { Post as PostType } from "@/types/post.type";
+import PostGrid, { PostItem } from "@/components/PostGrid";
 
 export default function ProfileScreen() {
   const { colors } = useTheme();
@@ -27,7 +30,6 @@ export default function ProfileScreen() {
   const [showMainModal, setShowMainModal] = useState(false);
   const [showAddAccountModal, setShowAddAccountModal] = useState(false);
   const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState(false);
-
   const [showAuthFlowModal, setShowAuthFlowModal] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
 
@@ -39,7 +41,11 @@ export default function ProfileScreen() {
   const [knockingList, setKnockingList] = useState<KnockRequest[]>([]);
   const [lockedInList, setLockedInList] = useState<KnockRequest[]>([]);
 
+  const [userPosts, setUserPosts] = useState<PostType[]>([]);
+  const [savedPosts, setSavedPosts] = useState<PostType[]>([]);
   const [loadingKnocks, setLoadingKnocks] = useState(true);
+  const [loadingPosts, setLoadingPosts] = useState(true);
+  const [activeTab, setActiveTab] = useState("posts");
 
   const fetchKnockData = useCallback(async () => {
     if (!user || !accessToken) {
@@ -48,7 +54,6 @@ export default function ProfileScreen() {
     }
 
     setLoadingKnocks(true);
-
     try {
       const [myReceivedKnocks, mySentKnocks] = await Promise.all([
         KnockService.getKnockers(accessToken),
@@ -64,7 +69,6 @@ export default function ProfileScreen() {
       setKnockersList(knockers);
       setKnockingList(knocking);
       setLockedInList(lockedIn);
-
       setKnockersCount(knockers.length);
       setKnockingCount(knocking.length);
       setLockedInCount(lockedInCount);
@@ -78,8 +82,39 @@ export default function ProfileScreen() {
     }
   }, [user, accessToken]);
 
+  const fetchUserPosts = useCallback(async () => {
+    if (!user || !accessToken) {
+      setLoadingPosts(false);
+      return;
+    }
+
+    setLoadingPosts(true);
+    try {
+      const allPosts = await PostService.getPosts(accessToken);
+      const posts = allPosts.filter(post => post.user._id === user._id);
+      setUserPosts(posts);
+      setSavedPosts([]);
+    } catch (error) {
+      console.error("Failed to fetch user posts:", error);
+    } finally {
+      setLoadingPosts(false);
+    }
+  }, [user, accessToken]);
+
+  const handlePressPost = (item: PostItem) => {
+    let postsToUse = activeTab === "posts" ? userPosts : savedPosts;
+    const postData = postsToUse.find(p => p._id === item.id);
+    if (postData) {
+      router.push({
+        pathname: "/posts/[postId]",
+        params: { postId: postData._id }
+      });
+    }
+  };
+
   useEffect(() => {
     fetchKnockData();
+    fetchUserPosts();
 
     if (socket && user) {
       const handleKnockStatusChange = (data: { userId: string }) => {
@@ -87,14 +122,13 @@ export default function ProfileScreen() {
           fetchKnockData();
         }
       };
-
       socket.on('knockStatusChanged', handleKnockStatusChange);
 
       return () => {
         socket.off('knockStatusChanged', handleKnockStatusChange);
       };
     }
-  }, [fetchKnockData, socket, user]);
+  }, [fetchKnockData, fetchUserPosts, socket, user]);
 
   if (authLoading || loadingKnocks) {
     return (
@@ -159,6 +193,13 @@ export default function ProfileScreen() {
     </TouchableOpacity>
   );
 
+  const postsForGrid: PostItem[] = (activeTab === "posts" ? userPosts : savedPosts).map(post => ({
+    id: post._id,
+    thumbnail: post.images[0]?.url,
+    isMultiple: post.images.length > 1,
+    type: "image",
+  }));
+
   return (
     <LinearGradient colors={colors.gradient} style={styles.container}>
       <ThemedSafeArea style={styles.safeAreaTransparentBg}>
@@ -190,47 +231,89 @@ export default function ProfileScreen() {
           }
           showBottomBorder={true}
         />
-        <ThemedView style={styles.profileInfoContainer}>
-          <UserAvatar imageUri={user.profileImage} size={100} />
-          <ThemedText type="title" style={styles.fullName}>
-            {user.firstName} {user.lastName}
-          </ThemedText>
-          {user.bio && (
-            <ThemedText
-              type="default"
-              style={[styles.bio, { color: colors.textDim }]}
-            >
-              {user.bio}
+        <ScrollView style={styles.scrollView}>
+          <ThemedView style={styles.profileInfoContainer}>
+            <UserAvatar imageUri={user.profileImage} size={100} />
+            <ThemedText type="title" style={styles.fullName}>
+              {user.firstName} {user.lastName}
             </ThemedText>
-          )}
+            {user.bio && (
+              <ThemedText
+                type="default"
+                style={[styles.bio, { color: colors.textDim }]}
+              >
+                {user.bio}
+              </ThemedText>
+            )}
 
-          <ThemedView style={styles.knockStatsContainer}>
-            {renderStatItem(
-              "Knockers",
-              knockersCount,
-              knockersList,
-              KnockListType.Knockers
-            )}
-            {renderStatItem(
-              "Knocking",
-              knockingCount,
-              knockingList,
-              KnockListType.Knocking
-            )}
-            {renderStatItem(
-              "LockedIn",
-              lockedInCount,
-              lockedInList,
-              KnockListType.LockedIn
-            )}
+            <ThemedView style={styles.knockStatsContainer}>
+              {renderStatItem(
+                "Knockers",
+                knockersCount,
+                knockersList,
+                KnockListType.Knockers
+              )}
+              {renderStatItem(
+                "Knocking",
+                knockingCount,
+                knockingList,
+                KnockListType.Knocking
+              )}
+              {renderStatItem(
+                "LockedIn",
+                lockedInCount,
+                lockedInList,
+                KnockListType.LockedIn
+              )}
+            </ThemedView>
+
+            <Button
+              title="Edit Profile"
+              onPress={() => router.push("/profile/settings")}
+              style={styles.editProfileButton}
+            />
           </ThemedView>
 
-          <Button
-            title="Edit Profile"
-            onPress={() => router.push("/profile/settings")}
-            style={styles.editProfileButton}
-          />
-        </ThemedView>
+          {/* New Tab Bar */}
+          <ThemedView style={styles.tabBar}>
+            <TouchableOpacity
+              style={styles.tabItem}
+              onPress={() => setActiveTab("posts")}
+            >
+              <Ionicons name="grid" size={24} color={activeTab === "posts" ? colors.text : colors.primary} />
+              {activeTab === "posts" && (
+                <View style={[styles.activeTabIndicator, { backgroundColor: colors.text }]} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.tabItem}
+              onPress={() => setActiveTab("saved")}
+            >
+              <Ionicons name="bookmark" size={24} color={activeTab === "saved" ? colors.text : colors.primary} />
+              {activeTab === "saved" && (
+                <View style={[styles.activeTabIndicator, { backgroundColor: colors.text }]} />
+              )}
+            </TouchableOpacity>
+          </ThemedView>
+
+          {/* Content based on active tab */}
+          <ThemedView style={styles.postsSection}>
+            {loadingPosts ? (
+              <ActivityIndicator size="small" color={colors.text} />
+            ) : postsForGrid.length > 0 ? (
+              <PostGrid posts={postsForGrid} onPressPost={handlePressPost} />
+            ) : (
+              <View style={styles.noPostsContainer}>
+                <ThemedText style={[styles.noPostsText, {color: colors.text}]}>
+                  {activeTab === "posts" ? "No posts yet." : "No saved posts yet."}
+                </ThemedText>
+                <ThemedText style={[styles.noPostsSubtext, {color: colors.textDim}]}>
+                  {activeTab === "posts" ? "Create your first post to see it here." : "Save a post to see it here."}
+                </ThemedText>
+              </View>
+            )}
+          </ThemedView>
+        </ScrollView>
       </ThemedSafeArea>
       <ThemedModal
         visible={showMainModal}
@@ -388,6 +471,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
+  scrollView: {
+    flex: 1,
+  },
   userHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -399,8 +485,6 @@ const styles = StyleSheet.create({
   profileInfoContainer: {
     alignItems: "center",
     paddingVertical: 20,
-    borderBottomWidth: 1,
-    marginBottom: 5,
     paddingHorizontal: 20,
   },
   fullName: {
@@ -476,5 +560,44 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 14,
+  },
+  postsSection: {
+    flex: 1,
+    paddingHorizontal: 2,
+  },
+  noPostsContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: 50,
+  },
+  noPostsText: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 5,
+  },
+  noPostsSubtext: {
+    fontSize: 14,
+    textAlign: "center",
+  },
+  tabBar: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "flex-end",
+    marginBottom: 2
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: "center",
+    paddingTop: 10,
+    paddingBottom: 12,
+  },
+  activeTabIndicator: {
+    height: 2,
+    width: "25%",
+    backgroundColor: 'white',
+    borderRadius: 2,
+    position: 'absolute',
+    bottom: 0, // Position at the bottom of the tabItem container
   },
 });

@@ -161,7 +161,7 @@ const TicTacToeBoard: React.FC<TicTacToeBoardProps> = ({
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <View
+      <ThemedView
         style={[styles.playerInfoContainer, { borderColor: "white", backgroundColor: 'transparent' }]}
       >
         {myPlayer && (
@@ -193,15 +193,15 @@ const TicTacToeBoard: React.FC<TicTacToeBoardProps> = ({
             </ThemedText>
           </ThemedView>
         )}
-      </View>
+      </ThemedView>
       
-      <View style={[styles.board, { backgroundColor: 'transparent' }]}>
+      <ThemedView style={[styles.board, { backgroundColor: 'transparent' }]}>
         {[...Array(9)].map((_, index) => renderCell(index))}
-      </View>
+      </ThemedView>
 
-      <View style={styles.bottomButtonsRow}>
+      <ThemedView style={styles.bottomButtonsRow}>
         {renderActionButtons()}
-      </View>
+      </ThemedView>
 
       {showQuitModal && (
         <ThemedModal visible={showQuitModal} onClose={() => setShowQuitModal(false)}>
@@ -211,7 +211,7 @@ const TicTacToeBoard: React.FC<TicTacToeBoardProps> = ({
           >
             Are you sure you want to quit the game?
           </ThemedText>
-          <View style={styles.modalButtonRow}>
+          <ThemedView style={styles.modalButtonRow}>
             <Button
               title="Cancel"
               onPress={() => setShowQuitModal(false)}
@@ -222,7 +222,7 @@ const TicTacToeBoard: React.FC<TicTacToeBoardProps> = ({
               onPress={() => { onQuit(); setShowQuitModal(false); }}
               style={styles.actionButton}
             />
-          </View>
+          </ThemedView>
         </ThemedModal>
       )}
     </ThemedView>

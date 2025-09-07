@@ -1,2 +1,0 @@
-# FriendZone
-# FriendZone

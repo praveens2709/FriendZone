@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
-  email: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true, index: true },
   password: { type: String, required: true },
   isVerified: { type: Boolean, default: false },
   otp: String,
@@ -13,9 +13,15 @@ const userSchema = new mongoose.Schema({
   gender: String,
   dob: Date,
   bio: String,
-  phone: String,
-  profileImage: String,
-  additionalImages: [String],
+  phone: { type: String, unique: true, sparse: true },
+  profileImage: {
+    url: String,
+    public_id: String,
+  },
+  additionalImages: [{
+    url: String,
+    public_id: String,
+  }],
   isPrivate: { type: Boolean, default: false },
 
   chats: [{

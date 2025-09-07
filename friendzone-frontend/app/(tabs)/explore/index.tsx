@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   StyleSheet,
   TextInput,
@@ -8,21 +8,34 @@ import {
   RefreshControl,
   KeyboardAvoidingView,
   Platform,
-  Dimensions,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
-import { useAuth } from "@/context/AuthContext";
-import { getUserAvatar, showToast, getUserStatusLabel } from "@/constants/Functions";
-import KnockService, { KnockRequest, UserSearchResult } from "@/services/knockService";
+import {
+  getUserAvatar,
+  showToast,
+  getUserStatusLabel,
+} from "@/constants/Functions";
+import KnockService, {
+  KnockRequest,
+  UserSearchResult,
+} from "@/services/knockService";
 import ChatService from "@/services/ChatService";
 import UserProfileCard from "@/components/UserProfileCard";
 import UserSearchLoader from "@/components/UserSearchLoader";
+import CategoryCircle from "@/components/CategoryCircle";
+import PostGrid, { PostItem } from "@/components/PostGrid";
+import { useAuth } from "@/context/AuthContext";
+import ThemedScrollView from "@/components/ThemedScrollView";
+import CategoryLoader from "@/components/CategoryLoader";
+import PostGridLoader from "@/components/PostgridLoader";
 
 interface ExploreDisplayUser {
   id: string;
@@ -34,21 +47,83 @@ interface ExploreDisplayUser {
   knockId?: string;
 }
 
-const screenWidth = Dimensions.get('window').width;
+const categoriesData = [
+  {
+    id: "profileBased",
+    label: "Profiles",
+    mainImage: "https://i.pinimg.com/474x/26/f0/29/26f029e054e73facfb522b2abed7e49d.jpg",
+    avatars: [
+      "https://randomuser.me/api/portraits/women/11.jpg",
+      "https://randomuser.me/api/portraits/men/21.jpg",
+      "https://randomuser.me/api/portraits/women/31.jpg",
+      "https://randomuser.me/api/portraits/men/41.jpg",
+    ],
+  },
+  {
+    id: "locationBased",
+    label: "Nearby",
+    mainImage: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ5dQyKA-MZ5CYCviWJr80rng1OHJcn5jAaSw&s",
+    avatars: [
+      "https://randomuser.me/api/portraits/men/51.jpg",
+      "https://randomuser.me/api/portraits/women/61.jpg",
+    ],
+  },
+  {
+    id: "birthdays",
+    label: "Birthdays",
+    mainImage: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQCIyUj-DZtOHXgViANsPt1M4VtXowny1FzlQ&s",
+    avatars: [
+      "https://randomuser.me/api/portraits/women/71.jpg",
+      "https://randomuser.me/api/portraits/men/81.jpg",
+    ],
+  },
+];
+
+const postsData: PostItem[] = [
+  { id: "1", thumbnail: "https://randomuser.me/api/portraits/women/71.jpg", type: "image" },
+  { id: "2", thumbnail: "https://randomuser.me/api/portraits/men/81.jpg", type: "video" },
+  { id: "3", thumbnail: "https://randomuser.me/api/portraits/women/61.jpg", type: "image" },
+  { id: "4", thumbnail: "https://randomuser.me/api/portraits/men/51.jpg", type: "image" },
+  { id: "5", thumbnail: "https://randomuser.me/api/portraits/women/11.jpg", type: "video" },
+];
 
 export default function ExploreScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { accessToken, user } = useAuth();
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [users, setUsers] = useState<ExploreDisplayUser[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
+  const searchQueryRef = useRef("");
+  const usersRef = useRef<ExploreDisplayUser[]>([]);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [users, setUsers] = useState<ExploreDisplayUser[]>([]);
+  const textInputRef = useRef<TextInput>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      console.log("➡️ Screen focused. Restoring state.");
+      setSearchQuery(searchQueryRef.current);
+      setUsers(usersRef.current);
+      setInitialLoading(false);
+
+      return () => {
+        console.log("⬅️ Screen blurred.");
+      };
+    }, [])
+  );
+
   const determineUserRelation = useCallback(
-    (allUsers: UserSearchResult[], knockers: KnockRequest[], knocked: KnockRequest[], currentUserId: string) => {
+    (
+      allUsers: UserSearchResult[],
+      knockers: KnockRequest[],
+      knocked: KnockRequest[],
+      currentUserId: string
+    ) => {
       const usersMap = new Map<string, ExploreDisplayUser>();
 
       allUsers.forEach((u) => {
@@ -80,24 +155,26 @@ export default function ExploreScreen() {
         const existing = usersMap.get(k.user.id);
         if (existing) {
           if (existing.relationToMe === "knocker" && k.status === "lockedIn") {
-                usersMap.set(k.user.id, {
-                    ...existing,
-                    status: k.status,
-                    relationToMe: "lockedIn",
-                    knockId: existing.knockId || k.id,
-                });
+            usersMap.set(k.user.id, {
+              ...existing,
+              status: k.status,
+              relationToMe: "lockedIn",
+              knockId: existing.knockId || k.id,
+            });
           } else if (existing.relationToMe !== "knocker") {
-              usersMap.set(k.user.id, {
-                  ...existing,
-                  status: k.status,
-                  relationToMe: "knocked",
-                  knockId: k.id,
-              });
+            usersMap.set(k.user.id, {
+              ...existing,
+              status: k.status,
+              relationToMe: "knocked",
+              knockId: k.id,
+            });
           }
         }
       });
 
-      return Array.from(usersMap.values()).filter(u => u.id !== currentUserId);
+      return Array.from(usersMap.values()).filter(
+        (u) => u.id !== currentUserId
+      );
     },
     []
   );
@@ -108,7 +185,7 @@ export default function ExploreScreen() {
         setIsSearching(false);
         return;
       }
-
+      console.log("🌐 Fetching users for query:", query);
       try {
         const [searchResults, knockersResponse, knockedResponse] =
           await Promise.all([
@@ -123,10 +200,12 @@ export default function ExploreScreen() {
           knockedResponse,
           user._id
         );
+        usersRef.current = processedUsers;
         setUsers(processedUsers);
       } catch (error) {
-        console.error("Failed to fetch users:", error);
+        console.error("❌ Failed to fetch users:", error);
         showToast("error", "Failed to load users.");
+        usersRef.current = [];
         setUsers([]);
       } finally {
         setIsSearching(false);
@@ -136,38 +215,51 @@ export default function ExploreScreen() {
     [accessToken, user?._id, determineUserRelation]
   );
 
-  const searchTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSearch = useCallback(
     (text: string) => {
       setSearchQuery(text);
+      searchQueryRef.current = text;
 
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
 
       if (text.length === 0) {
+        usersRef.current = [];
         setUsers([]);
         setIsSearching(false);
         return;
       }
 
       setIsSearching(true);
-      searchTimeoutRef.current = setTimeout(() => {
-        fetchUsers(text);
+      searchTimeoutRef.current = setTimeout(async () => {
+        await fetchUsers(text);
       }, 500);
     },
     [fetchUsers]
   );
 
+  const handleClearSearch = () => {
+    console.log("🧹 Clearing search query and results.");
+    setSearchQuery("");
+    searchQueryRef.current = "";
+    usersRef.current = [];
+    setUsers([]);
+    setIsSearching(false);
+    textInputRef.current?.focus();
+  };
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setSearchQuery("");
-    setUsers([]);
-    fetchUsers("");
-  }, [fetchUsers]);
+    if (searchQuery.length > 0) {
+      fetchUsers(searchQuery);
+    } else {
+      // Simulate fetching for non-search content
+      setTimeout(() => setRefreshing(false), 1500);
+    }
+  }, [fetchUsers, searchQuery]);
 
   const handleUserAction = async (targetUser: ExploreDisplayUser) => {
     if (!accessToken || actionLoadingId) {
@@ -175,6 +267,7 @@ export default function ExploreScreen() {
     }
 
     setActionLoadingId(targetUser.id);
+    console.log("➡️ Action button pressed. Processing action.");
 
     try {
       if (targetUser.relationToMe === "lockedIn") {
@@ -194,18 +287,21 @@ export default function ExploreScreen() {
         });
       } else if (targetUser.relationToMe === "knocker") {
         if (targetUser.knockId) {
-             await KnockService.knockBack(targetUser.knockId, accessToken);
-             showToast("success", `You knocked back ${targetUser.username}! You are now LockedIn!`);
+          await KnockService.knockBack(targetUser.knockId, accessToken);
+          showToast(
+            "success",
+            `You knocked back ${targetUser.username}! You are now LockedIn!`
+          );
         } else {
-             showToast("error", "Knock ID not found for knock back action.");
+          showToast("error", "Knock ID not found for knock back action.");
         }
       } else if (targetUser.relationToMe === "stranger") {
         await KnockService.knockUser(targetUser.id, accessToken);
         showToast("success", `Knock sent to ${targetUser.username}!`);
       }
-      await fetchUsers(searchQuery);
+      await fetchUsers(searchQueryRef.current);
     } catch (error: any) {
-      console.error("Action failed:", error);
+      console.error("❌ Action failed:", error);
       showToast(
         "error",
         error.response?.data?.message || "Failed to perform action."
@@ -213,6 +309,11 @@ export default function ExploreScreen() {
     } finally {
       setActionLoadingId(null);
     }
+  };
+
+  const handleCardPress = (item: ExploreDisplayUser) => {
+    console.log("➡️ User card tapped. Navigating to profile.");
+    router.push(`/profile/${item.id}`);
   };
 
   const renderUserItem = ({ item }: { item: ExploreDisplayUser }) => {
@@ -254,141 +355,207 @@ export default function ExploreScreen() {
     const description = getUserStatusLabel(item.status, item.relationToMe);
 
     return (
-      <UserProfileCard
-        userId={item.id}
-        username={item.username}
-        avatar={item.avatar}
-        description={description}
-        isLoading={actionLoadingId === item.id}
-        rightActionComponent={
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              {
-                backgroundColor: buttonBackgroundColor,
-                borderColor: buttonBorderColor,
-                opacity: isDisabled ? 0.6 : 1,
-              },
-            ]}
-            onPress={() => handleUserAction(item)}
-            disabled={isDisabled || actionLoadingId === item.id}
-          >
-            <ThemedText style={[styles.actionButtonText, { color: buttonTextColor }]}>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => handleCardPress(item)}
+      >
+        <UserProfileCard
+          userId={item.id}
+          username={item.username}
+          avatar={item.avatar}
+          description={description}
+          isLoading={actionLoadingId === item.id}
+          rightActionComponent={
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                {
+                  backgroundColor: buttonBackgroundColor,
+                  borderColor: buttonBorderColor,
+                  opacity: isDisabled ? 0.6 : 1,
+                },
+              ]}
+              onPress={() => handleUserAction(item)}
+              disabled={isDisabled || actionLoadingId === item.id}
+            >
+              <ThemedText
+                style={[styles.actionButtonText, { color: buttonTextColor }]}
+              >
                 {buttonText}
-            </ThemedText>
-          </TouchableOpacity>
-        }
-      />
+              </ThemedText>
+            </TouchableOpacity>
+          }
+        />
+      </TouchableOpacity>
     );
   };
 
-  const showLoader = isSearching && users.length === 0;
+  const showSearchLoader = isSearching && users.length === 0;
+
+  const renderContent = () => {
+    if (searchQuery.length > 0) {
+      if (showSearchLoader) {
+        return (
+          <ThemedView style={[styles.loaderContainer, {paddingHorizontal: 15}]}>
+            {[...Array(5)].map((_, i) => (
+              <UserSearchLoader key={i} />
+            ))}
+          </ThemedView>
+        );
+      }
+      return (
+        <FlatList
+          data={users}
+          renderItem={renderUserItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          ItemSeparatorComponent={() => (
+            <ThemedView
+              style={[styles.separator, { backgroundColor: colors.border }]}
+            />
+          )}
+          ListEmptyComponent={() => (
+            <ThemedView style={styles.emptyListContainer}>
+              <ThemedText
+                style={{
+                  fontSize: 16,
+                  textAlign: "center",
+                  color: colors.textDim,
+                }}
+              >
+                No users found matching your search.
+              </ThemedText>
+            </ThemedView>
+          )}
+          keyboardShouldPersistTaps="handled"
+        />
+      );
+    } else {
+      if (initialLoading || refreshing) {
+        return (
+          <ThemedView style={styles.loaderContainer}>
+            <CategoryLoader />
+            <ThemedView style={styles.postGridSection}>
+              <PostGridLoader />
+            </ThemedView>
+          </ThemedView>
+        );
+      }
+      
+      return (
+        <ThemedScrollView
+          style={styles.scrollView}
+          contentContainerStyle={{
+            flexGrow: 1,
+            justifyContent: 'flex-start'
+          }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+            />
+          }
+        >
+          <ThemedView style={{ marginBottom: 16 }}>
+            <FlatList
+              data={categoriesData}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <CategoryCircle
+                  label={item.label}
+                  mainImage={item.mainImage}
+                  avatars={item.avatars}
+                  onPress={() => router.push({
+                    pathname: "/(tabs)/explore/CategoryDetailScreen",
+                    params: { categoryId: item.id, categoryName: item.label }
+                  })}
+                />
+              )}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingHorizontal: 20,
+              }}
+            />
+          </ThemedView>
+
+          <ThemedView style={styles.postGridSection}>
+            <PostGrid
+              posts={postsData}
+              onPressPost={(item) => console.log("Tapped post:", item.id)}
+            />
+          </ThemedView>
+        </ThemedScrollView>
+      );
+    }
+  };
 
   return (
     <LinearGradient colors={colors.gradient} style={styles.container}>
       <ThemedSafeArea style={styles.safeArea}>
-        <KeyboardAvoidingView
-          style={styles.content}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-        >
-          <ThemedView
-            style={[
-              styles.searchContainer,
-              {
-                backgroundColor: colors.buttonBackgroundSecondary,
-                borderColor: colors.border,
-              },
-            ]}
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <KeyboardAvoidingView
+            style={styles.content}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
           >
-            <Feather
-              name="search"
-              size={20}
-              color={colors.textDim}
-              style={styles.searchIcon}
-            />
-            <TextInput
+            <ThemedView
               style={[
-                styles.searchInput,
+                styles.searchContainer,
                 {
-                  color: colors.text,
                   backgroundColor: colors.buttonBackgroundSecondary,
+                  borderColor: colors.border,
                 },
               ]}
-              placeholder="Search users"
-              placeholderTextColor={colors.textDim}
-              value={searchQuery}
-              onChangeText={handleSearch}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            {isSearching && (
-              <ActivityIndicator
-                size="small"
-                color={colors.primary}
-                style={styles.searchLoading}
+            >
+              <Feather
+                name="search"
+                size={20}
+                color={colors.textDim}
+                style={styles.searchIcon}
               />
-            )}
-          </ThemedView>
-
-          {showLoader ? (
-            <ThemedView style={styles.loaderContainer}>
-              {[...Array(5)].map((_, i) => (
-                <UserSearchLoader key={i} />
-              ))}
+              <TextInput
+                ref={textInputRef}
+                style={[
+                  styles.searchInput,
+                  {
+                    color: colors.text,
+                    backgroundColor: colors.buttonBackgroundSecondary,
+                  },
+                ]}
+                placeholder="Search users"
+                placeholderTextColor={colors.textDim}
+                value={searchQuery}
+                onChangeText={handleSearch}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={handleClearSearch} style={styles.clearIcon}>
+                  <Feather name="x" size={20} color={colors.textDim} />
+                </TouchableOpacity>
+              )}
+              {isSearching && (
+                <ActivityIndicator
+                  size="small"
+                  color={colors.primary}
+                  style={styles.searchLoading}
+                />
+              )}
             </ThemedView>
-          ) : (
-            <FlatList
-              data={users}
-              renderItem={renderUserItem}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.listContent}
-              ItemSeparatorComponent={() => (
-                <ThemedView
-                  style={[styles.separator, { backgroundColor: colors.border }]}
-                />
-              )}
-              ListEmptyComponent={() => (
-                <ThemedView style={styles.emptyListContainer}>
-                  <ThemedText
-                    style={{
-                      fontSize: 16,
-                      textAlign: "center",
-                      color: colors.textDim,
-                    }}
-                  >
-                    {searchQuery.length > 0
-                      ? "No users found matching your search."
-                      : "Start typing to search for users."}
-                  </ThemedText>
-                </ThemedView>
-              )}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={onRefresh}
-                  tintColor={colors.primary}
-                />
-              }
-            />
-          )}
-        </KeyboardAvoidingView>
+            {renderContent()}
+          </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
       </ThemedSafeArea>
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-    backgroundColor: "transparent",
-  },
-  content: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  scrollView: { flex: 1, backgroundColor: "transparent" },
+  safeArea: { flex: 1, backgroundColor: "transparent" },
+  content: { flex: 1 },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -399,25 +566,11 @@ const styles = StyleSheet.create({
     height: 45,
     borderWidth: 1,
   },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchInput: {
-    flex: 1,
-    height: "100%",
-    fontSize: 16,
-  },
-  searchLoading: {
-    marginLeft: 10,
-  },
-  listContent: {
-    flexGrow: 1,
-    paddingHorizontal: 10,
-  },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    marginHorizontal: 15,
-  },
+  searchIcon: { marginRight: 10 },
+  searchInput: { flex: 1, height: "100%", fontSize: 16 },
+  searchLoading: { marginLeft: 10 },
+  listContent: { flexGrow: 1, paddingHorizontal: 10 },
+  separator: { height: StyleSheet.hairlineWidth, marginHorizontal: 15 },
   emptyListContainer: {
     flex: 1,
     justifyContent: "center",
@@ -425,14 +578,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     backgroundColor: "transparent",
   },
-  loaderContainer: {
-    flex: 1,
-    paddingHorizontal: 10,
-    marginTop: 10,
-  },
-  backButton: {
-    padding: 5,
-  },
+  loaderContainer: { flex: 1 },
   actionButton: {
     paddingVertical: 2,
     paddingHorizontal: 12,
@@ -443,8 +589,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
   },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: "bold",
+  actionButtonText: { fontSize: 14, fontWeight: "bold" },
+  clearIcon: {
+    marginLeft: 10,
+  },
+  postGridSection: {
+    paddingHorizontal: 2,
+    paddingBottom: Platform.OS === 'ios' ? 60 : 0
   },
 });

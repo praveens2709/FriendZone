@@ -16,6 +16,8 @@ export interface User {
   createdAt: string;
   updatedAt: string;
   __v?: number;
+  hasStory?: boolean;
+  storySeen?: boolean;
 }
 
 export interface UserProfileResponse {

@@ -5,8 +5,9 @@ const cloudinary = require('../config/cloudinary');
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
-    folder: 'user_profiles',
-    allowed_formats: ['jpg', 'jpeg', 'png'],
+    folder: 'posts',
+    resource_type: 'auto',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'mp4'],
   },
 });
 

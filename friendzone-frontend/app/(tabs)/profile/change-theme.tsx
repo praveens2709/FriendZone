@@ -67,7 +67,7 @@ export default function ChangeThemeScreen() {
     <>
       <LinearGradient colors={colors.gradient} style={styles.container}>
         <ThemedSafeArea style={styles.safeArea}>
-          <CommonHeader title="Choose Theme" leftContent={<BackButton/>} />
+          <CommonHeader title="Choose Theme" leftContent={<BackButton color={colors.text}/>} />
 
           <ThemedView style={styles.themeCardsHorizontalContainer}>
             <FlatList

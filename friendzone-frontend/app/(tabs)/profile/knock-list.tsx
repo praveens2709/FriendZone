@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   FlatList,
@@ -150,8 +150,8 @@ export default function KnockListScreen() {
                 {
                   color:
                     item.status === "lockedIn"
-                      ? colors.buttonText
-                      : colors.text,
+                      ? colors.text
+                      : colors.buttonText,
                 },
               ]}
             >
@@ -168,7 +168,7 @@ export default function KnockListScreen() {
     <LinearGradient colors={colors.gradient} style={styles.container}>
       <ThemedSafeArea style={styles.safeArea}>
         <CommonHeader
-          leftContent={<BackButton />}
+          leftContent={<BackButton color={colors.text}/>}
           title={listType}
           showBottomBorder={true}
         />

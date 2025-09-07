@@ -558,7 +558,7 @@ const handleGameInviteAction = async (notificationId: string, gameSessionId: str
       <ThemedSafeArea style={styles.safeArea}>
         <CommonHeader
           title="Notifications"
-          leftContent={<BackButton />}
+          leftContent={<BackButton color={colors.text}/>}
           showBottomBorder
         />
 

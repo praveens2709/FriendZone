@@ -21,6 +21,10 @@ export interface AppColors {
   buttonTextSecondary: string;
   selectedItemBackground: string;
   overlay: string;
+  storyGradient1: string;
+  storyGradient2: string;
+  red: string;
+  overlayLight: string;
 }
 
 export const LightThemeColors: AppColors = {
@@ -46,6 +50,10 @@ export const LightThemeColors: AppColors = {
   buttonTextSecondary: '#2b2b2b',
   selectedItemBackground: '#E0E0E0',
   overlay: 'rgba(0,0,0,0.3)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#F44336',
+  overlayLight: 'rgba(0,0,0,0.1)',
 };
 
 export const DarkThemeColors: AppColors = {
@@ -71,6 +79,10 @@ export const DarkThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#3A3A3A',
   overlay: 'rgba(0,0,0,0.5)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#EF5350',
+  overlayLight: 'rgba(255,255,255,0.1)',
 };
 
 export const OreoThemeColors: AppColors = {
@@ -96,6 +108,10 @@ export const OreoThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#555555',
   overlay: 'rgba(0,0,0,0.4)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#EF9A9A',
+  overlayLight: 'rgba(255,255,255,0.1)',
 };
 
 export const YinyangThemeColors: AppColors = {
@@ -121,6 +137,10 @@ export const YinyangThemeColors: AppColors = {
   buttonTextSecondary: '#000000',
   selectedItemBackground: '#A0A0A0',
   overlay: 'rgba(0,0,0,0.5)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#FFCDD2',
+  overlayLight: 'rgba(255,255,255,0.1)',
 };
 
 export const OceanThemeColors: AppColors = {
@@ -146,6 +166,10 @@ export const OceanThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#B3E5FC',
   overlay: 'rgba(0,0,0,0.3)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#EF5350',
+  overlayLight: 'rgba(0,0,0,0.1)',
 };
 
 export const SunsetThemeColors: AppColors = {
@@ -171,6 +195,10 @@ export const SunsetThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#FFE0B2',
   overlay: 'rgba(0,0,0,0.3)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#FF8A65',
+  overlayLight: 'rgba(0,0,0,0.1)',
 };
 
 export const ForestThemeColors: AppColors = {
@@ -196,6 +224,10 @@ export const ForestThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#C8E6C9',
   overlay: 'rgba(0,0,0,0.3)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#FFAB91',
+  overlayLight: 'rgba(0,0,0,0.1)',
 };
 
 export const MidnightThemeColors: AppColors = {
@@ -221,6 +253,10 @@ export const MidnightThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#3F1A73',
   overlay: 'rgba(0,0,0,0.6)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#D32F2F',
+  overlayLight: 'rgba(255,255,255,0.1)',
 };
 
 export const CandyThemeColors: AppColors = {
@@ -246,6 +282,10 @@ export const CandyThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#F8BBD0',
   overlay: 'rgba(0,0,0,0.3)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#FF8A80',
+  overlayLight: 'rgba(0,0,0,0.1)',
 };
 
 export const EarthThemeColors: AppColors = {
@@ -271,6 +311,10 @@ export const EarthThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#BCAAA4',
   overlay: 'rgba(0,0,0,0.3)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#BF360C',
+  overlayLight: 'rgba(0,0,0,0.1)',
 };
 
 export const DesertThemeColors: AppColors = {
@@ -296,6 +340,10 @@ export const DesertThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#FDD835',
   overlay: 'rgba(0,0,0,0.3)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#D50000',
+  overlayLight: 'rgba(0,0,0,0.1)',
 };
 
 export const TwilightThemeColors: AppColors = {
@@ -321,6 +369,10 @@ export const TwilightThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#A066B9',
   overlay: 'rgba(0,0,0,0.5)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#E74C3C',
+  overlayLight: 'rgba(255,255,255,0.1)',
 };
 
 export const CoralThemeColors: AppColors = {
@@ -346,6 +398,10 @@ export const CoralThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#FFCCBC',
   overlay: 'rgba(0,0,0,0.3)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#EF5350',
+  overlayLight: 'rgba(0,0,0,0.1)',
 };
 
 export const MintThemeColors: AppColors = {
@@ -371,6 +427,10 @@ export const MintThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#B2DFDB',
   overlay: 'rgba(0,0,0,0.3)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#F44336',
+  overlayLight: 'rgba(0,0,0,0.1)',
 };
 
 export const SteelThemeColors: AppColors = {
@@ -396,6 +456,10 @@ export const SteelThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#B0BEC5',
   overlay: 'rgba(0,0,0,0.3)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#FF5722',
+  overlayLight: 'rgba(0,0,0,0.1)',
 };
 
 export const RoyalThemeColors: AppColors = {
@@ -421,6 +485,10 @@ export const RoyalThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#3F1E8C',
   overlay: 'rgba(0,0,0,0.5)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#D32F2F',
+  overlayLight: 'rgba(255,255,255,0.1)',
 };
 
 export const LavenderThemeColors: AppColors = {
@@ -446,6 +514,10 @@ export const LavenderThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#E1BEE7',
   overlay: 'rgba(0,0,0,0.3)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#EF5350',
+  overlayLight: 'rgba(0,0,0,0.1)',
 };
 
 export const PlatinumThemeColors: AppColors = {
@@ -471,6 +543,10 @@ export const PlatinumThemeColors: AppColors = {
   buttonTextSecondary: '#000000',
   selectedItemBackground: '#EEEEEE',
   overlay: 'rgba(0,0,0,0.3)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#FFCDD2',
+  overlayLight: 'rgba(0,0,0,0.1)',
 };
 
 export const BlushThemeColors: AppColors = {
@@ -496,6 +572,10 @@ export const BlushThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#F8BBD0',
   overlay: 'rgba(0,0,0,0.3)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#EF5350',
+  overlayLight: 'rgba(0,0,0,0.1)',
 };
 
 export const RosegoldThemeColors: AppColors = {
@@ -521,6 +601,10 @@ export const RosegoldThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#FFCDD2',
   overlay: 'rgba(0,0,0,0.3)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#C62828',
+  overlayLight: 'rgba(0,0,0,0.1)',
 };
 
 export const SkyThemeColors: AppColors = {
@@ -546,6 +630,10 @@ export const SkyThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#B3E5FC',
   overlay: 'rgba(0,0,0,0.3)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#FFEB3B',
+  overlayLight: 'rgba(0,0,0,0.1)',
 };
 
 export const CyberpunkThemeColors: AppColors = {
@@ -571,6 +659,10 @@ export const CyberpunkThemeColors: AppColors = {
   buttonTextSecondary: '#00FFF7',
   selectedItemBackground: '#8D009F',
   overlay: 'rgba(0,0,0,0.6)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#FF0000',
+  overlayLight: 'rgba(255,255,255,0.1)',
 };
 
 export const CoffeeThemeColors: AppColors = {
@@ -596,6 +688,10 @@ export const CoffeeThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#D7CCC8',
   overlay: 'rgba(0,0,0,0.3)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#FF8A65',
+  overlayLight: 'rgba(0,0,0,0.1)',
 };
 
 export const IceThemeColors: AppColors = {
@@ -621,6 +717,10 @@ export const IceThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#B3E5FC',
   overlay: 'rgba(0,0,0,0.3)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#FFCDD2',
+  overlayLight: 'rgba(0,0,0,0.1)',
 };
 
 export const SakuraThemeColors: AppColors = {
@@ -646,6 +746,10 @@ export const SakuraThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#FCE4EC',
   overlay: 'rgba(0,0,0,0.3)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#FF8A80',
+  overlayLight: 'rgba(0,0,0,0.1)',
 };
 
 export const FireThemeColors: AppColors = {
@@ -671,6 +775,10 @@ export const FireThemeColors: AppColors = {
   buttonTextSecondary: '#FFFFFF',
   selectedItemBackground: '#FFE0B2',
   overlay: 'rgba(0,0,0,0.3)',
+  storyGradient1: '#8a3ab9',
+  storyGradient2: '#cd486b',
+  red: '#D32F2F',
+  overlayLight: 'rgba(0,0,0,0.1)',
 };
 
 export const Colors = {

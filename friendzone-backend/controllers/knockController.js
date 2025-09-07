@@ -24,14 +24,15 @@ exports.knockUser = async (req, res) => {
     }
 
     const mutualKnock = await Knock.findOne({ knocker: knockedId, knocked: knockerId });
+    const knockerUser = await User.findById(knockerId).select('firstName lastName profileImage');
 
     const isPrivate = knockedUser.isPrivate;
-    let status = mutualKnock ? 'lockedIn' : (isPrivate ? 'pending' : 'lockedIn');
+    let status = mutualKnock ? 'lockedIn' : (isPrivate ? 'pending' : 'onesidedlock');
 
     const newKnock = await Knock.create({ knocker: knockerId, knocked: knockedId, status });
 
-    if (mutualKnock && mutualKnock.status === 'pending') {
-      mutualKnock.status = 'onesidedlock';
+    if (mutualKnock && mutualKnock.status === 'onesidedlock') {
+      mutualKnock.status = 'lockedIn';
       await mutualKnock.save();
     }
 
@@ -48,6 +49,16 @@ exports.knockUser = async (req, res) => {
     if (status === 'lockedIn') {
       await NotificationController.createNotification({
         recipientId: knockerId,
+        senderId: knockedId,
+        type: 'knock_accepted',
+        content: ` knocked you back! You are now LockedIn.`,
+        relatedEntityId: newKnock._id,
+        relatedEntityType: 'Knock',
+        knockStatus: newKnock.status,
+      });
+
+      const receiverNotification = await NotificationController.createNotification({
+        recipientId: knockedId,
         senderId: knockerId,
         type: 'activity',
         content: `You knocked on ${knockedUser.firstName} ${knockedUser.lastName || ''}.`,
@@ -56,50 +67,15 @@ exports.knockUser = async (req, res) => {
         knockStatus: newKnock.status,
       });
 
-      const receiverNotification = await NotificationController.createNotification({
-        recipientId: knockedId,
-        senderId: knockerId,
-        type: 'activity',
-        content: `knocked on you.`,
-        relatedEntityId: newKnock._id,
-        relatedEntityType: 'Knock',
-        knockStatus: newKnock.status,
-      });
-
       if (receiverSocketId) {
         io.to(receiverSocketId).emit('newNotification', receiverNotification);
       }
-    } else if (status === 'pending' && isPrivate && !mutualKnock) {
-      const knockerUser = await User.findById(knockerId).select('firstName lastName profileImage');
-      if (receiverSocketId && knockerUser) {
-        const knockRequestData = {
-          id: newKnock._id.toString(),
-          user: {
-            id: knockerUser._id.toString(),
-            username: `${knockerUser.firstName} ${knockerUser.lastName || ''}`,
-            avatar: knockerUser.profileImage || null
-          },
-          status: newKnock.status,
-          timestamp: newKnock.createdAt.toISOString()
-        };
-        io.to(receiverSocketId).emit('newKnockRequest', knockRequestData);
-      }
-    } else if (status === 'lockedIn' && isPrivate && mutualKnock) {
-      await NotificationController.createNotification({
-        recipientId: knockerId,
-        senderId: knockedId,
-        type: 'knock_accepted',
-        content: `accepted your knock request.`,
-        relatedEntityId: newKnock._id,
-        relatedEntityType: 'Knock',
-        knockStatus: newKnock.status,
-      });
-
+    } else {
       const receiverNotification = await NotificationController.createNotification({
         recipientId: knockedId,
         senderId: knockerId,
-        type: 'activity',
-        content: `You knocked on ${knockedUser.firstName} ${knockedUser.lastName || ''}. You are now LockedIn!`,
+        type: isPrivate ? 'knock_request' : 'activity',
+        content: ` knocked on you.`,
         relatedEntityId: newKnock._id,
         relatedEntityType: 'Knock',
         knockStatus: newKnock.status,
@@ -165,7 +141,7 @@ exports.knockBack = async (req, res) => {
       recipientId: originalKnockerId,
       senderId: userId,
       type: 'knock_accepted',
-      content: `${existingKnock.knocker.firstName} ${existingKnock.knocker.lastName || ''} knocked you back. You are now LockedIn!`,
+      content: `knocked you back. You are now LockedIn!`,
       relatedEntityId: existingKnock._id,
       relatedEntityType: 'Knock',
       knockStatus: 'lockedIn',
@@ -316,6 +292,56 @@ exports.declineKnock = async (req, res) => {
   }
 };
 
+// --- NEW UNKNOCK USER FUNCTION ---
+exports.unknockUser = async (req, res) => {
+  const userId = req.user.id;
+  const knockId = req.params.id;
+
+  const io = req.io;
+  const userSocketMap = req.userSocketMap;
+
+  try {
+    const knockToUnknock = await Knock.findOneAndDelete({
+      _id: knockId,
+      knocker: userId,
+      status: { $in: ['pending', 'onesidedlock'] }
+    });
+
+    if (!knockToUnknock) {
+      return res.status(404).json({ message: 'Knock not found or already handled.' });
+    }
+
+    const unknockedUserId = knockToUnknock.knocked._id.toString();
+    const mySocketId = userSocketMap.get(userId);
+    const unknockedUserSocketId = userSocketMap.get(unknockedUserId);
+
+    if (mySocketId) {
+      io.to(mySocketId).emit('knockStatusChanged', { userId: userId });
+    }
+    if (unknockedUserSocketId) {
+      io.to(unknockedUserSocketId).emit('knockStatusChanged', { userId: unknockedUserId });
+    }
+
+    // You can also emit a real-time update to the unknocked user
+    if (unknockedUserSocketId) {
+      io.to(unknockedUserSocketId).emit('knockStatusUpdate', {
+        knockId: knockId,
+        newStatus: 'stranger',
+      });
+    }
+
+    // You might want to delete related notifications here
+    await NotificationController.deleteNotificationsByKnockId(userId, knockId);
+    await NotificationController.deleteNotificationsByKnockId(unknockedUserId, knockId);
+
+    res.json({ message: 'Knock unknocked successfully.' });
+
+  } catch (err) {
+    console.error('Error unknocking:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 exports.getKnockers = async (req, res) => {
   const userId = req.user.id;
 
@@ -425,5 +451,97 @@ exports.searchUsers = async (req, res) => {
   } catch (err) {
     console.error('Error searching users:', err);
     res.status(500).json({ message: 'Server error during user search.' });
+  }
+};
+
+exports.getKnockersForUser = async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const knockers = await Knock.find({
+      knocked: userId,
+      status: { $in: ['lockedIn'] }
+    })
+      .populate('knocker', 'firstName lastName profileImage')
+      .sort({ createdAt: -1 })
+      .limit(3)
+      .lean();
+
+    res.json(knockers.map(k => ({
+      id: k.knocker._id.toString(),
+      username: `${k.knocker.firstName} ${k.knocker.lastName || ''}`,
+      avatar: k.knocker.profileImage || null
+    })));
+  } catch (err) {
+    console.error('Error getting knockers for user:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.breakLock = async (req, res) => {
+  const myUserId = req.user.id;
+  const { otherUserId } = req.body;
+  const io = req.io;
+  const userSocketMap = req.userSocketMap;
+
+  try {
+    const otherUserKnock = await Knock.findOne({ knocker: otherUserId, knocked: myUserId });
+    
+    if (!otherUserKnock || otherUserKnock.status !== 'lockedIn') {
+        return res.status(404).json({ message: 'Knock not found or not in a LockedIn state.' });
+    }
+
+    otherUserKnock.status = 'onesidedlock';
+    await otherUserKnock.save();
+
+    await Knock.findOneAndDelete({ knocker: myUserId, knocked: otherUserId, status: 'lockedIn' });
+    
+    const mySocketId = userSocketMap.get(myUserId);
+    if (mySocketId) {
+      io.to(mySocketId).emit('knockStatusChanged', { userId: myUserId });
+    }
+
+    const otherUserSocketId = userSocketMap.get(otherUserId);
+    if (otherUserSocketId) {
+        io.to(otherUserSocketId).emit('knockStatusChanged', { userId: otherUserId });
+    }
+    
+    res.status(200).json({ success: true, message: 'Connection unknocked from your side successfully.' });
+  } catch (err) {
+    console.error('Error unknocking connection:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.getCountsForUser = async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const knockersCount = await Knock.countDocuments({ 
+      knocked: userId,
+      status: { $in: ['onesidedlock'] }
+    });
+    
+    const knockingCount = await Knock.countDocuments({ 
+      knocker: userId,
+      status: { $in: ['onesidedlock', 'pending'] }
+    });
+
+    const lockedInDocsCount = await Knock.countDocuments({ 
+      $or: [
+        { knocker: userId, status: 'lockedIn' },
+        { knocked: userId, status: 'lockedIn' },
+      ]
+    });
+    const lockedInCount = lockedInDocsCount / 2;
+
+    res.json({
+      knockersCount,
+      knockingCount,
+      lockedInCount
+    });
+  } catch (err) {
+    console.error('Error getting counts for user:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 };

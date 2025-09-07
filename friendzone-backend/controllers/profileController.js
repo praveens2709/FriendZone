@@ -1,3 +1,5 @@
+// profilecontroller.js
+
 const User = require('../models/User');
 
 exports.updateProfile = async (req, res) => {
@@ -77,6 +79,27 @@ exports.toggleUserPrivacy = async (req, res) => {
 
   } catch (err) {
     console.error('[ProfileController] Error toggling user privacy:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.getProfileById = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'User ID is required.' });
+    }
+
+    const user = await User.findById(userId).select('-password -otp -otpExpires');
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    res.json({ success: true, user });
+  } catch (err) {
+    console.error("Get profile by ID error:", err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };

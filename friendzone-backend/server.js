@@ -11,17 +11,18 @@ const profileRoutes = require("./routes/profileRoutes");
 const chatRoutes = require("./routes/chatRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const knockRoutes = require("./routes/knockRoutes");
-const gameRoutes = require("./routes/gameRoutes"); // Already present
+const gameRoutes = require("./routes/gameRoutes");
+const postRoutes = require('./routes/postRoutes');
 
 const chatController = require("./controllers/chatController");
 const notificationController = require("./controllers/notificationController");
+const postController = require('./controllers/postController');
 
 const User = require("./models/User");
 const Chat = require("./models/Chat");
 const Notification = require("./models/Notification");
 
-// NEW: Import the game socket handlers
-const registerGameSocketHandlers = require('./socketHandlers/gameSocketHandlers'); // Adjust path as needed
+const registerGameSocketHandlers = require('./socketHandlers/gameSocketHandlers');
 
 connectDB();
 
@@ -39,6 +40,7 @@ app.use(express.json());
 
 const userSocketMap = new Map();
 
+// Make Socket.IO available to all routes
 app.set("socketio", io);
 app.set("userSocketMap", userSocketMap);
 
@@ -48,12 +50,11 @@ app.use("/api/chats", chatRoutes(io, userSocketMap));
 app.use("/api/notifications", notificationRoutes(io, userSocketMap));
 app.use("/api/knock", knockRoutes(io, userSocketMap));
 app.use("/api/games", gameRoutes(io, userSocketMap));
+app.use('/api/posts', postRoutes); // Use post routes
 
 io.on("connection", (socket) => {
   console.log(`User connected: ${socket.id}`);
 
-  // It's crucial to set socket.userId right after authentication/connection
-  // This example assumes 'setUserId' is your method for this.
   socket.on("setUserId", async (userId) => {
     if (!userId) {
       console.warn(
@@ -61,7 +62,7 @@ io.on("connection", (socket) => {
       );
       return;
     }
-    socket.userId = userId; // Store userId directly on the socket object
+    socket.userId = userId;
     userSocketMap.set(userId, socket.id);
     console.log(`User ${userId} mapped to socket ${socket.id}`);
 
@@ -173,7 +174,6 @@ io.on("connection", (socket) => {
     socket.to(chatId).emit("stopTyping", { chatId, userId });
   });
 
-  // NEW: Register game socket handlers for this specific socket connection
   registerGameSocketHandlers(io, userSocketMap, socket);
 
 
@@ -185,8 +185,6 @@ io.on("connection", (socket) => {
         disconnectedUserId = key;
         userSocketMap.delete(key);
         console.log(`User ${key} unmapped from socket ${socket.id}`);
-        // Optional: Handle user leaving mid-game if they disconnect
-        // You might need to check active game sessions and mark players as offline/forfeit
         break;
       }
     }

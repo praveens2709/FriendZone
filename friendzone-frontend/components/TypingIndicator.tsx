@@ -60,7 +60,7 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({ isTyping }) => {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: colors.buttonBackgroundSecondary }]}>
-      <View style={styles.dotsContainer}>
+      <ThemedView style={styles.dotsContainer}>
         {dotAnimations.map((animation, index) => (
           <Animated.View
             key={index}
@@ -80,7 +80,7 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({ isTyping }) => {
             ]}
           />
         ))}
-      </View>
+      </ThemedView>
     </ThemedView>
   );
 };

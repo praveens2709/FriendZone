@@ -424,7 +424,7 @@ export default function ChatMessagesScreen() {
       <LinearGradient colors={colors.gradient} style={styles.container}>
         <ThemedSafeArea style={styles.safeArea}>
           <CommonHeader
-            leftContent={<BackButton />}
+            leftContent={<BackButton color={colors.text}/>}
             title="Chat Not Found"
             showBottomBorder={true}
           />

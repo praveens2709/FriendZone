@@ -185,7 +185,7 @@ export default function KnockRequestsScreen() {
     <LinearGradient colors={colors.gradient} style={styles.gradientContainer}>
       <ThemedSafeArea style={styles.safeArea}>
         <CommonHeader
-          leftContent={<BackButton />}
+          leftContent={<BackButton color={colors.text}/>}
           title="Knock Requests"
           showBottomBorder={true}
         />

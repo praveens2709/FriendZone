@@ -57,10 +57,10 @@ export default function GamesScreen() {
   };
 
   const renderGameCard = ({ item }: { item: GameCardData }) => (
-    <View style={styles.gameCardColumnWrapper}>
+    <ThemedView style={styles.gameCardColumnWrapper}>
       <ThemedView style={[styles.gameCard, { backgroundColor: colors.buttonBackgroundSecondary }]}>
         <Image source={item.imageUri} style={styles.gameImage} resizeMode="cover" />
-        <View style={styles.imageDarkOverlay} />
+        <ThemedView style={styles.imageDarkOverlay} />
 
         <ThemedView style={[styles.gameNameLabel, { backgroundColor: colors.primary }]}>
           <ThemedText style={[styles.gameNameText, { color: colors.buttonText }]}>
@@ -77,7 +77,7 @@ export default function GamesScreen() {
           </ThemedText>
         </TouchableOpacity>
       </ThemedView>
-    </View>
+    </ThemedView>
   );
 
   return (
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: 'transparent',
-    paddingBottom: Platform.OS === 'ios' ? 50 : 20
+    paddingBottom: Platform.OS === 'ios' ? 50 : 0
   },
   listContentContainer: {
     paddingHorizontal: SCREEN_HORIZONTAL_PADDING,

@@ -13,6 +13,7 @@ import Toast from "react-native-toast-message";
 import CustomToast from "@/components/CustomToast";
 import { ThemedView } from "@/components/ThemedView";
 import { GameProvider } from "@/context/GameContext";
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 
 function RootLayoutContent() {
   const { colors } = useTheme();
@@ -66,7 +67,9 @@ export default function RootLayout() {
           <AuthProvider>
             <SocketProvider>
               <GameProvider>
-                <RootLayoutContent />
+                <BottomSheetModalProvider>
+                  <RootLayoutContent />
+                </BottomSheetModalProvider>
               </GameProvider>
             </SocketProvider>
           </AuthProvider>

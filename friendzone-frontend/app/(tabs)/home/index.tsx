@@ -1,8 +1,11 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  FlatList,
+  ViewToken,
+  Platform,
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
@@ -17,6 +20,14 @@ import { LinearGradient } from "expo-linear-gradient";
 import ChatService, { ChatPreviewResponse } from "@/services/ChatService";
 import NotificationService from "@/services/NotificationService";
 import { ThemedView } from "@/components/ThemedView";
+import PostComponent from "@/components/PostComponent";
+import PostService from "@/services/PostService";
+import { Post } from "@/types/post.type";
+import { useFocusEffect } from '@react-navigation/native';
+
+interface ViewableItem extends ViewToken {
+  item: Post;
+}
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -26,8 +37,55 @@ export default function HomeScreen() {
 
   const [unreadChatIds, setUnreadChatIds] = useState<Set<string>>(new Set());
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [postsLoading, setPostsLoading] = useState(true);
 
+  const [isGloballyMuted, setIsGloballyMuted] = useState(false);
+  const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
+
+  const viewabilityConfig = {
+    itemVisiblePercentThreshold: 50,
+  };
+
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewableItem[] }) => {
+      if (isGloballyMuted) {
+        setCurrentlyPlayingId(null);
+        return;
+      }
+      const firstVisibleItem = viewableItems[0]?.item;
+      if (firstVisibleItem && firstVisibleItem.song) {
+        setCurrentlyPlayingId(firstVisibleItem._id);
+      } else {
+        setCurrentlyPlayingId(null);
+      }
+    },
+    [isGloballyMuted]
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        setIsGloballyMuted(true);
+        setCurrentlyPlayingId(null);
+      };
+    }, [])
+  );
+  
   const totalUnreadChats = unreadChatIds.size;
+
+  const fetchPosts = useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      setPostsLoading(true);
+      const fetchedPosts = await PostService.getFeedPosts(accessToken);
+      setPosts(fetchedPosts);
+    } catch (err) {
+      console.error("Error fetching posts:", err);
+    } finally {
+      setPostsLoading(false);
+    }
+  }, [accessToken]);
 
   const fetchInitialUnreadChats = useCallback(async () => {
     if (!accessToken) return;
@@ -62,8 +120,9 @@ export default function HomeScreen() {
     if (isAuthenticated) {
       fetchInitialUnreadChats();
       fetchInitialUnreadNotificationCount();
+      fetchPosts();
     }
-  }, [isAuthenticated, fetchInitialUnreadChats, fetchInitialUnreadNotificationCount]);
+  }, [isAuthenticated, fetchInitialUnreadChats, fetchInitialUnreadNotificationCount, fetchPosts]);
 
   useEffect(() => {
     if (!socket || !user) return;
@@ -86,12 +145,18 @@ export default function HomeScreen() {
       setHasUnreadNotifications(count > 0);
     };
 
+    const handleNewPost = (newPost: Post) => {
+      setPosts(prevPosts => [newPost, ...prevPosts]);
+    };
+
     socket.on("chatPreviewUpdate", handleChatPreviewUpdate);
     socket.on("unreadNotificationCountUpdate", handleUnreadNotificationCountUpdate);
+    socket.on("newPost", handleNewPost);
 
     return () => {
       socket.off("chatPreviewUpdate", handleChatPreviewUpdate);
       socket.off("unreadNotificationCountUpdate", handleUnreadNotificationCountUpdate);
+      socket.off("newPost", handleNewPost);
     };
   }, [socket, user]);
 
@@ -130,7 +195,27 @@ export default function HomeScreen() {
           }
           showBottomBorder={true}
         />
-        <StoryRingList />
+        <FlatList
+          data={posts}
+          renderItem={({ item }) => (
+            <PostComponent
+              post={item}
+              currentlyPlayingId={currentlyPlayingId}
+              setCurrentlyPlayingId={setCurrentlyPlayingId}
+              isActive={currentlyPlayingId === item._id}
+              isGloballyMuted={isGloballyMuted}
+              setIsGloballyMuted={setIsGloballyMuted}
+            />
+          )}
+          keyExtractor={(item) => item._id}
+          ListHeaderComponent={() => <StoryRingList />}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          initialNumToRender={5}
+          maxToRenderPerBatch={5}
+          windowSize={10}
+          contentContainerStyle={styles.postListContainer}
+        />
       </ThemedSafeArea>
     </LinearGradient>
   );
@@ -143,6 +228,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
+  },
+  postListContainer: {
+    paddingBottom: Platform.OS === 'ios' ? 50 : 20,
   },
   activityIndicator: {
     flex: 1,

@@ -257,7 +257,7 @@ export default function InviteFriendsToGameScreen() {
             </ThemedView>
           ) : (
             <>
-              <View
+              <ThemedView
                 style={[
                   styles.searchBarContainer,
                   {
@@ -280,7 +280,7 @@ export default function InviteFriendsToGameScreen() {
                   onChangeText={setSearchQuery}
                   autoCapitalize="none"
                 />
-              </View>
+              </ThemedView>
 
               <ThemedView style={styles.friendsListHeader}>
                 <ThemedText style={[styles.friendsListTitle, {color: OVERLAY_PRIMARY_TEXT_COLOR}]}>
@@ -322,7 +322,7 @@ export default function InviteFriendsToGameScreen() {
                   )}
                 />
               )}
-              <View style={styles.sendInviteButton}>
+              <ThemedView style={styles.sendInviteButton}>
                 <Button
                   onPress={handleSendInvite}
                   disabled={selectedFriendIds.size === 0 || sendingInvite}
@@ -354,7 +354,7 @@ export default function InviteFriendsToGameScreen() {
                     <ActivityIndicator size="small" color={colors.buttonText} />
                   )}
                 </Button>
-              </View>
+              </ThemedView>
             </>
           )}
         </ThemedSafeArea>

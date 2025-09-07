@@ -62,7 +62,7 @@ export default function SettingsScreen() {
     <>
       <LinearGradient colors={colors.gradient} style={styles.container}>
         <ThemedSafeArea style={styles.safeAreaTransparentBg}>
-          <CommonHeader title="Settings" leftContent={<BackButton/>}/>
+          <CommonHeader title="Settings" leftContent={<BackButton color={colors.text}/>}/>
 
           <ThemedView style={styles.settingsList}>
             <Button
