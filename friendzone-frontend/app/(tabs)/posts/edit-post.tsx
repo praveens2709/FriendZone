@@ -1,7 +1,6 @@
 import React from "react";
 import {
   StyleSheet,
-  View,
   TouchableOpacity,
   Dimensions,
   TextInput,
@@ -76,19 +75,22 @@ export default function EditPostScreen() {
       <TouchableOpacity onPress={() => selectTrack(item)}>
         <ThemedView style={[styles.trackRow, { borderColor: colors.border }]}>
           <Image source={{ uri: item.artworkUrl100 }} style={styles.artwork} />
-          <View style={styles.trackInfo}>
+          <ThemedView style={styles.trackInfo}>
             <ThemedText style={styles.trackName} numberOfLines={1}>
               {item.trackName}
             </ThemedText>
             <ThemedText style={styles.artistName} numberOfLines={1}>
               {item.artistName}
             </ThemedText>
-          </View>
+          </ThemedView>
           <TouchableOpacity
             onPress={() => playPausePreview(item.previewUrl)}
             style={[
               styles.iconButton,
-              { backgroundColor: colors.buttonBackgroundSecondary, borderColor: colors.border },
+              {
+                backgroundColor: colors.buttonBackgroundSecondary,
+                borderColor: colors.border,
+              },
             ]}
             disabled={isLoading}
           >
@@ -106,14 +108,13 @@ export default function EditPostScreen() {
             onPress={() => selectTrack(item)}
             style={[
               styles.iconButton,
-              { backgroundColor: colors.buttonBackgroundSecondary, borderColor: colors.border },
+              {
+                backgroundColor: colors.buttonBackgroundSecondary,
+                borderColor: colors.border,
+              },
             ]}
           >
-            <MaterialCommunityIcons
-              name="plus"
-              size={18}
-              color={colors.text}
-            />
+            <MaterialCommunityIcons name="plus" size={18} color={colors.text} />
           </TouchableOpacity>
         </ThemedView>
       </TouchableOpacity>
@@ -128,10 +129,10 @@ export default function EditPostScreen() {
             title="Edit Post"
             leftContent={<BackButton color={colors.text} />}
           />
-          <View style={styles.centeredContainer}>
+          <ThemedView style={styles.centeredContainer}>
             <ActivityIndicator size="small" color={colors.primary} />
             <ThemedText style={{ marginTop: 10 }}>Loading images...</ThemedText>
-          </View>
+          </ThemedView>
         </ThemedSafeArea>
       </LinearGradient>
     );
@@ -157,8 +158,10 @@ export default function EditPostScreen() {
           }
           showBottomBorder={false}
         />
-        <View style={styles.container}>
-          <View style={[styles.imageContainer, { backgroundColor: "#000" }]}>
+        <ThemedView style={styles.container}>
+          <ThemedView
+            style={[styles.imageContainer, { backgroundColor: "#000" }]}
+          >
             {currentImage && (
               <Image
                 source={{ uri: currentImage.uri }}
@@ -166,7 +169,7 @@ export default function EditPostScreen() {
                 contentFit="contain"
               />
             )}
-            <View style={styles.editControlsOverlay}>
+            <ThemedView style={styles.editControlsOverlay}>
               <TouchableOpacity
                 style={[
                   styles.editControlButton,
@@ -195,17 +198,17 @@ export default function EditPostScreen() {
                   color={colors.text}
                 />
               </TouchableOpacity>
-            </View>
+            </ThemedView>
             {isProcessing && (
-              <View style={styles.processingOverlay}>
+              <ThemedView style={styles.processingOverlay}>
                 <ActivityIndicator size="small" color={colors.primary} />
                 <ThemedText style={{ marginTop: 10, color: colors.text }}>
                   Processing...
                 </ThemedText>
-              </View>
+              </ThemedView>
             )}
-          </View>
-          <View style={styles.musicSection}>
+          </ThemedView>
+          <ThemedView style={styles.musicSection}>
             <TouchableOpacity
               style={[
                 styles.addMusicButton,
@@ -218,7 +221,12 @@ export default function EditPostScreen() {
                 size={20}
                 color={colors.buttonText}
               />
-              <ThemedText style={[styles.addMusicButtonText, {color: colors.buttonText}]}>
+              <ThemedText
+                style={[
+                  styles.addMusicButtonText,
+                  { color: colors.buttonText },
+                ]}
+              >
                 Add Music
               </ThemedText>
             </TouchableOpacity>
@@ -237,14 +245,14 @@ export default function EditPostScreen() {
                   source={{ uri: selectedTrack.artworkUrl100 }}
                   style={[styles.songArtwork, { borderColor: colors.border }]}
                 />
-                <View style={styles.gapView} />
-                <View style={styles.previewContent}>
-                  <View style={styles.flexWrapper}>
-                    <View style={styles.marqueeContainer}>
+                <ThemedView style={styles.gapView} />
+                <ThemedView style={styles.previewContent}>
+                  <ThemedView style={styles.flexWrapper}>
+                    <ThemedView style={styles.marqueeContainer}>
                       <Animated.View
                         style={[{ flexDirection: "row" }, marqueeStyle]}
                       >
-                        <View style={{ flexDirection: "row" }}>
+                        <ThemedView style={{ flexDirection: "row" }}>
                           <ThemedText
                             style={{
                               color: colors.textSecondary,
@@ -256,10 +264,10 @@ export default function EditPostScreen() {
                             {selectedTrack.trackName} -{" "}
                             {selectedTrack.artistName}
                           </ThemedText>
-                        </View>
+                        </ThemedView>
                       </Animated.View>
-                    </View>
-                    <View style={styles.musicIndicatorContainer}>
+                    </ThemedView>
+                    <ThemedView style={styles.musicIndicatorContainer}>
                       {isSelectedTrackPlaying ? (
                         <LottieView
                           ref={lottieRef}
@@ -269,7 +277,7 @@ export default function EditPostScreen() {
                           style={styles.lottieAnimation}
                         />
                       ) : (
-                        <View
+                        <ThemedView
                           style={[
                             styles.musicLine,
                             { backgroundColor: colors.primary },
@@ -293,8 +301,8 @@ export default function EditPostScreen() {
                           color={colors.primary}
                         />
                       </TouchableOpacity>
-                    </View>
-                  </View>
+                    </ThemedView>
+                  </ThemedView>
                   <TouchableOpacity
                     onPress={(e) => {
                       e.stopPropagation();
@@ -308,26 +316,26 @@ export default function EditPostScreen() {
                       color={colors.textDim}
                     />
                   </TouchableOpacity>
-                </View>
+                </ThemedView>
               </TouchableOpacity>
             )}
-          </View>
+          </ThemedView>
           {selectedAssets.length > 1 && (
-            <View style={styles.imageCounter}>
+            <ThemedView style={styles.imageCounter}>
               <ThemedText
                 style={[styles.counterText, { color: colors.textDim }]}
               >
                 {currentImageIndex + 1} of {selectedAssets.length}
               </ThemedText>
-            </View>
+            </ThemedView>
           )}
-        </View>
+        </ThemedView>
         <ThemedModal
           visible={showMusicModal}
           onClose={() => setShowMusicModal(false)}
           containerStyle={styles.modalContainer}
         >
-          <View style={styles.modalHeader}>
+          <ThemedView style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setShowMusicModal(false)}>
               <MaterialCommunityIcons
                 name="close"
@@ -338,8 +346,8 @@ export default function EditPostScreen() {
             <ThemedText style={[styles.modalTitle, { color: colors.text }]}>
               Search Music
             </ThemedText>
-            <View style={{ width: 24 }} />
-          </View>
+            <ThemedView style={{ width: 24 }} />
+          </ThemedView>
           <TextInput
             placeholder="Search music..."
             placeholderTextColor={colors.text}
@@ -347,7 +355,11 @@ export default function EditPostScreen() {
             onChangeText={setSearchQuery}
             style={[
               styles.input,
-              { color: colors.text, backgroundColor: colors.buttonBackgroundSecondary, borderColor: colors.border },
+              {
+                color: colors.text,
+                backgroundColor: colors.buttonBackgroundSecondary,
+                borderColor: colors.border,
+              },
             ]}
           />
           <FlatList
@@ -512,7 +524,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     paddingHorizontal: 15,
     marginBottom: 15,
-    borderWidth: 1
+    borderWidth: 1,
   },
   listContainer: { paddingBottom: 20, marginTop: 8 },
   trackRow: {
@@ -534,6 +546,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginLeft: 8,
-    borderWidth: 1
+    borderWidth: 1,
   },
 });

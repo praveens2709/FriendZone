@@ -1,4 +1,3 @@
-// types/auth-api.type.ts
 import { AuthSession } from './auth-session.type';
 
 export interface ILoginResponse {

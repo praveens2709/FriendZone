@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { StyleSheet, FlatList, ActivityIndicator, View } from "react-native";
+import React, { useState, useEffect } from "react";
+import { StyleSheet, FlatList, ActivityIndicator } from "react-native";
 import { useLocalSearchParams, Stack, useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";

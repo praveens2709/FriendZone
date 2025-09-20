@@ -11,13 +11,6 @@ import { ChatPreviewResponse } from "@/services/ChatService";
 import * as Location from "expo-location";
 import { GOOGLE_MAPS_API_KEY } from "./const";
 
-export const showToast = (type: ToastType, message: string) => {
-  Toast.show({
-    type,
-    text1: message,
-  });
-};
-
 export function HandleApiError(error: unknown) {
   // Your error handling logic
 }
@@ -231,16 +224,6 @@ export const generateClientTempId = (): string => {
     .substring(2, 9)}`;
 };
 
-export const getUserAvatar = (user: {
-  avatar: string | null;
-  username: string;
-}) => {
-  return (
-    user.avatar ||
-    `https://ui-avatars.com/api/?name=${user.username.replace(/\s/g, "+")}`
-  );
-};
-
 export const getUserStatusLabel = (
   status?: "pending" | "lockedIn" | "onesidedlock" | "declined",
   relationToMe?: "knocker" | "knocked" | "lockedIn" | "stranger"
@@ -311,15 +294,12 @@ export const safeFormatDate = (dateString: string): string => {
   return date ? format(date, "p") : "Invalid Date";
 };
 
-export const filterValidChats = (
-  chats: ChatPreviewResponse[]
-): ChatPreviewResponse[] => {
+export const filterValidChats = (chats: ChatPreviewResponse[]) => {
   return chats.filter(
     (chat) =>
-      chat.lastMessage &&
-      chat.lastMessage.trim() !== "No messages yet" &&
-      chat.lastMessage.trim() !== "Start chatting!" &&
-      chat.lastMessage.trim() !== ""
+      chat.lastMessage?.content !== "No messages yet" &&
+      chat.lastMessage?.content !== "Start chatting!" &&
+      chat.lastMessage?.content !== ""
   );
 };
 

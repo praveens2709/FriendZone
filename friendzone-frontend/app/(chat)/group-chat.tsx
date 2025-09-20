@@ -29,20 +29,29 @@ import KnockService, { KnockRequest } from "@/services/knockService";
 import UserProfileCard from "@/components/UserProfileCard";
 import UserSearchLoader from "@/components/UserSearchLoader";
 import { DisplayUser } from "@/types/chat.type";
+import Button from "@/components/Button";
 
 const screenWidth = Dimensions.get("window").width;
 const LIST_ITEM_HORIZONTAL_PADDING = 10;
 
-export default function NewChatScreen() {
+interface SelectedUser {
+  id: string;
+  username: string;
+  avatar: string | null;
+}
+
+export default function GroupChatScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { accessToken, user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [users, setUsers] = useState<DisplayUser[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<SelectedUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [creatingChatId, setCreatingChatId] = useState<string | null>(null);
+  const [isCreatingChat, setIsCreatingChat] = useState(false);
+  const [groupName, setGroupName] = useState("");
 
   const listItemWidth = screenWidth - LIST_ITEM_HORIZONTAL_PADDING * 2;
 
@@ -134,7 +143,7 @@ export default function NewChatScreen() {
       setUsers(sortedUsers);
     } catch (error: any) {
       console.error("Failed to fetch potential chat users:", error);
-      console.log("error", "Failed to load users for new chat.");
+      console.log("error", "Failed to load users for group chat.");
       setUsers([]);
     } finally {
       setIsLoading(false);
@@ -214,49 +223,110 @@ export default function NewChatScreen() {
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     setSearchQuery("");
+    setSelectedUsers([]);
+    setGroupName("");
     fetchInitialUsers();
   }, [fetchInitialUsers]);
 
-  const handleCreateChat = async (
-    recipientId: string,
-    recipientName: string,
-    recipientAvatar: string | null
-  ) => {
-    if (!accessToken) {
-      console.log("error", "You are not authenticated.");
+  const handleUserSelection = (item: DisplayUser) => {
+    const isSelected = selectedUsers.find((u) => u.id === item.id);
+
+    if (isSelected) {
+      // Deselect user
+      setSelectedUsers((prev) => prev.filter((u) => u.id !== item.id));
+    } else {
+      // Select user
+      const newSelectedUser: SelectedUser = {
+        id: item.id,
+        username: item.username,
+        avatar: item.avatar,
+      };
+      setSelectedUsers((prev) => [...prev, newSelectedUser]);
+    }
+  };
+
+  const removeSelectedUser = (userId: string) => {
+    setSelectedUsers((prev) => prev.filter((u) => u.id !== userId));
+  };
+
+  const handleCreateGroupChat = async () => {
+    if (!accessToken || selectedUsers.length < 2) {
+      console.log("error", "Please select at least 2 users for a group chat.");
       return;
     }
-    if (creatingChatId) return;
 
-    setCreatingChatId(recipientId);
+    if (!groupName.trim()) {
+      console.log("error", "Please enter a group name.");
+      return;
+    }
+
+    if (isCreatingChat) return;
+
+    setIsCreatingChat(true);
     try {
-      const response = await ChatService.createChat(accessToken, recipientId);
+      const participantIds = selectedUsers.map((u) => u.id);
+      const response = await ChatService.createGroupChat(
+        accessToken,
+        participantIds,
+        groupName.trim()
+      );
       router.replace({
         pathname: "/(chat)/[id]",
         params: {
           id: response.chatId,
-          chatName: recipientName,
-          chatAvatar: recipientAvatar || "",
+          chatName: groupName.trim(),
+          chatAvatar: "",
           isNewChatFromCreation: "true",
-          isRestricted: String(response.isRestricted),
-          firstMessageByKnockerId: response.firstMessageByKnockerId || "",
+          isRestricted: "false",
+          firstMessageByKnockerId: "",
         },
       });
     } catch (error: any) {
-      console.error("Failed to create chat:", error);
+      console.error("Failed to create group chat:", error);
       console.log(
         "error",
         error.response?.data?.message ||
-          "Failed to create chat. Please try again."
+          "Failed to create group chat. Please try again."
       );
     } finally {
-      setCreatingChatId(null);
+      setIsCreatingChat(false);
     }
   };
 
-  const navigateToGroupChat = () => {
-    router.push("/group-chat");
+  const clearSelection = () => {
+    setSelectedUsers([]);
+    setGroupName("");
   };
+
+  const isUserSelected = (userId: string) => {
+    return selectedUsers.some((u) => u.id === userId);
+  };
+
+  const renderSelectedUser = ({ item }: { item: SelectedUser }) => (
+    <ThemedView
+      style={[
+        styles.selectedUserChip,
+        { backgroundColor: colors.buttonBackgroundSecondary },
+      ]}
+    >
+      <ThemedView style={styles.selectedUserContent}>
+        <ThemedText
+          style={[styles.selectedUserName, { color: colors.text }]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {item.username}
+        </ThemedText>
+        <TouchableOpacity
+          onPress={() => removeSelectedUser(item.id)}
+          style={styles.removeButton}
+          hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+        >
+          <Ionicons name="close-circle" size={18} color={colors.textDim} />
+        </TouchableOpacity>
+      </ThemedView>
+    </ThemedView>
+  );
 
   const renderUserItem = ({ item }: { item: DisplayUser }) => {
     const description =
@@ -264,19 +334,21 @@ export default function NewChatScreen() {
         ? getUserStatusLabel(item.status, item.relationToMe)
         : "Stranger";
 
+    const selected = isUserSelected(item.id);
+
     return (
       <UserProfileCard
         userId={item.id}
         username={item.username}
         avatar={item.avatar}
         description={description}
-        onPress={() => handleCreateChat(item.id, item.username, item.avatar)}
-        isLoading={creatingChatId === item.id}
+        onPress={() => handleUserSelection(item)}
+        isLoading={false}
         rightActionComponent={
           <Ionicons
-            name="chatbubble-outline"
+            name={selected ? "checkmark-circle" : "chatbubble-outline"}
             size={24}
-            color={colors.primary}
+            color={selected ? colors.primary : colors.textDim}
           />
         }
       />
@@ -292,13 +364,74 @@ export default function NewChatScreen() {
       <ThemedSafeArea style={styles.safeArea}>
         <CommonHeader
           leftContent={<BackButton color={colors.text} />}
-          title="New message"
+          title="New group chat"
+          rightContent1={
+            selectedUsers.length > 0 ? (
+              <TouchableOpacity onPress={clearSelection}>
+                <ThemedText style={[styles.clearText, { color: colors.text }]}>
+                  Clear
+                </ThemedText>
+              </TouchableOpacity>
+            ) : null
+          }
           showBottomBorder={true}
         />
+        <ThemedText style={[styles.descriptionText, { color: colors.textDim }]}>
+          Start your group chat by selecting at least 2 people and entering a
+          group name.
+        </ThemedText>
+
         <KeyboardAvoidingView
           style={styles.content}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
+          {/* Group Name Input */}
+          <ThemedView style={styles.groupNameSection}>
+            <ThemedView
+              style={[
+                styles.groupNameInputContainer,
+                { borderColor: colors.border },
+              ]}
+            >
+              <MaterialIcons
+                name="group"
+                size={20}
+                color={colors.textDim}
+                style={styles.groupIcon}
+              />
+              <TextInput
+                style={[
+                  styles.groupNameInput,
+                  {
+                    color: colors.text,
+                  },
+                ]}
+                placeholder="Enter group name"
+                placeholderTextColor={colors.textDim}
+                value={groupName}
+                onChangeText={setGroupName}
+                maxLength={50}
+              />
+            </ThemedView>
+          </ThemedView>
+
+          {/* Selected Users Section */}
+          {selectedUsers.length > 0 && (
+            <ThemedView style={styles.selectedUsersSection}>
+              <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
+                Selected ({selectedUsers.length})
+              </ThemedText>
+              <FlatList
+                data={selectedUsers}
+                renderItem={renderSelectedUser}
+                keyExtractor={(item) => item.id}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+              />
+            </ThemedView>
+          )}
+
+          {/* Search Section */}
           <ThemedView
             style={[
               styles.searchContainer,
@@ -338,35 +471,7 @@ export default function NewChatScreen() {
             )}
           </ThemedView>
 
-          {/* Group Chat Option */}
-          <TouchableOpacity
-            style={styles.groupChatOption}
-            onPress={navigateToGroupChat}
-          >
-            <ThemedView style={styles.groupChatContent}>
-              <ThemedView style={styles.groupChatLeft}>
-                <ThemedView
-                  style={[
-                    styles.groupIconContainer,
-                    { backgroundColor: colors.primary },
-                  ]}
-                >
-                  <MaterialIcons name="group" size={24} color={colors.buttonText} />
-                </ThemedView>
-                <ThemedText
-                  style={[styles.groupChatText, { color: colors.text }]}
-                >
-                  Create Group Chat
-                </ThemedText>
-              </ThemedView>
-              <Ionicons name="chevron-forward" size={20} color={colors.text} />
-            </ThemedView>
-          </TouchableOpacity>
-
-          <ThemedText style={[styles.suggestedText, { color: colors.textDim }]}>
-            Suggested
-          </ThemedText>
-
+          {/* Users List */}
           {showLoader ? (
             <ThemedView style={styles.loaderContainer}>
               {[...Array(5)].map((_, i) => (
@@ -395,7 +500,7 @@ export default function NewChatScreen() {
                   >
                     {searchQuery.length > 0
                       ? "No users found matching your search."
-                      : "No eligible users to chat with yet. Connect with someone first!"}
+                      : "No eligible users to add to group. Connect with someone first!"}
                   </ThemedText>
                 </ThemedView>
               )}
@@ -407,6 +512,32 @@ export default function NewChatScreen() {
                 />
               }
             />
+          )}
+
+          {/* Create Group Button */}
+          {selectedUsers.length >= 2 && groupName.trim() && (
+            <ThemedView style={styles.actionButtonContainer}>
+              <Button
+                onPress={handleCreateGroupChat}
+                disabled={isCreatingChat}
+                style={[
+                  styles.actionButton,
+                  { opacity: isCreatingChat ? 0.7 : 1 },
+                ]}
+                textStyle={styles.actionButtonText}
+              >
+                {isCreatingChat ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <>
+                    <Ionicons name="people" size={20} color="white" />
+                    <ThemedText style={styles.actionButtonText}>
+                      Create Group
+                    </ThemedText>
+                  </>
+                )}
+              </Button>
+            </ThemedView>
           )}
         </KeyboardAvoidingView>
       </ThemedSafeArea>
@@ -425,12 +556,73 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
+  clearText: {
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  descriptionText: {
+    textAlign: "center",
+    marginHorizontal: 20,
+    marginTop: 10,
+    fontSize: 14,
+  },
+  groupNameSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: "transparent",
+  },
+  groupNameInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    height: 45,
+    borderBottomWidth: 1,
+  },
+  groupIcon: {
+    marginRight: 10,
+  },
+  groupNameInput: {
+    flex: 1,
+    height: "100%",
+    fontSize: 16,
+  },
+  selectedUsersSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: "transparent",
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  selectedUserChip: {
+    borderRadius: 20,
+    marginRight: 8,
+    minWidth: 100,
+    maxWidth: 160,
+  },
+  selectedUserContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: "transparent",
+  },
+  selectedUserName: {
+    fontSize: 14,
+    flex: 1,
+  },
+  removeButton: {
+    marginLeft: 2,
+    flexShrink: 0,
+  },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
     borderRadius: 10,
     marginHorizontal: 20,
-    marginTop: 10,
+    marginVertical: 10,
     paddingHorizontal: 10,
     height: 45,
     borderWidth: 1,
@@ -446,43 +638,18 @@ const styles = StyleSheet.create({
   searchLoading: {
     marginLeft: 10,
   },
-  groupChatOption: {
-    marginHorizontal: 15,
-    marginVertical: 10,
-  },
-  groupChatContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 10,
-    paddingVertical: 12,
-    backgroundColor: "transparent",
-  },
-  groupChatLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  groupIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 12,
-  },
-  groupChatText: {
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  suggestedText: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginHorizontal: 20,
-    marginBottom: 10,
   },
   listContent: {
     flexGrow: 1,
     paddingHorizontal: 10,
+    paddingBottom: 100,
   },
   separator: {
     height: StyleSheet.hairlineWidth,
@@ -499,5 +666,28 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 10,
     marginTop: 10,
+  },
+  actionButtonContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: "transparent",
+  },
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    gap: 8,
+  },
+  actionButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

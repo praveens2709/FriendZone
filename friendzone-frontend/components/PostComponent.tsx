@@ -7,27 +7,28 @@ import React, {
 } from "react";
 import {
   StyleSheet,
-  View,
   TouchableOpacity,
   Dimensions,
   Image,
   FlatList,
   Platform,
-  Alert,
   ActivityIndicator,
   TouchableWithoutFeedback,
   TextInput,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
-import { AntDesign, Entypo, Feather, MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
+import {
+  Entypo,
+  Feather,
+  FontAwesome,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import Animated, {
   useSharedValue,
   withTiming,
-  withRepeat,
-  withDelay,
   Easing,
   useAnimatedStyle,
 } from "react-native-reanimated";
@@ -38,20 +39,24 @@ import {
   BottomSheetFlatList,
   BottomSheetTextInput,
 } from "@gorhom/bottom-sheet";
-import * as Haptics from 'expo-haptics';
+import * as Haptics from "expo-haptics";
 import { Post, Comment } from "@/types/post.type";
 import PostService from "@/services/PostService";
 import { useAuth } from "@/context/AuthContext";
-import { formatPostTimestamp, formatCommentTimestamp, showToast, getUserStatusLabel } from "@/constants/Functions";
+import {
+  formatPostTimestamp,
+  formatCommentTimestamp,
+  getUserStatusLabel,
+} from "@/constants/Functions";
 import { User } from "@/types/user.type";
 import KnockService, { KnockRequest } from "@/services/knockService";
 import ChatService from "@/services/ChatService";
 import { DisplayUser } from "@/types/chat.type";
 import UserProfileCard from "@/components/UserProfileCard";
+import UserAvatar from "./UserAvatar";
 
 const { width, height } = Dimensions.get("window");
 const POST_WIDTH = width;
-const ONE_SECOND_IN_MS = 1000;
 
 interface PostComponentProps {
   post: Post;
@@ -62,56 +67,70 @@ interface PostComponentProps {
   setIsGloballyMuted: (isMuted: boolean) => void;
 }
 
-const CommentInput = React.memo(({
-  user,
-  colors,
-  commentText,
-  setCommentText,
-  handleCommentSubmit,
-  isCommentSending,
-}: {
-  user: User | null;
-  colors: any;
-  commentText: string;
-  setCommentText: (text: string) => void;
-  handleCommentSubmit: () => void;
-  isCommentSending: boolean;
-}) => (
-  <View
-    style={[styles.commentInputContainer, { borderTopColor: colors.border }]}
-  >
-    <Image
-      source={{ uri: user?.profileImage }}
-      style={styles.currentUserImage}
-    />
-    <BottomSheetTextInput
-      style={[
-        styles.commentInput,
-        { backgroundColor: colors.backgroundSecondary, color: colors.text, borderColor: colors.border },
-      ]}
-      placeholder="Add a comment..."
-      placeholderTextColor={colors.textDim}
-      value={commentText}
-      onChangeText={setCommentText}
-    />
-    <TouchableOpacity
-      style={styles.sendButton}
-      onPress={handleCommentSubmit}
-      disabled={isCommentSending}
+const CommentInput = React.memo(
+  ({
+    user,
+    colors,
+    commentText,
+    setCommentText,
+    handleCommentSubmit,
+    isCommentSending,
+  }: {
+    user: User | null;
+    colors: any;
+    commentText: string;
+    setCommentText: (text: string) => void;
+    handleCommentSubmit: () => void;
+    isCommentSending: boolean;
+  }) => (
+    <ThemedView
+      style={[styles.commentInputContainer, { borderTopColor: colors.border }]}
     >
-      {isCommentSending ? (
-        <ActivityIndicator size="small" color={colors.primary} />
-      ) : (
-        <Feather name="send" size={24} color={colors.primary} />
-      )}
-    </TouchableOpacity>
-  </View>
-));
+      <UserAvatar
+        imageUri={user?.profileImage}
+        size={32}
+        style={styles.currentUserImage}
+      />
+      <BottomSheetTextInput
+        style={[
+          styles.commentInput,
+          {
+            backgroundColor: colors.backgroundSecondary,
+            color: colors.text,
+            borderColor: colors.border,
+          },
+        ]}
+        placeholder="Add a comment..."
+        placeholderTextColor={colors.textDim}
+        value={commentText}
+        onChangeText={setCommentText}
+      />
+      <TouchableOpacity
+        style={styles.sendButton}
+        onPress={handleCommentSubmit}
+        disabled={isCommentSending}
+      >
+        {isCommentSending ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : (
+          <Feather name="send" size={24} color={colors.primary} />
+        )}
+      </TouchableOpacity>
+    </ThemedView>
+  )
+);
 
-const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActive, isGloballyMuted, setIsGloballyMuted }: PostComponentProps) => {
+const PostComponent = ({
+  post,
+  currentlyPlayingId,
+  setCurrentlyPlayingId,
+  isActive,
+  isGloballyMuted,
+  setIsGloballyMuted,
+}: PostComponentProps) => {
   const { colors } = useTheme();
   const { user, accessToken } = useAuth();
-  
+
   const safeLikes = Array.isArray(post.likes) ? post.likes : [];
   const safeSaves = Array.isArray(post.saves) ? post.saves : [];
   const safeComments = Array.isArray(post.comments) ? post.comments : [];
@@ -126,11 +145,11 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [showFullCaption, setShowFullCaption] = useState(false);
-  
+
   const soundRef = useRef<Audio.Sound | null>(null);
   const lastTap = useRef<number | null>(null);
   const animationInterval = useRef<NodeJS.Timeout | number | null>(null);
-  
+
   const isPlayingThisPost = currentlyPlayingId === post._id && !isGloballyMuted;
   const isMuted = isGloballyMuted;
 
@@ -142,7 +161,7 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
 
   const snapPointsComments = useMemo(() => [height * 0.55], []);
   const snapPointsOptions = useMemo(() => [height * 0.4], []);
-  const snapPointsShare = useMemo(() => ['70%'], []);
+  const snapPointsShare = useMemo(() => ["70%"], []);
 
   const hasMultipleInfo = !!post.song && !!post.location;
 
@@ -154,24 +173,33 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const getRelationAndStatus = useCallback(
-    (targetUserId: string, knockers: KnockRequest[], knocked: KnockRequest[], currentUserId: string) => {
-      const knockedByMe = knocked.find(k => k.knockedId === targetUserId && k.knockerId === currentUserId);
-      const knockedMe = knockers.find(k => k.knockerId === targetUserId && k.knockedId === currentUserId);
-      
-      let relation: DisplayUser['relationToMe'] = "stranger";
-      let status: DisplayUser['status'] = undefined;
+    (
+      targetUserId: string,
+      knockers: KnockRequest[],
+      knocked: KnockRequest[],
+      currentUserId: string
+    ) => {
+      const knockedByMe = knocked.find(
+        (k) => k.knockedId === targetUserId && k.knockerId === currentUserId
+      );
+      const knockedMe = knockers.find(
+        (k) => k.knockerId === targetUserId && k.knockedId === currentUserId
+      );
+
+      let relation: DisplayUser["relationToMe"] = "stranger";
+      let status: DisplayUser["status"] = undefined;
 
       if (knockedByMe && knockedMe) {
         relation = "lockedIn";
         status = "lockedIn";
       } else if (knockedByMe) {
         relation = "knocked";
-        status = knockedByMe.status as DisplayUser['status'];
+        status = knockedByMe.status as DisplayUser["status"];
       } else if (knockedMe) {
         relation = "knocker";
-        status = knockedMe.status as DisplayUser['status'];
+        status = knockedMe.status as DisplayUser["status"];
       }
-      
+
       return { relation, status };
     },
     []
@@ -192,9 +220,14 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
       allRelevantKnocks.forEach((k) => {
         const targetUserId = k.user.id;
         if (targetUserId === user._id) return;
-        const { relation, status } = getRelationAndStatus(targetUserId, knockersResponse, knockedResponse, user._id);
-        
-        if (status === 'lockedIn' || status === 'onesidedlock') {
+        const { relation, status } = getRelationAndStatus(
+          targetUserId,
+          knockersResponse,
+          knockedResponse,
+          user._id
+        );
+
+        if (status === "lockedIn" || status === "onesidedlock") {
           uniqueUsersMap.set(targetUserId, {
             id: targetUserId,
             username: k.user.username,
@@ -206,7 +239,9 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
         }
       });
 
-      const sortedUsers = Array.from(uniqueUsersMap.values()).filter(u => u.status === 'lockedIn' || u.status === 'onesidedlock');
+      const sortedUsers = Array.from(uniqueUsersMap.values()).filter(
+        (u) => u.status === "lockedIn" || u.status === "onesidedlock"
+      );
       setUsersToShareWith(sortedUsers);
     } catch (error) {
       console.error("Failed to fetch users for share:", error);
@@ -229,16 +264,22 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
       setIsSearching(true);
       searchTimeoutRef.current = setTimeout(async () => {
         try {
-          const [searchResults, knockersResponse, knockedResponse] = await Promise.all([
-            KnockService.searchUsers(accessToken, text),
-            KnockService.getKnockers(accessToken),
-            KnockService.getKnocked(accessToken),
-          ]);
-          
+          const [searchResults, knockersResponse, knockedResponse] =
+            await Promise.all([
+              KnockService.searchUsers(accessToken, text),
+              KnockService.getKnockers(accessToken),
+              KnockService.getKnocked(accessToken),
+            ]);
+
           const processedSearchResults: DisplayUser[] = searchResults
-            .filter(u => u._id !== user._id)
-            .map(u => {
-              const { relation, status } = getRelationAndStatus(u._id, knockersResponse, knockedResponse, user._id);
+            .filter((u) => u._id !== user._id)
+            .map((u) => {
+              const { relation, status } = getRelationAndStatus(
+                u._id,
+                knockersResponse,
+                knockedResponse,
+                user._id
+              );
               return {
                 id: u._id,
                 username: `${u.firstName} ${u.lastName || ""}`.trim(),
@@ -248,7 +289,9 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
                 isCreatingChat: false,
               };
             })
-            .filter(u => u.status === 'lockedIn' || u.status === 'onesidedlock');
+            .filter(
+              (u) => u.status === "lockedIn" || u.status === "onesidedlock"
+            );
 
           setUsersToShareWith(processedSearchResults);
         } catch (error) {
@@ -260,30 +303,41 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
     },
     [accessToken, user?._id, fetchInitialUsersForShare, getRelationAndStatus]
   );
-  
+
   const handlePresentShareModal = useCallback(() => {
-    if (!accessToken) return showToast("error", "You must be logged in to share a post.");
+    if (!accessToken)
+      return console.log("error", "You must be logged in to share a post.");
     setSearchQuery("");
     fetchInitialUsersForShare();
     shareModalRef.current?.present();
   }, [accessToken, fetchInitialUsersForShare]);
 
-  const handleShareToUser = useCallback(async (recipientId: string) => {
-    if (!accessToken) return;
-    setSharingToChatId(recipientId);
-    try {
-      const chatResponse = await ChatService.createChat(accessToken, recipientId);
-      await PostService.sharePostToChat(post._id, chatResponse.chatId, accessToken); 
-      showToast("success", "Post shared successfully!");
-      shareModalRef.current?.dismiss();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error) {
-      console.error("Failed to share post:", error);
-      showToast("error", "Failed to share post. Please try again.");
-    } finally {
-      setSharingToChatId(null);
-    }
-  }, [accessToken, post._id]);
+  const handleShareToUser = useCallback(
+    async (recipientId: string) => {
+      if (!accessToken) return;
+      setSharingToChatId(recipientId);
+      try {
+        const chatResponse = await ChatService.createChat(
+          accessToken,
+          recipientId
+        );
+        await PostService.sharePostToChat(
+          post._id,
+          chatResponse.chatId,
+          accessToken
+        );
+        console.log("success", "Post shared successfully!");
+        shareModalRef.current?.dismiss();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch (error) {
+        console.error("Failed to share post:", error);
+        console.log("error", "Failed to share post. Please try again.");
+      } finally {
+        setSharingToChatId(null);
+      }
+    },
+    [accessToken, post._id]
+  );
 
   useEffect(() => {
     if (hasMultipleInfo) {
@@ -351,13 +405,15 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
       ],
     };
   });
-  
+
   const slideStyleSong = useAnimatedStyle(() => {
     return {
       opacity: withTiming(slideAnimation.value, { duration: 500 }),
       transform: [
         {
-          translateY: withTiming((1 - slideAnimation.value) * 20, { duration: 500 }),
+          translateY: withTiming((1 - slideAnimation.value) * 20, {
+            duration: 500,
+          }),
         },
       ],
     };
@@ -447,23 +503,24 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
   }, [accessToken, post._id, commentText]);
 
   const renderComment = ({ item }: { item: Comment }) => (
-    <View style={styles.commentRow}>
-      <Image
-        source={{ uri: item.user.profileImage }}
+    <ThemedView style={styles.commentRow}>
+      <UserAvatar
+        imageUri={item.user.profileImage}
+        size={35}
         style={styles.commentUserImage}
       />
-      <View style={styles.commentContent}>
-        <View style={styles.commentHeader}>
+      <ThemedView style={styles.commentContent}>
+        <ThemedView style={styles.commentHeader}>
           <ThemedText style={styles.commentUserName}>
             {item.user.firstName} {item.user.lastName}
           </ThemedText>
-          <ThemedText style={[styles.commentTime, {color: colors.textDim}]}>
+          <ThemedText style={[styles.commentTime, { color: colors.textDim }]}>
             {formatCommentTimestamp(item.createdAt)}
           </ThemedText>
-        </View>
+        </ThemedView>
         <ThemedText style={styles.commentText}>{item.text}</ThemedText>
-      </View>
-    </View>
+      </ThemedView>
+    </ThemedView>
   );
 
   const renderUserItem = ({ item }: { item: DisplayUser }) => {
@@ -490,14 +547,13 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
     );
   };
 
-  const captionContent = typeof post.caption === 'string' ? post.caption : '';
+  const captionContent = typeof post.caption === "string" ? post.caption : "";
 
   return (
     <ThemedView style={styles.postContainer}>
-      {/* Post Header */}
-      <View style={styles.postHeader}>
+      <ThemedView style={styles.postHeader}>
         <TouchableOpacity style={styles.userInfoContainer}>
-          <View
+          <ThemedView
             style={[
               styles.userImageBorder,
               post.user.hasStory && {
@@ -524,25 +580,35 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
                 ]}
               />
             )}
-            <Image source={{ uri: post.user.profileImage }} style={styles.userImage} />
-          </View>
-          <View style={styles.userInfoText}>
-            <ThemedText style={[styles.userName, {color: colors.text}]}>
+            <UserAvatar
+              imageUri={post.user.profileImage}
+              size={34}
+              style={styles.userImage}
+            />
+          </ThemedView>
+          <ThemedView style={styles.userInfoText}>
+            <ThemedText style={[styles.userName, { color: colors.text }]}>
               {post.user.firstName} {post.user.lastName}
             </ThemedText>
             {hasMultipleInfo ? (
-              <View style={styles.slidingContainer}>
+              <ThemedView style={styles.slidingContainer}>
                 <Animated.View style={[styles.slidingItem, slideStyleLocation]}>
-                  <ThemedText style={[styles.infoText, {color: colors.text}]} numberOfLines={1}>
+                  <ThemedText
+                    style={[styles.infoText, { color: colors.text }]}
+                    numberOfLines={1}
+                  >
                     {post.location}
                   </ThemedText>
                 </Animated.View>
                 <Animated.View style={[styles.slidingItem, slideStyleSong]}>
-                  <ThemedText style={[styles.infoText, {color: colors.text}]} numberOfLines={1}>
+                  <ThemedText
+                    style={[styles.infoText, { color: colors.text }]}
+                    numberOfLines={1}
+                  >
                     {post.song?.artistName} - {post.song?.trackName}
                   </ThemedText>
                 </Animated.View>
-              </View>
+              </ThemedView>
             ) : post.location ? (
               <ThemedText style={styles.infoText} numberOfLines={1}>
                 {post.location}
@@ -552,23 +618,17 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
                 {post.song.artistName} - {post.song.trackName}
               </ThemedText>
             ) : null}
-          </View>
+          </ThemedView>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.threeDotsIcon}
           onPress={handlePresentOptionsModal}
         >
-          <Entypo
-            name="dots-three-horizontal"
-            size={24}
-            color={colors.text}
-          />
+          <Entypo name="dots-three-horizontal" size={24} color={colors.text} />
         </TouchableOpacity>
-      </View>
-
-      {/* Post Body */}
+      </ThemedView>
       <TouchableWithoutFeedback onPress={handleDoublePress}>
-        <View style={styles.postImageContainer}>
+        <ThemedView style={styles.postImageContainer}>
           <FlatList
             horizontal
             pagingEnabled
@@ -581,7 +641,7 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
             onMomentumScrollEnd={onMomentumScrollEnd}
           />
           {post.images.length > 1 && (
-            <View
+            <ThemedView
               style={[
                 styles.slideCounter,
                 { backgroundColor: colors.overlayLight },
@@ -590,7 +650,7 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
               <ThemedText style={styles.slideCounterText}>
                 {activeImageIndex + 1}/{post.images.length}
               </ThemedText>
-            </View>
+            </ThemedView>
           )}
           {post.song && (
             <MotiView
@@ -611,19 +671,24 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
               </TouchableOpacity>
             </MotiView>
           )}
-        </View>
+        </ThemedView>
       </TouchableWithoutFeedback>
-
-      {/* Post Footer */}
-      <View style={styles.postFooter}>
-        <View style={styles.footerIconsLeft}>
-          <TouchableOpacity onPress={handleLikePress} style={styles.iconAndCountContainer}>
-            <AntDesign
-              name={isLiked ? "heart" : "hearto"}
+      <ThemedView style={styles.postFooter}>
+        <ThemedView style={styles.footerIconsLeft}>
+          <TouchableOpacity
+            onPress={handleLikePress}
+            style={styles.iconAndCountContainer}
+          >
+            <FontAwesome
+              name={isLiked ? "heart" : "heart-o"}
               size={28}
               color={isLiked ? colors.red : colors.text}
             />
-            {postLikesCount > 0 && <ThemedText style={styles.iconCountText}>{postLikesCount}</ThemedText>}
+            {postLikesCount > 0 && (
+              <ThemedText style={styles.iconCountText}>
+                {postLikesCount}
+              </ThemedText>
+            )}
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handlePresentCommentsModal}
@@ -634,17 +699,20 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
               size={28}
               color={colors.text}
             />
-            {commentCount > 0 && <ThemedText style={styles.iconCountText}>{commentCount}</ThemedText>}
+            {commentCount > 0 && (
+              <ThemedText style={styles.iconCountText}>
+                {commentCount}
+              </ThemedText>
+            )}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.footerIcon} onPress={handlePresentShareModal}>
-            <Feather
-              name="send"
-              size={28}
-              color={colors.text}
-            />
+          <TouchableOpacity
+            style={styles.footerIcon}
+            onPress={handlePresentShareModal}
+          >
+            <Feather name="send" size={28} color={colors.text} />
           </TouchableOpacity>
-        </View>
-        <View style={styles.footerIconsRight}>
+        </ThemedView>
+        <ThemedView style={styles.footerIconsRight}>
           <TouchableOpacity onPress={handleSavePress}>
             <MaterialCommunityIcons
               name={isSaved ? "bookmark" : "bookmark-outline"}
@@ -652,12 +720,10 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
               color={isSaved ? colors.text : colors.text}
             />
           </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Post Details */}
-      <View style={styles.postDetails}>
-        <View style={styles.captionRow}>
+        </ThemedView>
+      </ThemedView>
+      <ThemedView style={styles.postDetails}>
+        <ThemedView style={styles.captionRow}>
           <ThemedText style={styles.captionText}>
             <ThemedText style={styles.captionUserName}>
               {post.user.firstName} {post.user.lastName}
@@ -675,13 +741,11 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
               </ThemedText>
             )}
           </ThemedText>
-        </View>
-        <ThemedText style={[styles.timeAgoText, {color: colors.textDim}]}>
+        </ThemedView>
+        <ThemedText style={[styles.timeAgoText, { color: colors.textDim }]}>
           {formatPostTimestamp(post.createdAt)}
         </ThemedText>
-      </View>
-
-      {/* Comments BottomSheet */}
+      </ThemedView>
       <BottomSheetModal
         ref={commentsModalRef}
         index={0}
@@ -693,24 +757,26 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
         handleIndicatorStyle={{ backgroundColor: colors.textDim }}
         backgroundStyle={{ backgroundColor: colors.backgroundSecondary }}
       >
-        <View style={{ flex: 1 }}>
-          <View
+        <ThemedView style={{ flex: 1 }}>
+          <ThemedView
             style={[styles.modalHeader, { borderBottomColor: colors.border }]}
           >
             <ThemedText style={styles.modalTitle}>Comments</ThemedText>
-          </View>
+          </ThemedView>
 
           <BottomSheetFlatList
             data={localComments}
             renderItem={renderComment}
-            keyExtractor={(item, index) => item._id || index.toString()}
+            keyExtractor={(item: Comment, index: number) =>
+              item._id || index.toString()
+            }
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.commentsList}
             style={{ flex: 1 }}
           />
 
-          <CommentInput 
+          <CommentInput
             user={user}
             colors={colors}
             commentText={commentText}
@@ -718,10 +784,8 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
             handleCommentSubmit={handleCommentSubmit}
             isCommentSending={isCommentSending}
           />
-        </View>
+        </ThemedView>
       </BottomSheetModal>
-
-      {/* Options BottomSheet */}
       <BottomSheetModal
         ref={optionsModalRef}
         index={0}
@@ -731,10 +795,10 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
         handleIndicatorStyle={{ backgroundColor: colors.textDim }}
         backgroundStyle={{ backgroundColor: colors.backgroundSecondary }}
       >
-        <View style={styles.optionsModal}>
+        <ThemedView style={styles.optionsModal}>
           <TouchableOpacity
             style={[styles.optionItem, { borderBottomColor: colors.border }]}
-            onPress={() => Alert.alert("Option", "About this account")}
+            onPress={() => console.log("Option", "About this account")}
           >
             <MaterialCommunityIcons
               name="account"
@@ -742,7 +806,7 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
               color={colors.text}
               style={styles.optionIcon}
             />
-            <ThemedText style={[styles.optionText, {color: colors.text}]}>
+            <ThemedText style={[styles.optionText, { color: colors.text }]}>
               About this account
             </ThemedText>
           </TouchableOpacity>
@@ -756,13 +820,13 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
               color={isSaved ? colors.text : colors.text}
               style={styles.optionIcon}
             />
-            <ThemedText style={[styles.optionText, {color: colors.text}]}>
+            <ThemedText style={[styles.optionText, { color: colors.text }]}>
               {isSaved ? "Unsave" : "Save"}
             </ThemedText>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.optionItem, { borderBottomColor: colors.border }]}
-            onPress={() => Alert.alert("Option", "Report")}
+            onPress={() => console.log("Option", "Report")}
           >
             <MaterialCommunityIcons
               name="alert-circle-outline"
@@ -776,7 +840,7 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.optionItem, { borderBottomColor: colors.border }]}
-            onPress={() => Alert.alert("Option", "Block user")}
+            onPress={() => console.log("Option", "Block user")}
           >
             <MaterialCommunityIcons
               name="block-helper"
@@ -784,12 +848,12 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
               color={colors.text}
               style={styles.optionIcon}
             />
-            <ThemedText style={[styles.optionText, {color: colors.text}]}>Block user</ThemedText>
+            <ThemedText style={[styles.optionText, { color: colors.text }]}>
+              Block user
+            </ThemedText>
           </TouchableOpacity>
-        </View>
+        </ThemedView>
       </BottomSheetModal>
-
-      {/* Share BottomSheetModal */}
       <BottomSheetModal
         ref={shareModalRef}
         index={0}
@@ -801,11 +865,13 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
         keyboardBehavior="interactive"
         keyboardBlurBehavior="restore"
       >
-        <View style={{ flex: 1 }}>
-          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+        <ThemedView style={{ flex: 1 }}>
+          <ThemedView
+            style={[styles.modalHeader, { borderBottomColor: colors.border }]}
+          >
             <ThemedText style={styles.modalTitle}>Share Post</ThemedText>
-          </View>
-          <View
+          </ThemedView>
+          <ThemedView
             style={[
               styles.searchContainer,
               {
@@ -845,11 +911,11 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
                 style={styles.searchLoading}
               />
             )}
-          </View>
+          </ThemedView>
           <BottomSheetFlatList
             data={usersToShareWith}
             renderItem={renderUserItem}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item: DisplayUser) => item.id}
             contentContainerStyle={styles.listContent}
             ItemSeparatorComponent={() => (
               <ThemedView
@@ -870,7 +936,7 @@ const PostComponent = ({ post, currentlyPlayingId, setCurrentlyPlayingId, isActi
               </ThemedView>
             )}
           />
-        </View>
+        </ThemedView>
       </BottomSheetModal>
     </ThemedView>
   );
@@ -908,7 +974,7 @@ const styles = StyleSheet.create({
   },
   userInfoText: {
     marginLeft: 10,
-    width: '70%',
+    width: "70%",
   },
   userName: {
     fontSize: 14,
@@ -918,15 +984,15 @@ const styles = StyleSheet.create({
   slidingContainer: {
     height: 20,
     overflow: "hidden",
-    width: '100%',
+    width: "100%",
   },
   slidingItem: {
     position: "absolute",
-    width: '100%',
+    width: "100%",
   },
   infoText: {
     fontSize: 12,
-    width: '100%',
+    width: "100%",
   },
   threeDotsIcon: {
     padding: 5,
@@ -1035,7 +1101,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 16,
     borderTopWidth: 1,
-    marginBottom: Platform.OS === 'ios' ? 20 : 30
+    marginBottom: Platform.OS === "ios" ? 20 : 30,
   },
   currentUserImage: {
     width: 32,

@@ -1,6 +1,6 @@
-const cloudinary = require('../config/cloudinary');
+import { cloudinary } from '../config/cloudinary.js';
 
-const uploadImageToCloudinary = async (fileBuffer, folder = 'posts') => {
+export const uploadImageToCloudinary = async (fileBuffer, folder = 'posts') => {
   return new Promise((resolve, reject) => {
     cloudinary.uploader.upload_stream(
       { folder, resource_type: 'auto' },
@@ -15,11 +15,6 @@ const uploadImageToCloudinary = async (fileBuffer, folder = 'posts') => {
   });
 };
 
-const deleteImageFromCloudinary = async (publicId) => {
+export const deleteImageFromCloudinary = async (publicId) => {
   return await cloudinary.uploader.destroy(publicId);
-};
-
-module.exports = {
-  uploadImageToCloudinary,
-  deleteImageFromCloudinary,
 };

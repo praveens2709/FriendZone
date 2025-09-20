@@ -6,7 +6,7 @@ import {
   Animated,
 } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
-import { AntDesign } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { ThemedView } from "./ThemedView";
 
 type Story = {
@@ -81,11 +81,7 @@ export default function StoryItem({
               ]}
               hitSlop={10}
             >
-              <AntDesign
-                name="pluscircleo"
-                size={18}
-                color={colors.text}
-              />
+              <Ionicons name="add-circle-outline" size={20} color={colors.text} />
             </Pressable>
           )}
         </Animated.View>

@@ -1,4 +1,3 @@
-// types/form.type.ts
 export type TFormData = {
   email?: string;
   password?: string;

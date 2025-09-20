@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   StyleSheet,
-  View,
   TouchableOpacity,
   Platform,
 } from 'react-native';

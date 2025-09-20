@@ -4,6 +4,7 @@ import React, {
   useContext,
   ReactNode,
   useLayoutEffect,
+  useCallback,
 } from "react";
 import {
   getAuthSession,
@@ -27,7 +28,8 @@ interface AuthContextType {
   signUp: (email: string, password: string) => Promise<void>;
   updateUserTheme: (theme: ThemeType) => Promise<void>;
   user: User | null;
-  loadUserProfile: () => Promise<void>;
+  loadUserProfile: (tokenOverride?: string | null) => Promise<void>;
+  fetchProfile: () => Promise<User>;
   updateProfile: (data: any) => Promise<void>;
   accessToken: string | null;
 }
@@ -51,6 +53,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const setThemeFromStore = useThemeStore((state) => state.setTheme);
   const availableThemes = useThemeStore((state) => state.availableThemes);
+
+  const signOut = useCallback(async () => {
+    await removeAuthSession();
+    await removeFilterSettings();
+    await AsyncStorage.removeItem("userToken");
+    setSession(null);
+    setAccessToken(null);
+    setIsAuthenticated(false);
+    setUser(null);
+  }, []);
+
+  const loadUserProfile = useCallback(async (tokenOverride?: string | null) => {
+    const token = tokenOverride || (await AsyncStorage.getItem("userToken"));
+    try {
+      if (token) {
+        const userProfile = await ProfileServices.getProfile(token);
+        setUser(userProfile);
+      }
+    } catch (error: any) {
+      await signOut();
+      throw error;
+    }
+  }, [signOut]);
+
+  const fetchProfile = useCallback(async () => {
+    if (!accessToken) {
+      throw new Error("No access token available.");
+    }
+    const userProfile = await ProfileServices.getProfile(accessToken);
+    setUser(userProfile);
+    return userProfile;
+  }, [accessToken]);
+
 
   useLayoutEffect(() => {
     (async () => {
@@ -86,7 +121,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setAuthLoading(false);
       }
     })();
-  }, [setThemeFromStore, availableThemes]);
+  }, [setThemeFromStore, availableThemes, loadUserProfile, signOut]);
 
   const signIn = async (sessionData: AuthSession) => {
     await storeAuthSession(sessionData);
@@ -101,16 +136,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setThemeFromStore(sessionData.theme as ThemeType);
     }
     await loadUserProfile(sessionData.accessToken);
-  };
-
-  const signOut = async () => {
-    await removeAuthSession();
-    await removeFilterSettings();
-    await AsyncStorage.removeItem("userToken");
-    setSession(null);
-    setAccessToken(null);
-    setIsAuthenticated(false);
-    setUser(null);
   };
 
   const signUp = async (email: string, password: string) => {
@@ -129,19 +154,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await storeAuthSession(updatedSession);
       setThemeFromStore(theme);
     } catch (error) {
-      throw error;
-    }
-  };
-
-  const loadUserProfile = async (tokenOverride?: string | null) => {
-    const token = tokenOverride || (await AsyncStorage.getItem("userToken"));
-    try {
-      if (token) {
-        const userProfile = await ProfileServices.getProfile(token);
-        setUser(userProfile);
-      }
-    } catch (error: any) {
-      await signOut();
       throw error;
     }
   };
@@ -193,6 +205,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         updateUserTheme,
         user,
         loadUserProfile,
+        fetchProfile,
         updateProfile,
         accessToken,
       }}

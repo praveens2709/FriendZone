@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const KnockSchema = new mongoose.Schema({
   knocker: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -14,4 +14,4 @@ const KnockSchema = new mongoose.Schema({
 
 KnockSchema.index({ knocker: 1, knocked: 1 }, { unique: true });
 
-module.exports = mongoose.model('Knock', KnockSchema);
+export default mongoose.model('Knock', KnockSchema);

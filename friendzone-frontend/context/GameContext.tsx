@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router';
 import { useSocket } from './SocketContext';
 import { useAuth } from './AuthContext';
 import GameService from '@/services/GameService';
-import { showToast } from '@/constants/Functions';
 
 interface GameInvite {
   gameSessionId: string;
@@ -50,7 +49,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('[GameContext] Adding new invite to pendingInvites.');
         return [...prev, invite];
       });
-      showToast('info', `New Game Invite from ${invite.initiator.username} for ${invite.gameName}. Check notifications!`);
+      console.log('info', `New Game Invite from ${invite.initiator.username} for ${invite.gameName}. Check notifications!`);
     };
 
     const handleGameInviteAccepted = (data: any) => {
@@ -73,7 +72,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleGameSessionStarted = (data: any) => {
         console.log('[GameContext] Received gameSessionStarted event:', data);
-        showToast('success', `Game ${data.gameId} is starting!`);
+        console.log('success', `Game ${data.gameId} is starting!`);
         setPendingInvites((prev) => {
             const newInvites = prev.filter(inv => inv.gameSessionId !== data.gameSessionId);
             console.log(`[GameContext] Removed started game session ${data.gameSessionId} from pendingInvites.`);

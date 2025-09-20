@@ -1,7 +1,8 @@
 import React from "react";
 import ContentLoader, { Rect } from "react-content-loader/native";
-import { Dimensions, StyleSheet, FlatList, View } from "react-native";
+import { Dimensions, StyleSheet, FlatList } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
+import { ThemedView } from "./ThemedView";
 
 const { width: screenWidth } = Dimensions.get("window");
 const numColumns = 3;
@@ -18,9 +19,12 @@ const PostGridLoader: React.FC = () => {
       data={Array.from({ length: numPosts })}
       keyExtractor={(_, i) => i.toString()}
       numColumns={numColumns}
-      columnWrapperStyle={{ justifyContent: "space-between", marginBottom: spacing }}
+      columnWrapperStyle={{
+        justifyContent: "space-between",
+        marginBottom: spacing,
+      }}
       renderItem={() => (
-        <View style={{ width: postSize, height: postSize }}>
+        <ThemedView style={{ width: postSize, height: postSize }}>
           <ContentLoader
             speed={1}
             width={postSize}
@@ -30,9 +34,16 @@ const PostGridLoader: React.FC = () => {
             foregroundColor={colors.textSecondary}
             opacity={0.8}
           >
-            <Rect x="0" y="0" rx="0" ry="0" width={postSize} height={postSize} />
+            <Rect
+              x="0"
+              y="0"
+              rx="0"
+              ry="0"
+              width={postSize}
+              height={postSize}
+            />
           </ContentLoader>
-        </View>
+        </ThemedView>
       )}
     />
   );

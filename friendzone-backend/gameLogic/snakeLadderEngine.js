@@ -17,7 +17,7 @@ const BASE_SNAKES_LADDERS = {
     ],
 };
 
-exports.initialize = (participants) => {
+export const initialize = (participants) => {
     const players = participants.map(p => ({
         userId: p.userId,
         position: 1,
@@ -28,8 +28,8 @@ exports.initialize = (participants) => {
     return {
         players,
         boardSize: BOARD_SIZE,
-        snakes: BASE_SNAKES_LADDERS.snakes, // Use fixed snakes
-        ladders: BASE_SNAKES_LADDERS.ladders, // Use fixed ladders
+        snakes: BASE_SNAKES_LADDERS.snakes,
+        ladders: BASE_SNAKES_LADDERS.ladders,
         currentPlayerIndex: 0,
         lastDiceRoll: 0,
         diceRollsThisTurn: 0,
@@ -37,9 +37,9 @@ exports.initialize = (participants) => {
     };
 };
 
-exports.rollDice = () => Math.floor(Math.random() * 6) + 1;
+export const rollDice = () => Math.floor(Math.random() * 6) + 1;
 
-exports.calculateNextPosition = (currentPosition, roll) => {
+export const calculateNextPosition = (currentPosition, roll) => {
     let newPosition = currentPosition + roll;
 
     if (newPosition > BOARD_SIZE) {
@@ -49,13 +49,11 @@ exports.calculateNextPosition = (currentPosition, roll) => {
         return BOARD_SIZE;
     }
 
-    // Check for fixed ladders
     const ladder = BASE_SNAKES_LADDERS.ladders.find(l => l.bottom === newPosition);
     if (ladder) {
         return ladder.top;
     }
 
-    // Check for fixed snakes
     const snake = BASE_SNAKES_LADDERS.snakes.find(s => s.head === newPosition);
     if (snake) {
         return snake.tail;
@@ -64,8 +62,8 @@ exports.calculateNextPosition = (currentPosition, roll) => {
     return newPosition;
 };
 
-exports.applyMove = (gameState, playerId, move) => {
-    const { players, snakes, ladders, currentPlayerIndex, boardSize } = gameState;
+export const applyMove = (gameState, playerId, move) => {
+    const { players, currentPlayerIndex, boardSize } = gameState;
     const currentPlayer = players[currentPlayerIndex];
 
     if (currentPlayer.userId !== playerId) {
@@ -75,9 +73,9 @@ exports.applyMove = (gameState, playerId, move) => {
         throw new Error('Invalid move type for Snake and Ladder.');
     }
 
-    const diceRoll = exports.rollDice();
-    const oldPosition = currentPlayer.position; // Store old position for animation
-    const newPosition = exports.calculateNextPosition(oldPosition, diceRoll);
+    const diceRoll = rollDice();
+    const oldPosition = currentPlayer.position;
+    const newPosition = calculateNextPosition(oldPosition, diceRoll);
 
     currentPlayer.position = newPosition;
 
@@ -89,7 +87,6 @@ exports.applyMove = (gameState, playerId, move) => {
         currentPlayerIndex: nextPlayerIndex,
         lastDiceRoll: diceRoll,
         message: `${currentPlayer.username || 'Player'} rolled a ${diceRoll}. Moved to ${newPosition}.`,
-        // NEW: Add old position to state for frontend animation
         animationData: {
             playerId: currentPlayer.userId,
             fromPosition: oldPosition,
@@ -99,12 +96,12 @@ exports.applyMove = (gameState, playerId, move) => {
     };
 };
 
-exports.checkWin = (gameState) => {
+export const checkWin = (gameState) => {
     const winningPlayer = gameState.players.find(p => p.position === BOARD_SIZE);
     return winningPlayer ? winningPlayer.userId : null;
 };
 
-exports.getMessage = (gameState, currentUserId) => {
+export const getMessage = (gameState, currentUserId) => {
     if (!gameState || !gameState.players || gameState.players.length === 0) {
         return 'Initializing game...';
     }
@@ -128,8 +125,8 @@ exports.getMessage = (gameState, currentUserId) => {
     }
 };
 
-exports.getPendingGameState = (participantsData, initiatorId) => {
-    const initialState = exports.initialize(participantsData);
+export const getPendingGameState = (participantsData, initiatorId) => {
+    const initialState = initialize(participantsData);
     initialState.status = 'waiting';
     initialState.message = `Waiting for players to accept the invite...`;
     initialState.currentPlayer = initiatorId;
@@ -138,8 +135,8 @@ exports.getPendingGameState = (participantsData, initiatorId) => {
     return initialState;
 };
 
-exports.getInitialGameState = (participantsData, initiatorId) => {
-    const initialState = exports.initialize(participantsData);
+export const getInitialGameState = (participantsData, initiatorId) => {
+    const initialState = initialize(participantsData);
     const initiatorPlayer = initialState.players.find(p => p.userId === initiatorId);
     if (initiatorPlayer) {
         initialState.currentPlayer = initiatorPlayer.userId;

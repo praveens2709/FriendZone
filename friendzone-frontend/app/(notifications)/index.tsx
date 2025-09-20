@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { StyleSheet, TouchableOpacity, FlatList, View, ActivityIndicator, RefreshControl, Alert } from "react-native";
+import {
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
+  RefreshControl,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemedView } from "@/components/ThemedView";
@@ -9,12 +15,17 @@ import { useRouter, useFocusEffect } from "expo-router";
 import CommonHeader from "@/components/CommonHeader";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import BackButton from "@/components/BackButton";
-import NotificationService, { NotificationResponse } from "@/services/NotificationService";
+import NotificationService, {
+  NotificationResponse,
+} from "@/services/NotificationService";
 import KnockService, { KnockRequest } from "@/services/knockService";
 import GameService from "@/services/GameService";
 import { useSocket } from "@/context/SocketContext";
 import { useAuth } from "@/context/AuthContext";
-import { formatNotificationDateGroup, formatNotificationTimestamp, getUserAvatar, showToast } from "@/constants/Functions";
+import {
+  formatNotificationDateGroup,
+  formatNotificationTimestamp,
+} from "@/constants/Functions";
 import UserAvatar from "@/components/UserAvatar";
 
 type GameInviteMetadata = {
@@ -22,46 +33,67 @@ type GameInviteMetadata = {
   gameName: string;
   initiatorUsername: string;
   initiatorAvatar: string | null;
-  status: 'pending' | 'accepted' | 'declined' | 'in-progress';
+  status: "pending" | "accepted" | "decline" | "in-progress";
 };
 
 type EnrichedNotificationItem = NotificationResponse & {
   knockStatus?: "pending" | "lockedIn" | "onesidedlock" | "declined" | null;
   gameInviteMeta?: GameInviteMetadata;
+  hasMutualKnockRequest?: boolean;
 };
 
 const buildKnockRequestDisplay = (requests: KnockRequest[]) => {
   const count = requests.length;
   const avatar1Uri = requests[0]?.user?.avatar || null;
   const avatar2Uri = requests[1]?.user?.avatar || null;
-  const message = count === 0 ? "No new knocks yet." : `${count} new knock${count > 1 ? "s" : ""}`;
+  const message =
+    count === 0
+      ? "No new knocks yet."
+      : `${count} new knock${count > 1 ? "s" : ""}`;
   return { count, avatar1Uri, avatar2Uri, message };
 };
 
 export default function NotificationsScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const { accessToken, user } = useAuth();
+  const { accessToken, user, fetchProfile } = useAuth();
   const { socket } = useSocket();
 
-  const [notifications, setNotifications] = useState<EnrichedNotificationItem[]>([]);
+  const [notifications, setNotifications] = useState<
+    EnrichedNotificationItem[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [pendingKnockRequestsData, setPendingKnockRequestsData] = useState<KnockRequest[]>([]);
+  const [pendingKnockRequestsData, setPendingKnockRequestsData] = useState<
+    KnockRequest[]
+  >([]);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  const [mutualKnockRequests, setMutualKnockRequests] = useState<Set<string>>(
+    new Set()
+  );
+
+  const [isProfilePrivate, setIsProfilePrivate] = useState(user?.isPrivate);
 
   const privateKnockRequestsCount = pendingKnockRequestsData.length;
 
-  const knockRequestDisplay = useMemo(() => buildKnockRequestDisplay(pendingKnockRequestsData), [pendingKnockRequestsData]);
+  const knockRequestDisplay = useMemo(
+    () => buildKnockRequestDisplay(pendingKnockRequestsData),
+    [pendingKnockRequestsData]
+  );
 
   const fetchNotifications = useCallback(
     async (pageNum: number, isRefreshing = false) => {
-      console.log(`[NotificationsScreen] Fetching notifications: page ${pageNum}, isRefreshing: ${isRefreshing}`);
+      console.log(
+        `[NotificationsScreen] Fetching notifications: page ${pageNum}, isRefreshing: ${isRefreshing}`
+      );
       if (!accessToken) {
-        console.warn("[NotificationsScreen] No accessToken, cannot fetch notifications.");
+        console.warn(
+          "[NotificationsScreen] No accessToken, cannot fetch notifications."
+        );
         return;
       }
 
@@ -73,20 +105,54 @@ export default function NotificationsScreen() {
       }
 
       try {
-        const res = await NotificationService.getUserNotifications(accessToken, pageNum);
-        console.log(`[NotificationsScreen] Received ${res.notifications.length} notifications for page ${pageNum}.`);
+        const res = await NotificationService.getUserNotifications(
+          accessToken,
+          pageNum
+        );
+        console.log(
+          `[NotificationsScreen] Received ${res.notifications.length} notifications for page ${pageNum}.`
+        );
+
+        // Check for mutual knock requests for each notification
+        const enrichedNotifications = await Promise.all(
+          res.notifications.map(async (n) => {
+            let hasMutualKnockRequest = false;
+
+            // If this is a knock notification, check if user has sent a mutual request
+            if (
+              n.type === "activity" &&
+              n.relatedEntityType === "Knock" &&
+              n.content?.includes("knocked on you.") &&
+              n.user
+            ) {
+              try {
+                const knocked = await KnockService.getKnocked(accessToken);
+                hasMutualKnockRequest = knocked.some(
+                  (k) => k.knockedId === n.user.id && k.status === "pending"
+                );
+              } catch (error) {
+                console.warn("Error checking mutual knock requests:", error);
+              }
+            }
+
+            return {
+              ...n,
+              knockStatus: n.knockStatus || null,
+              hasMutualKnockRequest,
+              gameInviteMeta:
+                n.type === "game_invite"
+                  ? (n.metadata as GameInviteMetadata)
+                  : undefined,
+            } as EnrichedNotificationItem;
+          })
+        );
+
         setNotifications((prev) =>
           pageNum === 1
-            ? res.notifications.map(n => ({
-                ...n,
-                knockStatus: n.knockStatus || null,
-                gameInviteMeta: n.type === 'game_invite' ? (n.metadata as GameInviteMetadata) : undefined,
-              }))
-            : [...prev, ...res.notifications.map(n => ({
-                  ...n,
-                  knockStatus: n.knockStatus || null,
-                  gameInviteMeta: n.type === 'game_invite' ? (n.metadata as GameInviteMetadata) : undefined,
-                })).filter(
+            ? enrichedNotifications
+            : [
+                ...prev,
+                ...enrichedNotifications.filter(
                   (n) => !prev.some((p) => p.id === n.id)
                 ),
               ]
@@ -94,46 +160,97 @@ export default function NotificationsScreen() {
 
         setTotalPages(res.totalPages);
         setHasMore(pageNum < res.totalPages);
-        console.log(`[NotificationsScreen] Total pages: ${res.totalPages}, Has more: ${pageNum < res.totalPages}`);
-
-        if (user?.isPrivate) {
-          const knockers = await KnockService.getKnockers(accessToken);
-          setPendingKnockRequestsData(knockers.filter((k) => k.status === "pending"));
-          console.log(`[NotificationsScreen] Fetched ${knockers.length} knockers, ${knockers.filter(k => k.status === 'pending').length} pending.`);
-        }
+        console.log(
+          `[NotificationsScreen] Total pages: ${res.totalPages}, Has more: ${
+            pageNum < res.totalPages
+          }`
+        );
       } catch (error) {
-        showToast("error", "Failed to load notifications.");
-        console.error("[NotificationsScreen] Error fetching notifications:", error);
+        console.log("error", "Failed to load notifications.");
+        console.error(
+          "[NotificationsScreen] Error fetching notifications:",
+          error
+        );
       } finally {
         setLoading(false);
         setRefreshing(false);
         console.log("[NotificationsScreen] Notification fetching finished.");
       }
     },
-    [accessToken, user?.isPrivate]
+    [accessToken]
   );
+
+  const fetchPendingKnockRequests = useCallback(async () => {
+    if (!accessToken || !user?._id) return;
+
+    try {
+      const updatedUser = await fetchProfile();
+      setIsProfilePrivate(updatedUser.isPrivate);
+
+      if (updatedUser.isPrivate) {
+        const knockers = await KnockService.getKnockers(accessToken);
+        const filteredPendingKnocks = knockers.filter(
+          (k) => k.status === "pending" && k.knockerId !== user._id
+        );
+        setPendingKnockRequestsData(filteredPendingKnocks);
+
+        // Also fetch knocked users to track mutual requests
+        const knocked = await KnockService.getKnocked(accessToken);
+        const mutualRequests = new Set(
+          knocked.filter((k) => k.status === "pending").map((k) => k.knockedId)
+        );
+        setMutualKnockRequests(mutualRequests);
+
+        console.log(
+          `[NotificationsScreen] Fetched ${knockers.length} knocks. Displaying ${filteredPendingKnocks.length} pending requests. Mutual requests: ${mutualRequests.size}`
+        );
+      } else {
+        setPendingKnockRequestsData([]);
+        setMutualKnockRequests(new Set());
+        console.log(
+          "[NotificationsScreen] User profile is public, clearing knock requests."
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching pending knock requests:", error);
+    }
+  }, [accessToken, fetchProfile, user?._id]);
 
   const markAllNotificationsAsRead = useCallback(async () => {
     console.log("[NotificationsScreen] Marking all notifications as read.");
     if (!accessToken) return;
     try {
       await NotificationService.markAllNotificationsAsRead(accessToken);
-      setNotifications((prev) => prev.map((notif) => ({ ...notif, isRead: true })));
-      console.log("[NotificationsScreen] All notifications marked as read in UI.");
+      setNotifications((prev) =>
+        prev.map((notif) => ({ ...notif, isRead: true }))
+      );
+      if (socket) {
+        socket.emit("unreadNotificationCountUpdate", { count: 0 });
+      }
     } catch (error) {
-      console.error("[NotificationsScreen] Error marking all notifications as read:", error);
+      console.error(
+        "[NotificationsScreen] Error marking all notifications as read:",
+        error
+      );
     }
-  }, [accessToken]);
+  }, [accessToken, socket]);
 
   useFocusEffect(
     useCallback(() => {
-      console.log("[NotificationsScreen] useFocusEffect triggered. Fetching and marking all as read.");
+      console.log(
+        "[NotificationsScreen] useFocusEffect triggered. Fetching and marking all as read."
+      );
       fetchNotifications(1);
+      fetchPendingKnockRequests();
       markAllNotificationsAsRead();
       return () => {
         console.log("[NotificationsScreen] useFocusEffect cleanup.");
       };
-    }, [fetchNotifications, markAllNotificationsAsRead])
+    }, [
+      fetchNotifications,
+      markAllNotificationsAsRead,
+      fetchPendingKnockRequests,
+    ])
   );
 
   useEffect(() => {
@@ -144,44 +261,38 @@ export default function NotificationsScreen() {
   }, [page, fetchNotifications]);
 
   useEffect(() => {
-    console.log("[NotificationsScreen] useEffect for socket listeners started.");
+    console.log(
+      "[NotificationsScreen] useEffect for socket listeners started."
+    );
     if (!socket) {
       console.warn("[NotificationsScreen] Socket not available for listeners.");
       return;
     }
 
     const handleNewNotification = (n: NotificationResponse) => {
-      console.log("[NotificationsScreen] Received newNotification socket event:", n);
+      console.log(
+        "[NotificationsScreen] Received newNotification socket event:",
+        n
+      );
       const enrichedN: EnrichedNotificationItem = {
-          ...n,
-          knockStatus: n.knockStatus || null,
-          gameInviteMeta: n.type === 'game_invite' ? (n.metadata as GameInviteMetadata) : undefined,
+        ...n,
+        knockStatus: n.knockStatus || null,
+        hasMutualKnockRequest: false, // Will be updated if needed
+        gameInviteMeta:
+          n.type === "game_invite"
+            ? (n.metadata as GameInviteMetadata)
+            : undefined,
       };
       setNotifications((prev) =>
         prev.some((p) => p.id === n.id) ? prev : [enrichedN, ...prev]
       );
-      if (
-        enrichedN.type === "activity" &&
-        enrichedN.relatedEntityType === "Knock" &&
-        enrichedN.knockStatus === "pending" &&
-        user?.isPrivate
-      ) {
-        console.log("[NotificationsScreen] New pending knock request detected. Refetching knockers.");
-        KnockService.getKnockers(accessToken!)
-          .then((reqs) =>
-            setPendingKnockRequestsData(
-              reqs.filter((r) => r.status === "pending")
-            )
-          )
-          .catch(console.error);
-      }
-      if (enrichedN.type === 'game_invite') {
-        showToast('info', `New Game Invite: ${enrichedN.content}`);
-      }
     };
 
     const handleNewKnockRequest = (knock: KnockRequest) => {
-      console.log("[NotificationsScreen] Received newKnockRequest socket event:", knock);
+      console.log(
+        "[NotificationsScreen] Received newKnockRequest socket event:",
+        knock
+      );
       setPendingKnockRequestsData((prev) =>
         knock.status === "pending" && !prev.some((r) => r.id === knock.id)
           ? [knock, ...prev]
@@ -190,35 +301,55 @@ export default function NotificationsScreen() {
     };
 
     const handleKnockRequestRemoved = (id: string) => {
-      console.log("[NotificationsScreen] Received knockRequestRemoved socket event:", id);
+      console.log(
+        "[NotificationsScreen] Received knockRequestRemoved socket event:",
+        id
+      );
       setPendingKnockRequestsData((prev) => prev.filter((r) => r.id !== id));
+      setNotifications((prev) => prev.filter((n) => n.relatedEntityId !== id));
     };
 
-    const handleKnockStatusUpdate = ({
+    const handleKnockStatusUpdated = ({
       knockId,
       newStatus,
     }: {
       knockId: string;
       newStatus: string;
     }) => {
-      console.log(`[NotificationsScreen] Received knockStatusUpdate socket event for knockId ${knockId}, status: ${newStatus}`);
-      if (newStatus !== "pending") {
-        setPendingKnockRequestsData((prev) => prev.filter((r) => r.id !== knockId));
-      }
-
-      setNotifications((prev) =>
-        prev.map((n) =>
-          n.relatedEntityId === knockId && n.relatedEntityType === "Knock"
-            ? ({ ...n, knockStatus: newStatus } as EnrichedNotificationItem)
-            : n
-        )
+      console.log(
+        `[NotificationsScreen] Received knockStatusUpdated for knockId: ${knockId}, newStatus: ${newStatus}`
       );
+
+      // Update notification status
+      setNotifications((prevNotifications) =>
+        prevNotifications.map((notification) => {
+          if (notification.relatedEntityId === knockId) {
+            return {
+              ...notification,
+              knockStatus: newStatus as EnrichedNotificationItem["knockStatus"],
+            } as EnrichedNotificationItem;
+          }
+          return notification;
+        })
+      );
+
+      // Refresh mutual knock requests to update button states
+      fetchPendingKnockRequests();
+    };
+
+    const handleUserProfileUpdated = () => {
+      console.log(
+        "[NotificationsScreen] Received userProfileUpdated. Re-fetching profile and knock requests."
+      );
+      fetchPendingKnockRequests();
     };
 
     socket.on("newNotification", handleNewNotification);
     socket.on("newKnockRequest", handleNewKnockRequest);
     socket.on("knockRequestRemoved", handleKnockRequestRemoved);
-    socket.on("knockStatusUpdate", handleKnockStatusUpdate);
+    socket.on("knockStatusUpdated", handleKnockStatusUpdated);
+    socket.on("userProfileUpdated", handleUserProfileUpdated);
+
     console.log("[NotificationsScreen] All socket listeners set up.");
 
     return () => {
@@ -226,27 +357,19 @@ export default function NotificationsScreen() {
       socket.off("newNotification", handleNewNotification);
       socket.off("newKnockRequest", handleNewKnockRequest);
       socket.off("knockRequestRemoved", handleKnockRequestRemoved);
-      socket.off("knockStatusUpdate", handleKnockStatusUpdate);
+      socket.off("knockStatusUpdated", handleKnockStatusUpdated);
+      socket.off("userProfileUpdated", handleUserProfileUpdated);
     };
-  }, [socket, accessToken, user?.isPrivate]);
+  }, [socket, accessToken, fetchPendingKnockRequests]);
 
   const groupedNotifications = useMemo(() => {
     console.log("[NotificationsScreen] Recalculating grouped notifications.");
-    return notifications
-      .filter(
-        (n) =>
-          !(
-            n.type === "activity" &&
-            n.relatedEntityType === "Knock" &&
-            n.knockStatus === "pending"
-          )
-      )
-      .reduce((acc, notif) => {
-        const group = formatNotificationDateGroup(notif.timestamp);
-        acc[group] = acc[group] || [];
-        acc[group].push(notif);
-        return acc;
-      }, {} as Record<string, EnrichedNotificationItem[]>);
+    return notifications.reduce((acc, notif) => {
+      const group = formatNotificationDateGroup(notif.timestamp);
+      acc[group] = acc[group] || [];
+      acc[group].push(notif);
+      return acc;
+    }, {} as Record<string, EnrichedNotificationItem[]>);
   }, [notifications]);
 
   const sortedGroups = useMemo(() => {
@@ -261,16 +384,21 @@ export default function NotificationsScreen() {
     const available = order.filter(
       (group) => groupedNotifications[group]?.length
     );
-    if (groupedNotifications["Invalid Date"]?.length) available.push("Invalid Date");
+    if (groupedNotifications["Invalid Date"]?.length)
+      available.push("Invalid Date");
     return available;
   }, [groupedNotifications]);
 
   const onRefresh = () => {
     console.log("[NotificationsScreen] Initiating manual refresh.");
     fetchNotifications(1, true);
+    fetchPendingKnockRequests();
   };
+
   const handleLoadMore = () => {
-    console.log(`[NotificationsScreen] Attempting to load more. HasMore: ${hasMore}, Loading: ${loading}, Refreshing: ${refreshing}`);
+    console.log(
+      `[NotificationsScreen] Attempting to load more. HasMore: ${hasMore}, Loading: ${loading}, Refreshing: ${refreshing}`
+    );
     hasMore && !loading && !refreshing && setPage((p) => p + 1);
   };
 
@@ -279,17 +407,30 @@ export default function NotificationsScreen() {
     if (!accessToken) return;
     try {
       await NotificationService.markNotificationAsRead(id, accessToken);
-      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
-      console.log(`[NotificationsScreen] Notification ${id} marked as read in UI.`);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+      );
+      console.log(
+        `[NotificationsScreen] Notification ${id} marked as read in UI.`
+      );
     } catch (err) {
-      console.error(`[NotificationsScreen] Mark as read failed for ${id}:`, err);
+      console.error(
+        `[NotificationsScreen] Mark as read failed for ${id}:`,
+        err
+      );
     }
   };
 
-  const handleKnockBack = async (notificationId: string, knockId: string) => {
-    console.log(`[NotificationsScreen] handleKnockBack called for notification: ${notificationId}, knock: ${knockId}`);
+  const handleKnockBack = async (
+    notificationId: string,
+    knockId: string,
+    knockerUserId: string
+  ) => {
+    console.log(
+      `[NotificationsScreen] handleKnockBack called for notification: ${notificationId}, knock: ${knockId}`
+    );
     if (!accessToken) {
-      Alert.alert("Error", "Authentication required.");
+      console.log("Error", "Authentication required.");
       return;
     }
 
@@ -297,115 +438,233 @@ export default function NotificationsScreen() {
 
     try {
       await KnockService.knockBack(knockId, accessToken);
-      showToast("success", "You knocked them back!");
+      console.log("success", "You knocked them back!");
+
       setNotifications((prev) =>
-        prev.map((n) =>
-          n.id === notificationId
-            ? { ...n, metadata: { ...n.metadata, knockBackState: "knocking" } }
-            : n
-        )
+        prev.map((n) => {
+          if (n.id === notificationId) {
+            return {
+              ...n,
+              hasMutualKnockRequest: true,
+              knockStatus: "pending",
+            };
+          }
+          return n;
+        })
       );
-      console.log(`[NotificationsScreen] Knock back successful for notification: ${notificationId}`);
+
+      setMutualKnockRequests((prev) => new Set([...prev, knockerUserId]));
+
+      console.log(
+        `[NotificationsScreen] Knock back successful for notification: ${notificationId}`
+      );
     } catch (error: any) {
-      showToast("error", error.response?.data?.message || "Failed to knock back.");
+      console.log(
+        "error",
+        error.response?.data?.message || "Failed to knock back."
+      );
       console.error("[NotificationsScreen] Error knocking back:", error);
     } finally {
       setActionLoadingId(null);
     }
   };
 
-const handleGameInviteAction = async (notificationId: string, gameSessionId: string, action: 'accept' | 'decline', gameIdFromNotification: string) => {
-    console.log(`[NotificationsScreen] handleGameInviteAction called: notification ${notificationId}, session ${gameSessionId}, action: ${action}`);
+  const handleGameInviteAction = async (
+    notificationId: string,
+    gameSessionId: string,
+    action: "accept" | "decline",
+    gameIdFromNotification: string
+  ) => {
+    console.log(
+      `[NotificationsScreen] handleGameInviteAction called: notification ${notificationId}, session ${gameSessionId}, action: ${action}`
+    );
     if (!accessToken) {
-      console.warn("[NotificationsScreen] handleGameInviteAction: No accessToken available.");
-      Alert.alert("Error", "Authentication required.");
+      console.warn(
+        "[NotificationsScreen] handleGameInviteAction: No accessToken available."
+      );
+      console.log("Error", "Authentication required.");
       return;
     }
     if (!socket || !user) {
-        console.warn("[NotificationsScreen] handleGameInviteAction: Socket or user not available.");
-        Alert.alert("Error", "Socket connection not ready.");
-        return;
+      console.warn(
+        "[NotificationsScreen] handleGameInviteAction: Socket or user not available."
+      );
+      console.log("Error", "Socket connection not ready.");
+      return;
     }
 
     setActionLoadingId(notificationId);
 
     try {
-      if (action === 'accept') {
-        console.log(`[NotificationsScreen] Attempting to accept game invite for session: ${gameSessionId}`);
+      if (action === "accept") {
+        console.log(
+          `[NotificationsScreen] Attempting to accept game invite for session: ${gameSessionId}`
+        );
         await GameService.acceptGameInvite(accessToken, gameSessionId);
-        showToast('success', 'Game invite accepted!');
+        console.log("success", "Game invite accepted!");
 
-        console.log(`[NotificationsScreen] Emitting 'joinGameSession' for user ${user._id} to room ${gameSessionId} after accept.`);
-        socket.emit('joinGameSession', gameSessionId);
+        console.log(
+          `[NotificationsScreen] Emitting 'joinGameSession' for user ${user._id} to room ${gameSessionId} after accept.`
+        );
+        socket.emit("joinGameSession", gameSessionId);
 
         setNotifications((prev) =>
           prev.map((n) =>
             n.id === notificationId
-              ? { ...n, gameInviteMeta: { ...n.gameInviteMeta!, status: 'accepted' } }
+              ? {
+                  ...n,
+                  gameInviteMeta: { ...n.gameInviteMeta!, status: "accepted" },
+                }
               : n
           )
         );
-        console.log(`[NotificationsScreen] Game invite ${notificationId} accepted in UI.`);
-
+        console.log(
+          `[NotificationsScreen] Game invite ${notificationId} accepted in UI.`
+        );
       } else {
-        console.log(`[NotificationsScreen] Attempting to decline game invite for session: ${gameSessionId}`);
+        console.log(
+          `[NotificationsScreen] Attempting to decline game invite for session: ${gameSessionId}`
+        );
         await GameService.declineGameInvite(accessToken, gameSessionId);
-        showToast('info', 'Game invite declined.');
+        console.log("info", "Game invite declined.");
         setNotifications((prev) =>
           prev.map((n) =>
             n.id === notificationId
-              ? { ...n, gameInviteMeta: { ...n.gameInviteMeta!, status: 'declined' } }
+              ? {
+                  ...n,
+                  gameInviteMeta: { ...n.gameInviteMeta!, status: "decline" },
+                }
               : n
           )
         );
-        console.log(`[NotificationsScreen] Game invite ${notificationId} declined in UI.`);
+        console.log(
+          `[NotificationsScreen] Game invite ${notificationId} declined in UI.`
+        );
       }
     } catch (error: any) {
-      showToast('error', error.response?.data?.message || `Failed to ${action} invite.`);
-      console.error(`[NotificationsScreen] Error ${action}ing invite for ${gameSessionId}:`, error);
+      console.log(
+        "error",
+        error.response?.data?.message || `Failed to ${action} invite.`
+      );
+      console.error(
+        `[NotificationsScreen] Error ${action}ing invite for ${gameSessionId}:`,
+        error
+      );
     } finally {
       setActionLoadingId(null);
-      console.log(`[NotificationsScreen] Action finished for notification: ${notificationId}.`);
+      console.log(
+        `[NotificationsScreen] Action finished for notification: ${notificationId}.`
+      );
     }
-};
-
-  const renderKnockBackButton = (item: EnrichedNotificationItem) => {
-    const knockId = item.relatedEntityId;
-    const localState = item.metadata?.knockBackState || "initial";
-    const isKnocking = localState === "knocking";
-    const isLocked = item.knockStatus === "lockedIn";
-    const disabled = isKnocking || isLocked;
-
-    console.log(`[NotificationsScreen] Rendering Knock Back Button for ${item.id}. Status: ${item.knockStatus}, Local State: ${localState}`);
-    return (
-      <TouchableOpacity
-        style={[
-          styles.knockBackButton,
-          {
-            backgroundColor: disabled ? colors.primary + "50" : colors.primary,
-          },
-        ]}
-        onPress={() => knockId && handleKnockBack(item.id, knockId)}
-        disabled={disabled}
-      >
-        <ThemedText
-          style={[styles.knockButtonText, { color: colors.buttonText }]}
-        >
-          {isKnocking ? "Knocking..." : isLocked ? "Knocked" : "Knock Back"}
-        </ThemedText>
-      </TouchableOpacity>
-    );
   };
 
-  const renderNotificationItem = ({ item }: { item: EnrichedNotificationItem }) => {
+  const renderKnockActionButton = (item: EnrichedNotificationItem) => {
+    const knockId = item.relatedEntityId;
+    const knockerUserId = item.user?.id;
+    const isLoading = actionLoadingId === item.id;
+    const isKnockbackAction = item.content?.includes("knocked on you.");
+
+    if (!isKnockbackAction || !knockerUserId) {
+      return null;
+    }
+
+    console.log(
+      `[KnockActionButton] Rendering for notification ${item.id}. Current knockStatus: ${item.knockStatus}, hasMutualKnockRequest: ${item.hasMutualKnockRequest}`
+    );
+
+    const isLocked = item.knockStatus === "lockedIn";
+    const isOneSided = item.knockStatus === "onesidedlock";
+    const isPending = item.knockStatus === "pending";
+    const hasMutualRequest =
+      item.hasMutualKnockRequest || mutualKnockRequests.has(knockerUserId);
+
+    // Show "Requested" if user has sent a mutual knock request to the knocker
+    if ((isOneSided && hasMutualRequest) || isPending) {
+      return (
+        <TouchableOpacity
+          style={[
+            styles.knockBackButton,
+            {
+              backgroundColor: colors.buttonBackgroundSecondary,
+              borderWidth: 1,
+              borderColor: colors.primary,
+            },
+          ]}
+          disabled={true}
+        >
+          <ThemedText
+            style={[styles.knockButtonText, { color: colors.primary }]}
+          >
+            Requested
+          </ThemedText>
+        </TouchableOpacity>
+      );
+    }
+
+    // Show "Knock Back" for one-sided knocks where no mutual request exists
+    if (isOneSided && !hasMutualRequest) {
+      return (
+        <TouchableOpacity
+          style={[
+            styles.knockBackButton,
+            {
+              backgroundColor: isLoading
+                ? colors.primary + "50"
+                : colors.primary,
+            },
+          ]}
+          onPress={() =>
+            knockId && handleKnockBack(item.id, knockId, knockerUserId)
+          }
+          disabled={isLoading}
+        >
+          <ThemedText
+            style={[styles.knockButtonText, { color: colors.buttonText }]}
+          >
+            {isLoading ? "Knocking..." : "Knock Back"}
+          </ThemedText>
+        </TouchableOpacity>
+      );
+    }
+
+    // Show "Knocked" for locked connections
+    if (isLocked) {
+      return (
+        <TouchableOpacity
+          style={[
+            styles.knockBackButton,
+            { backgroundColor: colors.primary, opacity: 0.5 },
+          ]}
+          disabled={true}
+        >
+          <ThemedText
+            style={[styles.knockButtonText, { color: colors.buttonText }]}
+          >
+            Knocked
+          </ThemedText>
+        </TouchableOpacity>
+      );
+    }
+
+    return null;
+  };
+
+  const renderNotificationItem = ({
+    item,
+  }: {
+    item: EnrichedNotificationItem;
+  }) => {
     const sender = item.user;
     if (!sender) {
-      console.warn(`[NotificationsScreen] Notification item ${item.id} has no sender user data. Skipping render.`);
+      console.warn(
+        `[NotificationsScreen] Notification item ${item.id} has no sender user data. Skipping render.`
+      );
       return null;
     }
 
     const isNew = !item.isRead;
     const isCurrentUserAction = user && sender.id === user._id;
+    const isSelfAction = item.content?.startsWith("You knocked back");
 
     const message = (
       <ThemedText
@@ -413,12 +672,14 @@ const handleGameInviteAction = async (notificationId: string, gameSessionId: str
         numberOfLines={2}
         ellipsizeMode="tail"
       >
-        {!isCurrentUserAction && (
+        {!isCurrentUserAction && !isSelfAction ? (
           <ThemedText style={styles.notificationUsername}>
-            {sender.username}
+            {sender.username}{" "}
           </ThemedText>
-        )}{" "}
-        <ThemedText style={styles.notificationText}>{item.content}</ThemedText>
+        ) : null}
+        <ThemedText style={styles.notificationText}>
+          {item.content?.startsWith(" ") ? item.content.trim() : item.content}
+        </ThemedText>
       </ThemedText>
     );
 
@@ -426,12 +687,14 @@ const handleGameInviteAction = async (notificationId: string, gameSessionId: str
       console.log(`[NotificationsScreen] Tapped notification item: ${item.id}`);
       markNotificationAsRead(item.id);
       if (item.type === "message" && item.relatedEntityId) {
-        console.log(`[NotificationsScreen] Navigating to chat: ${item.relatedEntityId}`);
+        console.log(
+          `[NotificationsScreen] Navigating to chat: ${item.relatedEntityId}`
+        );
         router.push({
           pathname: `/(chat)/${item.relatedEntityId}`,
           params: {
             chatName: sender.username,
-            chatAvatar: getUserAvatar(sender),
+            chatAvatar: sender.avatar || "",
           },
         });
       }
@@ -439,23 +702,33 @@ const handleGameInviteAction = async (notificationId: string, gameSessionId: str
 
     const isLoadingAction = actionLoadingId === item.id;
 
-    if (item.type === 'game_invite' && item.relatedEntityId && item.gameInviteMeta) {
-      console.log(`[NotificationsScreen] Rendering game invite notification: ${item.id}`);
+    if (
+      item.type === "game_invite" &&
+      item.relatedEntityId &&
+      item.gameInviteMeta
+    ) {
+      console.log(
+        `[NotificationsScreen] Rendering game invite notification: ${item.id}`
+      );
       const gameInviteMeta = item.gameInviteMeta;
-      const inviteStatus = gameInviteMeta.status || 'pending';
-      const isProcessed = ['accepted', 'declined', 'in-progress'].includes(inviteStatus);
+      const inviteStatus = gameInviteMeta.status || "pending";
+      const isProcessed = ["accepted", "decline", "in-progress"].includes(
+        inviteStatus
+      );
 
       return (
         <TouchableOpacity
           style={[
             styles.notificationItem,
-            isNew && { backgroundColor: colors.buttonBackgroundSecondary + "1A" },
+            isNew && {
+              backgroundColor: colors.buttonBackgroundSecondary + "1A",
+            },
           ]}
           onPress={onPressNotificationItem}
           disabled={isLoadingAction || isProcessed}
         >
           <UserAvatar
-            imageUri={gameInviteMeta.initiatorAvatar || getUserAvatar(sender)}
+            imageUri={gameInviteMeta.initiatorAvatar || sender.avatar}
             size={45}
             style={styles.notificationAvatar}
           />
@@ -464,15 +737,18 @@ const handleGameInviteAction = async (notificationId: string, gameSessionId: str
               <ThemedText style={styles.notificationText}>
                 <ThemedText style={styles.notificationUsername}>
                   {gameInviteMeta.initiatorUsername || sender.username}
-                </ThemedText>{' '}
-                invited you to play{' '}
+                </ThemedText>{" "}
+                invited you to play{" "}
                 <ThemedText style={styles.notificationGameName}>
-                  {gameInviteMeta.gameName || 'a game'}
+                  {gameInviteMeta.gameName || "a game"}
                 </ThemedText>
                 !
               </ThemedText>
               <ThemedText
-                style={[styles.notificationTimestamp, { color: colors.textDim }]}
+                style={[
+                  styles.notificationTimestamp,
+                  { color: colors.textDim },
+                ]}
               >
                 {formatNotificationTimestamp(item.timestamp)}
               </ThemedText>
@@ -481,24 +757,69 @@ const handleGameInviteAction = async (notificationId: string, gameSessionId: str
               {isLoadingAction ? (
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : isProcessed ? (
-                <ThemedText style={[styles.gameInviteStatusText, { color: (inviteStatus === 'accepted' || inviteStatus === 'in-progress') ? colors.success : colors.error }]}>
-                  {inviteStatus === 'accepted' ? 'Accepted' : inviteStatus === 'in-progress' ? 'Joined' : 'Declined'}
+                <ThemedText
+                  style={[
+                    styles.gameInviteStatusText,
+                    {
+                      color:
+                        inviteStatus === "accepted" ||
+                        inviteStatus === "in-progress"
+                          ? colors.success
+                          : colors.error,
+                    },
+                  ]}
+                >
+                  {inviteStatus === "accepted"
+                    ? "Accepted"
+                    : inviteStatus === "in-progress"
+                    ? "Joined"
+                    : "Declined"}
                 </ThemedText>
               ) : (
                 <>
                   <TouchableOpacity
-                    style={[styles.gameActionButton, { backgroundColor: colors.success }]}
-                    onPress={() => handleGameInviteAction(item.id, item.relatedEntityId!, 'accept', item.gameInviteMeta?.gameId!)}
+                    style={[
+                      styles.gameActionButton,
+                      { backgroundColor: colors.success },
+                    ]}
+                    onPress={() =>
+                      handleGameInviteAction(
+                        item.id,
+                        item.relatedEntityId!,
+                        "accept",
+                        item.gameInviteMeta?.gameId!
+                      )
+                    }
                   >
-                    <ThemedText style={[styles.gameActionButtonText, { color: colors.buttonText }]}>
+                    <ThemedText
+                      style={[
+                        styles.gameActionButtonText,
+                        { color: colors.buttonText },
+                      ]}
+                    >
                       Accept
                     </ThemedText>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.gameActionButton, { backgroundColor: colors.error, marginLeft: 8 }]}
-                    onPress={() => handleGameInviteAction(item.id, item.relatedEntityId!, 'decline', item.gameInviteMeta?.gameId!)}
+                    style={[
+                      styles.gameActionButton,
+                      { backgroundColor: colors.error, marginLeft: 8 },
+                    ]}
+                    onPress={() =>
+                      handleGameInviteAction(
+                        item.id,
+                        item.relatedEntityId!,
+                        "decline",
+                        item.gameInviteMeta?.gameId!
+                      )
+                    }
                   >
-                    <ThemedText style={[styles.gameActionButtonText, { color: colors.buttonText }]}>
+                    <ThemedText
+                      style={[
+                        styles.gameActionButtonText,
+                        { color: colors.buttonText },
+                      ]}
+                    >
                       Decline
                     </ThemedText>
                   </TouchableOpacity>
@@ -526,7 +847,7 @@ const handleGameInviteAction = async (notificationId: string, gameSessionId: str
         disabled={isLoadingAction}
       >
         <UserAvatar
-          imageUri={getUserAvatar(sender)}
+          imageUri={sender.avatar}
           size={45}
           style={styles.notificationAvatar}
         />
@@ -544,7 +865,7 @@ const handleGameInviteAction = async (notificationId: string, gameSessionId: str
               {isLoadingAction ? (
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : (
-                renderKnockBackButton(item)
+                renderKnockActionButton(item)
               )}
             </ThemedView>
           )}
@@ -558,7 +879,7 @@ const handleGameInviteAction = async (notificationId: string, gameSessionId: str
       <ThemedSafeArea style={styles.safeArea}>
         <CommonHeader
           title="Notifications"
-          leftContent={<BackButton color={colors.text}/>}
+          leftContent={<BackButton color={colors.text} />}
           showBottomBorder
         />
 
@@ -571,7 +892,7 @@ const handleGameInviteAction = async (notificationId: string, gameSessionId: str
           </ThemedView>
         ) : (
           <>
-            {user?.isPrivate && (
+            {isProfilePrivate && (
               <TouchableOpacity
                 style={[
                   styles.friendRequestsContainer,
@@ -654,7 +975,7 @@ const handleGameInviteAction = async (notificationId: string, gameSessionId: str
               contentContainerStyle={styles.notificationListContent}
               ListEmptyComponent={() =>
                 Object.keys(groupedNotifications).length === 0 &&
-                (!user?.isPrivate || privateKnockRequestsCount === 0) ? (
+                (!isProfilePrivate || privateKnockRequestsCount === 0) ? (
                   <ThemedView style={styles.emptyListContainer}>
                     <ThemedText
                       style={{
@@ -855,29 +1176,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   notificationActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginLeft: 10,
   },
   gameActionButton: {
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   gameActionButtonText: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   notificationGameName: {
-    fontWeight: 'bold',
+    fontWeight: "bold",
     fontSize: 14,
   },
   gameInviteStatusText: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     minWidth: 60,
-    textAlign: 'center',
-  }
+    textAlign: "center",
+  },
 });

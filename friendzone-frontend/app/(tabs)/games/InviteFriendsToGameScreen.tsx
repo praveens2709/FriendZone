@@ -2,12 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   StyleSheet,
   FlatList,
-  TouchableOpacity,
-  Image,
   ActivityIndicator,
-  Alert,
   TextInput,
-  View,
   Platform,
   ImageBackground,
 } from "react-native";
@@ -22,7 +18,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import UserProfileCard from '@/components/UserProfileCard';
 import KnockService from '@/services/knockService';
 import { useAuth } from '@/context/AuthContext';
-import { showToast } from '@/constants/Functions';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import Button from "@/components/Button";
 import GameService from '@/services/GameService';
@@ -72,7 +67,7 @@ export default function InviteFriendsToGameScreen() {
   useEffect(() => {
     if (!gameId || !gameName || isNaN(minPlayers) || isNaN(maxPlayers)) {
       router.back();
-      showToast('error', 'Game details not found or invalid player count.');
+      console.log('error', 'Game details not found or invalid player count.');
       return;
     }
 
@@ -107,7 +102,7 @@ export default function InviteFriendsToGameScreen() {
         setAllFriends(Array.from(allFriendsMap.values()));
       } catch (error) {
         console.error("Failed to fetch locked-in friends:", error);
-        showToast('error', 'Failed to load friends.');
+        console.log('error', 'Failed to load friends.');
       } finally {
         setLoadingFriends(false);
       }
@@ -135,7 +130,7 @@ export default function InviteFriendsToGameScreen() {
             if (newSelected.size < maxPlayers - 1) {
               newSelected.add(friendId);
             } else {
-              showToast(
+              console.log(
                 'info',
                 `Cannot select more than ${maxPlayers - 1} opponent(s) for this game.`
               );
@@ -162,19 +157,19 @@ export default function InviteFriendsToGameScreen() {
     const requiredOpponents = isSinglePlayerGame ? 0 : minPlayers - 1;
 
     if (!accessToken) {
-      showToast('error', 'Authentication required to send invite.');
+      console.log('error', 'Authentication required to send invite.');
       return;
     }
 
     if (numSelected < requiredOpponents) {
-      Alert.alert(
+      console.log(
         'Insufficient Players',
         `Please select at least ${requiredOpponents} opponent(s) for this game.`
       );
       return;
     }
     if (!isSinglePlayerGame && numSelected > maxPlayers - 1) {
-      Alert.alert(
+      console.log(
         'Too Many Players',
         `You can select at most ${maxPlayers - 1} opponent(s) for this game.`
       );
@@ -185,7 +180,7 @@ export default function InviteFriendsToGameScreen() {
     try {
       const response: SendInviteResponse = await GameService.sendGameInvite(accessToken, gameId, Array.from(selectedFriendIds));
 
-      showToast('success', `Invite sent for ${gameName}!`);
+      console.log('success', `Invite sent for ${gameName}!`);
       router.push({
         pathname: '/games/[id]',
         params: { id: response.gameSessionId, gameId: gameId }
@@ -193,7 +188,7 @@ export default function InviteFriendsToGameScreen() {
 
     } catch (error: any) {
       console.error("Failed to send game invite:", error);
-      showToast('error', error.response?.data?.message || 'Failed to send invite.');
+      console.log('error', error.response?.data?.message || 'Failed to send invite.');
     } finally {
       setSendingInvite(false);
     }
@@ -249,7 +244,7 @@ export default function InviteFriendsToGameScreen() {
               <Button
                 title="Play"
                 onPress={() =>
-                  showToast('info', `Starting solo ${gameName}! (Mock)`)
+                  console.log('info', `Starting solo ${gameName}! (Mock)`)
                 }
                 style={styles.startSoloGameButton}
                 textStyle={styles.startSoloGameButtonText}

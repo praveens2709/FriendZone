@@ -1,7 +1,6 @@
-// routes/authRoutes.js
-const express = require('express');
-const router = express.Router();
-const {
+import { Router } from 'express';
+const router = Router();
+import {
   signup,
   verifyOTP,
   login,
@@ -9,8 +8,8 @@ const {
   refreshToken,
   forgetPassword,
   resetPassword,
-} = require('../controllers/authController');
-const { protect } = require('../middleware/authMiddleware');
+} from '../controllers/authController.js';
+import { protect } from '../middleware/authMiddleware.js';
 
 router.post('/signup', signup);
 router.post('/verify-otp', verifyOTP);
@@ -20,4 +19,4 @@ router.post('/refresh-token', refreshToken);
 router.post('/forget-password', forgetPassword);
 router.post('/reset-password', resetPassword);
 
-module.exports = router;
+export default router;

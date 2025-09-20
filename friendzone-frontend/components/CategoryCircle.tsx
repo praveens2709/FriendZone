@@ -1,6 +1,6 @@
 import { useTheme } from "@/context/ThemeContext";
 import React, { useEffect, useMemo } from "react";
-import { View, StyleSheet, Text, TouchableOpacity } from "react-native";
+import { StyleSheet, Text, TouchableOpacity } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,

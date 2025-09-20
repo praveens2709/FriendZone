@@ -1,14 +1,8 @@
 import React from "react";
-import {
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  ActivityIndicator,
-} from "react-native";
+import { StyleSheet, TouchableOpacity, Image } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemedText } from "@/components/ThemedText";
 import UserAvatar from "@/components/UserAvatar";
-import { getUserAvatar } from "@/constants/Functions";
 import { useRouter } from "expo-router";
 import { ThemedView } from "./ThemedView";
 import { LinearGradient } from "expo-linear-gradient";
@@ -61,7 +55,7 @@ export default function UserProfileCard({
   const content = (
     <ThemedView style={styles.cardContent}>
       <UserAvatar
-        imageUri={getUserAvatar({ avatar, username })}
+        imageUri={avatar}
         size={45}
         style={[styles.avatar, { borderColor: colors.border }]}
       />
@@ -95,33 +89,32 @@ export default function UserProfileCard({
           end={{ x: 1, y: 1 }}
           style={styles.gradientFrameContainer}
         >
-          <ThemedView style={[styles.cardContainer, { backgroundColor: colors.backgroundSecondary }]}>
+          <ThemedView
+            style={[
+              styles.cardContainer,
+              { backgroundColor: colors.backgroundSecondary },
+            ]}
+          >
             {content}
           </ThemedView>
         </LinearGradient>
       );
     }
 
-    return (
-      <ThemedView
-        style={styles.cardContainer}
-      >
-        {content}
-      </ThemedView>
-    );
+    return <ThemedView style={styles.cardContainer}>{content}</ThemedView>;
   };
-  
+
   const renderBadge = () => {
-    if (frameType === 'birthday') {
+    if (frameType === "birthday") {
       return <Image source={birthdayBadge} style={styles.badge} />;
     }
-    if (frameType === 'creative') {
+    if (frameType === "creative") {
       return <Image source={statusBadge} style={styles.badge} />;
     }
-    if (frameType === 'coder') {
+    if (frameType === "coder") {
       return <Image source={statusBadge2} style={styles.badge} />;
     }
-    if (frameType === 'location') {
+    if (frameType === "location") {
       return <Image source={locationBadge} style={styles.badge} />;
     }
     return null;
@@ -142,11 +135,11 @@ export default function UserProfileCard({
 
 const styles = StyleSheet.create({
   touchableContainer: {
-    position: 'relative',
+    position: "relative",
   },
   cardContainer: {
     borderRadius: 8,
-    overflow: 'hidden',
+    overflow: "hidden",
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 10,
@@ -178,12 +171,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   badge: {
-    position: 'absolute',
+    position: "absolute",
     right: -10,
     top: -5,
     width: 80,
     height: 80,
-    resizeMode: 'contain',
+    resizeMode: "contain",
     zIndex: 1,
-  }
+  },
 });

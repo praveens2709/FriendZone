@@ -4,7 +4,6 @@ import {
   TouchableOpacity,
   Dimensions,
   StyleSheet,
-  View,
   FlatList
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";

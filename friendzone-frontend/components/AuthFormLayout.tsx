@@ -1,4 +1,3 @@
-// AuthFormLayout.tsx
 import React from "react";
 import {
   KeyboardAvoidingView,

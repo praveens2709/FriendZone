@@ -145,7 +145,7 @@ export const usePostEdit = (selectedAssetsParam: string) => {
       });
     } catch (error) {
       console.error("Error manipulating image:", error);
-      Alert.alert("Error", "Failed to edit image");
+      console.log("Error", "Failed to edit image");
     } finally {
       setIsProcessing(false);
     }
@@ -195,7 +195,7 @@ export const usePostEdit = (selectedAssetsParam: string) => {
       }
     } catch (error) {
       console.error("Error fetching music:", error);
-      Alert.alert("Error", "Failed to fetch tracks");
+      console.log("Error", "Failed to fetch tracks");
     }
   }, []);
 
@@ -206,7 +206,7 @@ export const usePostEdit = (selectedAssetsParam: string) => {
       }
     } catch (error) {
       console.error("Error parsing selected assets:", error);
-      Alert.alert("Error", "Failed to load selected images");
+      console.log("Error", "Failed to load selected images");
     }
   }, [selectedAssetsParam]);
 

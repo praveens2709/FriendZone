@@ -3,7 +3,7 @@ import StoryViewer from "@/components/StoryViewer";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { mockStories } from "@/utils/mockStories";
 import { StatusBar } from "expo-status-bar";
-import ThemedSafeArea from "@/components/ThemedSafeArea"; // Assuming this path is correct
+import ThemedSafeArea from "@/components/ThemedSafeArea";
 
 export default function StoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

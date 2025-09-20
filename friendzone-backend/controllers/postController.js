@@ -1,11 +1,11 @@
-const Post = require('../models/Post');
-const User = require('../models/User');
-const Knock = require('../models/Knock');
-const Chat = require('../models/Chat');
-const Message = require('../models/Message');
-const { uploadImageToCloudinary } = require('../services/cloudinaryService');
-const multer = require('multer');
-const sharp = require('sharp');
+import Post from '../models/Post.js';
+import User from '../models/User.js';
+import Knock from '../models/Knock.js';
+import Chat from '../models/Chat.js';
+import Message from '../models/Message.js';
+import { uploadImageToCloudinary } from '../services/cloudinaryService.js';
+import multer from 'multer';
+import sharp from 'sharp';
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -19,7 +19,7 @@ const addBlackBackground = async (buffer, size = 1080) => {
     .toBuffer();
 };
 
-exports.createPost = [
+export const createPost = [
   upload.array('images', 10),
   async (req, res) => {
     try {
@@ -68,7 +68,7 @@ exports.createPost = [
   }
 ];
 
-exports.getMyPosts = async (req, res) => {
+export const getMyPosts = async (req, res) => {
   const userId = req.user.id;
   try {
     const posts = await Post.find({ user: userId })
@@ -83,7 +83,7 @@ exports.getMyPosts = async (req, res) => {
   }
 };
 
-exports.getFeedPosts = async (req, res) => {
+export const getFeedPosts = async (req, res) => {
   const userId = req.user.id;
   try {
     const knockingKnocks = await Knock.find({
@@ -117,7 +117,7 @@ exports.getFeedPosts = async (req, res) => {
   }
 };
 
-exports.getPostsByUserId = async (req, res) => {
+export const getPostsByUserId = async (req, res) => {
   const { userId } = req.params;
   try {
     const posts = await Post.find({ user: userId })
@@ -132,7 +132,7 @@ exports.getPostsByUserId = async (req, res) => {
   }
 };
 
-exports.getPostById = async (req, res) => {
+export const getPostById = async (req, res) => {
   const { postId } = req.params;
   try {
     const post = await Post.findById(postId)
@@ -150,7 +150,7 @@ exports.getPostById = async (req, res) => {
   }
 };
 
-exports.addComment = async (req, res) => {
+export const addComment = async (req, res) => {
   try {
     const { postId } = req.params;
     const { text } = req.body;
@@ -183,7 +183,7 @@ exports.addComment = async (req, res) => {
   }
 };
 
-exports.toggleLike = async (req, res) => {
+export const toggleLike = async (req, res) => {
   try {
     const { postId } = req.params;
     const userId = req.user.id;
@@ -206,7 +206,7 @@ exports.toggleLike = async (req, res) => {
   }
 };
 
-exports.toggleSave = async (req, res) => {
+export const toggleSave = async (req, res) => {
   try {
     const { postId } = req.params;
     const userId = req.user.id;
@@ -229,7 +229,7 @@ exports.toggleSave = async (req, res) => {
   }
 };
 
-exports.sharePost = async (req, res) => {
+export const sharePost = async (req, res) => {
   try {
     const { postId } = req.params;
 
@@ -246,7 +246,7 @@ exports.sharePost = async (req, res) => {
   }
 };
 
-exports.sharePostToChat = async (req, res) => {
+export const sharePostToChat = async (req, res) => {
   const { postId } = req.params;
   const { chatId } = req.body;
   const senderId = req.user.id;

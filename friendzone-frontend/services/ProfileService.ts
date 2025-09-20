@@ -1,5 +1,3 @@
-// services/ProfileService.ts
-
 import { User, UserProfileResponse } from "@/types/user.type";
 import { _get, _put } from "../configs/api-methods.config";
 

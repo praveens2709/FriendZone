@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 const { Schema } = mongoose;
 
 const imageSchema = new Schema({
@@ -23,11 +23,10 @@ const postSchema = new Schema({
     previewUrl: { type: String, trim: true },
   },
   likes: [{ type: Schema.Types.ObjectId, ref: 'User' }],
-  saves: [{ type: Schema.Types.ObjectId, ref: 'User' }], // NEW
-  shares: { type: Number, default: 0 }, // NEW
+  saves: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+  shares: { type: Number, default: 0 },
   comments: [commentSchema],
   createdAt: { type: Date, default: Date.now },
 });
 
-const Post = mongoose.model('Post', postSchema);
-module.exports = Post;
+export default mongoose.model('Post', postSchema);

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import {
-  View,
   TextInput,
   FlatList,
   TouchableOpacity,
@@ -10,6 +9,7 @@ import {
 import { useTheme } from "@/context/ThemeContext";
 import { fetchPlaces } from "@/constants/Functions";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { ThemedView } from "./ThemedView";
 
 type Props = {
   placeholder?: string;
@@ -49,8 +49,8 @@ const LocationSearch = ({
   }, [value]);
 
   return (
-    <View style={{ flex: 1 }}>
-      <View style={{ flexDirection: "row", alignItems: "center" }}>
+    <ThemedView style={{ flex: 1 }}>
+      <ThemedView style={{ flexDirection: "row", alignItems: "center" }}>
         <TextInput
           placeholder={placeholder}
           placeholderTextColor={colors.text}
@@ -58,7 +58,12 @@ const LocationSearch = ({
           onChangeText={onChangeText}
           style={[
             styles.input,
-            { flex: 1 ,color: colors.text, backgroundColor: colors.buttonBackgroundSecondary, borderColor: colors.border },
+            {
+              flex: 1,
+              color: colors.text,
+              backgroundColor: colors.buttonBackgroundSecondary,
+              borderColor: colors.border,
+            },
           ]}
           onFocus={() => setIsTyping(true)}
           onBlur={() => setIsTyping(false)}
@@ -75,10 +80,10 @@ const LocationSearch = ({
             />
           </TouchableOpacity>
         )}
-      </View>
+      </ThemedView>
 
       {(results.length > 0 || (!isTyping && popularSearches.length > 0)) && (
-        <View
+        <ThemedView
           style={[
             styles.listContainer,
             {
@@ -106,9 +111,9 @@ const LocationSearch = ({
             keyboardShouldPersistTaps="handled"
             style={styles.list}
           />
-        </View>
+        </ThemedView>
       )}
-    </View>
+    </ThemedView>
   );
 };
 
@@ -120,7 +125,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     paddingHorizontal: 15,
     marginBottom: 15,
-    borderWidth: 1
+    borderWidth: 1,
   },
   listContainer: {
     marginTop: 8,

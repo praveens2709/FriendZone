@@ -3,8 +3,6 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  Alert,
-  View,
 } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -16,7 +14,6 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "expo-router";
 import { useLoadingDialog } from "@/context/LoadingContext";
 import AuthFormLayout from "@/components/AuthFormLayout";
-import { showToast } from "@/constants/Functions";
 
 interface SignupScreenProps {
   isModal?: boolean;
@@ -57,7 +54,7 @@ export default function SignupScreen({
       loadingDialog.show();
       await signUp(email, password);
       if (isModal) {
-        showToast("success", "Account created! Please verify your email.");
+        console.log("success", "Account created! Please verify your email.");
         onCloseModal?.();
       } else {
         router.push({
@@ -66,7 +63,7 @@ export default function SignupScreen({
         });
       }
     } catch (err: any) {
-      Alert.alert("Signup Failed", err.message || "Please try again.");
+      console.log("Signup Failed", err.message || "Please try again.");
     } finally {
       loadingDialog.hide();
     }

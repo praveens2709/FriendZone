@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, StatusBar, Switch, View, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, StatusBar, Switch, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/context/ThemeContext';
 import Button from '@/components/Button';
@@ -29,7 +29,7 @@ export default function SettingsScreen() {
       setIsPrivateAccount(userProfile.isPrivate);
     } catch (error) {
       console.error("Failed to fetch user privacy status:", error);
-      Alert.alert("Error", "Could not load privacy settings.");
+      console.log("Error", "Could not load privacy settings.");
     } finally {
       setLoadingPrivacy(false);
     }
@@ -44,11 +44,11 @@ export default function SettingsScreen() {
     setIsPrivateAccount(newValue);
     try {
       const response = await ProfileServices.togglePrivacy(newValue, accessToken);
-      Alert.alert("Success", `Account is now ${response.isPrivate ? 'Private' : 'Public'}.`);
+      console.log("Success", `Account is now ${response.isPrivate ? 'Private' : 'Public'}.`);
     } catch (error) {
       console.error("Failed to toggle private account status:", error);
       setIsPrivateAccount(!newValue);
-      Alert.alert("Error", "Failed to update privacy settings.");
+      console.log("Error", "Failed to update privacy settings.");
     }
   };
 

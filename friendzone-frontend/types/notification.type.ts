@@ -1,6 +1,5 @@
 import { KnockStatus } from "./knock.type";
 
-
 export interface NotifyingUser {
   id: string;
   username: string;

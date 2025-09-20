@@ -11,7 +11,7 @@ import Button from "@/components/Button";
 import { useTheme } from "@/context/ThemeContext";
 import { useLoadingDialog } from "@/context/LoadingContext";
 import AuthServices from "@/services/AuthService";
-import { HandleApiError, showToast } from "@/constants/Functions";
+import { HandleApiError } from "@/constants/Functions";
 
 type TRouteProp = RouteProp<
   {
@@ -55,7 +55,7 @@ export default function ResetPasswordScreen() {
         otp,
         newPassword: password,
       });
-      showToast("success", res.message);
+      console.log("success", res.message);
       router.replace("/(auth)/login");
     } catch (err) {
       HandleApiError(err);

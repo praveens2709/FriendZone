@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, Dimensions, Platform, ViewStyle } from 'react-native';
+import { StyleSheet, Dimensions, Platform, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';

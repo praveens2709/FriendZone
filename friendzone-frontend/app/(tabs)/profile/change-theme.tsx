@@ -9,7 +9,7 @@ import { ThemedText } from '@/components/ThemedText';
 import PhoneMockupPreview from '@/components/PhoneMockupPreview';
 import Button from '@/components/Button';
 import { useAuth } from '@/context/AuthContext';
-import { showToast, HandleApiError } from '@/constants/Functions';
+import { HandleApiError } from '@/constants/Functions';
 import { Colors } from '@/constants/Colors';
 import { useLoadingDialog } from '@/context/LoadingContext';
 import { ThemedView } from '@/components/ThemedView';
@@ -42,20 +42,20 @@ export default function ChangeThemeScreen() {
 
   const handleConfirmThemeChange = async () => {
     if (!session?.accessToken) {
-      showToast('error', 'Authentication required to save theme.');
+      console.log('error', 'Authentication required to save theme.');
       router.replace('/(auth)/login');
       return;
     }
 
     if (selectedThemeForPreview === currentGlobalTheme) {
-      showToast('info', 'This theme is already active!');
+      console.log('info', 'This theme is already active!');
       return;
     }
 
     loadingDialog.show();
     try {
       await updateUserTheme(selectedThemeForPreview);
-      showToast('success', `Theme updated to ${selectedThemeForPreview}!`);
+      console.log('success', `Theme updated to ${selectedThemeForPreview}!`);
     } catch (error) {
       HandleApiError(error);
     } finally {

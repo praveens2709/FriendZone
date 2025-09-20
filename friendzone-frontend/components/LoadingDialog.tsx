@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, StyleSheet, Dimensions } from 'react-native';
+import { Modal, StyleSheet } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { ThemedView } from './ThemedView';
 

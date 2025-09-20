@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet,
   FlatList,
   ActivityIndicator,
   TouchableOpacity,
+  RefreshControl,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
@@ -15,7 +16,6 @@ import ThemedSafeArea from "@/components/ThemedSafeArea";
 import BackButton from "@/components/BackButton";
 import KnockService, { KnockRequest } from "@/services/knockService";
 import { useAuth } from "@/context/AuthContext";
-import { getUserAvatar, showToast } from "@/constants/Functions";
 import ChatService from "@/services/ChatService";
 import {
   getKnockListByType,
@@ -38,14 +38,7 @@ export default function KnockListScreen() {
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!listType || !initialData) {
-      console.error("Error", "Invalid list type or data provided.");
-      router.back();
-    }
-  }, [listType, initialData, router]);
-
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     if (!user || !accessToken) return;
     setLoading(true);
     try {
@@ -61,14 +54,17 @@ export default function KnockListScreen() {
       setListData(updatedList);
     } catch (error) {
       console.error("Failed to refresh knock data:", error);
-      showToast("error", "Failed to refresh data.");
+      console.log("error", "Failed to refresh data.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, accessToken, listType]);
 
   const isButtonDisabled = (item: KnockRequest) => {
-    return actionLoading === item.id || item.status === "pending";
+    return (
+      actionLoading === item.id ||
+      (listType === "Knocking" && item.status === "pending")
+    );
   };
 
   const handleActionButtonPress = async (item: KnockRequest) => {
@@ -81,7 +77,10 @@ export default function KnockListScreen() {
     try {
       if (item.status === "lockedIn") {
         const recipientId = item.user.id;
-        const chatResponse = await ChatService.createChat(accessToken, recipientId);
+        const chatResponse = await ChatService.createChat(
+          accessToken,
+          recipientId
+        );
 
         if (chatResponse && chatResponse.chatId) {
           router.push({
@@ -89,28 +88,26 @@ export default function KnockListScreen() {
             params: {
               id: chatResponse.chatId,
               chatName: item.user.username,
-              chatAvatar: getUserAvatar({
-                avatar: item.user.avatar,
-                username: item.user.username,
-              }),
+              chatAvatar: item.user.avatar || "",
               isRestricted: String(chatResponse.isRestricted),
-              firstMessageByKnockerId: chatResponse.firstMessageByKnockerId || "",
+              firstMessageByKnockerId:
+                chatResponse.firstMessageByKnockerId || "",
             },
           });
         } else {
-          showToast("error", "Failed to open chat.");
+          console.log("error", "Failed to open chat.");
         }
       } else if (listType === "Knockers" && item.status === "onesidedlock") {
         await KnockService.knockBack(item.id, accessToken);
-        showToast("success", "You knocked them back! You are now LockedIn!");
+        console.log("success", "You knocked them back! You are now LockedIn!");
       } else if (listType === "Knocking" && item.status === "onesidedlock") {
-        await KnockService.declineKnock(item.id, accessToken);
-        showToast("success", "You have unknocked them.");
+        await KnockService.unknockUser(item.id, accessToken);
+        console.log("success", "You have unknocked them.");
       }
       refreshData();
     } catch (error: any) {
       console.error("Action failed:", error);
-      showToast(
+      console.log(
         "error",
         error.response?.data?.message || "Failed to perform action."
       );
@@ -137,7 +134,8 @@ export default function KnockListScreen() {
                   item.status === "lockedIn"
                     ? colors.buttonBackgroundSecondary
                     : colors.primary,
-                borderColor: colors.border,
+                borderColor:
+                  item.status === "lockedIn" ? colors.border : colors.primary,
                 opacity: isDisabled ? 0.6 : 1,
               },
             ]}
@@ -168,13 +166,13 @@ export default function KnockListScreen() {
     <LinearGradient colors={colors.gradient} style={styles.container}>
       <ThemedSafeArea style={styles.safeArea}>
         <CommonHeader
-          leftContent={<BackButton color={colors.text}/>}
+          leftContent={<BackButton color={colors.text} />}
           title={listType}
           showBottomBorder={true}
         />
-        {loading ? (
+        {loading && listData.length === 0 ? (
           <ThemedView style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
+            <ActivityIndicator size="small" color={colors.primary} />
             <ThemedText style={[styles.loadingText, { color: colors.textDim }]}>
               Loading...
             </ThemedText>
@@ -185,6 +183,13 @@ export default function KnockListScreen() {
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
             contentContainerStyle={styles.listContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={loading}
+                onRefresh={refreshData}
+                tintColor={colors.primary}
+              />
+            }
             ListEmptyComponent={() => (
               <ThemedView style={styles.emptyContainer}>
                 <ThemedText

@@ -7,7 +7,6 @@ import ThemedSafeArea from "@/components/ThemedSafeArea";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSocket } from "@/context/SocketContext";
 import { useAuth } from "@/context/AuthContext";
-import { showToast } from "@/constants/Functions";
 import SnakeLadderBoard from "@/components/gameUIs/SnakeLadderBoard";
 import TicTacToeBoard from "@/components/gameUIs/TicTacToeBoard";
 
@@ -84,15 +83,15 @@ export default function GameSessionScreen() {
         const winnerName =
           updatedState.players?.find((p) => p.userId === updatedState.winner)
             ?.username || "A player";
-        Alert.alert("Game Over!", `${winnerName} won!`);
+        console.log("Game Over!", `${winnerName} won!`);
       } else if (updatedState.status === "draw") {
-        Alert.alert("Game Over!", "It's a draw!");
+        console.log("Game Over!", "It's a draw!");
       }
     };
 
     const handleGameError = (errorMsg: string) => {
       console.error("[GameSessionScreen] Received gameError:", errorMsg);
-      showToast("error", `Game Error: ${errorMsg}`);
+      console.log("error", `Game Error: ${errorMsg}`);
       setIsMakingMove(false);
     };
 
@@ -115,7 +114,7 @@ export default function GameSessionScreen() {
     (moveData: any) => {
       console.log("[GameSessionScreen] handleMakeMove called with:", moveData);
       if (!socket) {
-        showToast("error", "Socket connection not ready.");
+        console.log("error", "Socket connection not ready.");
         console.warn("[GameSessionScreen] handleMakeMove: Socket not ready.");
         return;
       }
@@ -127,7 +126,7 @@ export default function GameSessionScreen() {
       ) {
         const message =
           gameState?.message || "Not your turn or game not ready.";
-        showToast("info", message);
+        console.log("info", message);
         console.warn("[GameSessionScreen] Invalid move attempt:", {
           gameStateStatus: gameState?.status,
           isMakingMove,
@@ -149,7 +148,7 @@ export default function GameSessionScreen() {
   
   const handlePlayAgain = useCallback(() => {
     if (!socket || !gameSessionId) {
-      showToast("error", "Socket connection not ready.");
+      console.log("error", "Socket connection not ready.");
       return;
     }
     console.log("[GameSessionScreen] Requesting to play again.");
@@ -159,14 +158,14 @@ export default function GameSessionScreen() {
 
   const handlePlay = useCallback(() => {
     if (!socket || !gameSessionId) {
-        showToast("error", "Socket connection not ready.");
+        console.log("error", "Socket connection not ready.");
         return;
     }
     if (gameState?.status === "pending" && gameState?.initiatorId === currentUserId) {
         console.log("[GameSessionScreen] Emitting 'startGame' event.");
         socket.emit("startGame", { gameSessionId });
     } else {
-        showToast("info", "Only the game initiator can start the game.");
+        console.log("info", "Only the game initiator can start the game.");
     }
   }, [socket, gameState, gameSessionId, currentUserId]);
 

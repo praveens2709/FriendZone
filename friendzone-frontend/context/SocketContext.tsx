@@ -1,5 +1,3 @@
-// context/SocketContext.tsx
-
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { Socket } from 'socket.io-client';
 import { connectSocket, getSocket, disconnectSocket } from '@/services/socketService';

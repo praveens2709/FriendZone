@@ -1,8 +1,6 @@
-// profilecontroller.js
+import User from '../models/User.js';
 
-const User = require('../models/User');
-
-exports.updateProfile = async (req, res) => {
+export const updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -45,7 +43,7 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
-exports.getProfile = async (req, res) => {
+export const getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password -otp -otpExpires');
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
@@ -57,7 +55,7 @@ exports.getProfile = async (req, res) => {
   }
 };
 
-exports.toggleUserPrivacy = async (req, res) => {
+export const toggleUserPrivacy = async (req, res) => {
   const userId = req.user.id;
   const { isPrivate } = req.body;
   
@@ -83,7 +81,7 @@ exports.toggleUserPrivacy = async (req, res) => {
   }
 };
 
-exports.getProfileById = async (req, res) => {
+export const getProfileById = async (req, res) => {
   try {
     const { userId } = req.params;
 

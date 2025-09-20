@@ -10,7 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useLoadingDialog } from "@/context/LoadingContext";
 import AuthServices from "@/services/AuthService";
-import { HandleApiError, showToast } from "@/constants/Functions";
+import { HandleApiError } from "@/constants/Functions";
 import AuthFormLayout from "@/components/AuthFormLayout";
 
 interface LoginScreenProps {
@@ -45,7 +45,7 @@ export default function LoginScreen({
           refreshToken: response.tokens.refreshToken,
           theme: response.theme,
         });
-        if (response.message) showToast("success", response.message);
+        if (response.message) console.log("success", response.message);
         onCloseModal?.();
         router.replace("/home");
       }

@@ -3,7 +3,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  View,
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
@@ -17,11 +16,7 @@ import ThemedSafeArea from "@/components/ThemedSafeArea";
 import BackButton from "@/components/BackButton";
 import KnockService, { KnockRequest } from "@/services/knockService";
 import { useAuth } from "@/context/AuthContext";
-import {
-  formatNotificationTimestamp,
-  getUserAvatar,
-  showToast,
-} from "@/constants/Functions";
+import { formatNotificationTimestamp } from "@/constants/Functions";
 import UserAvatar from "@/components/UserAvatar";
 
 export default function KnockRequestsScreen() {
@@ -57,7 +52,7 @@ export default function KnockRequestsScreen() {
           "[KnockRequestsScreen] Error fetching knock requests:",
           error
         );
-        showToast("error", "Failed to load knock requests.");
+        console.log("error", "Failed to load knock requests.");
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -90,13 +85,13 @@ export default function KnockRequestsScreen() {
           return newRequests;
         });
 
-        showToast("success", "Knock request accepted.");
+        console.log("success", "Knock request accepted.");
       } catch (error) {
         console.error(
           `[KnockRequestsScreen] Error accepting knock request ${requestId}:`,
           error
         );
-        showToast("error", "Failed to accept knock request.");
+        console.log("error", "Failed to accept knock request.");
       }
     },
     [accessToken, router]
@@ -114,13 +109,13 @@ export default function KnockRequestsScreen() {
           }
           return newRequests;
         });
-        showToast("success", "Knock request declined.");
+        console.log("success", "Knock request declined.");
       } catch (error) {
         console.error(
           `[KnockRequestsScreen] Error declining knock request ${requestId}:`,
           error
         );
-        showToast("error", "Failed to decline knock request.");
+        console.log("error", "Failed to decline knock request.");
       }
     },
     [accessToken, router]
@@ -129,10 +124,7 @@ export default function KnockRequestsScreen() {
   const renderRequestItem = ({ item }: { item: KnockRequest }) => (
     <ThemedView style={[styles.requestItem]}>
       <UserAvatar
-        imageUri={getUserAvatar({
-          avatar: item.user.avatar,
-          username: item.user.username,
-        })}
+        imageUri={item.user.avatar}
         size={50}
         style={styles.requestAvatar}
       />
@@ -185,7 +177,7 @@ export default function KnockRequestsScreen() {
     <LinearGradient colors={colors.gradient} style={styles.gradientContainer}>
       <ThemedSafeArea style={styles.safeArea}>
         <CommonHeader
-          leftContent={<BackButton color={colors.text}/>}
+          leftContent={<BackButton color={colors.text} />}
           title="Knock Requests"
           showBottomBorder={true}
         />

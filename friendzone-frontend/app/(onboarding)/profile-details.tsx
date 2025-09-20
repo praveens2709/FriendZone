@@ -12,7 +12,6 @@ import AuthFormLayout from "@/components/AuthFormLayout";
 import ImagePickerComponent from "@/components/ImagePickerComponent";
 import DateTimePickerComponent from "@/components/DateTimePickerComponent";
 import { ProfileDetailsForm } from "@/types/form.type";
-import { showToast } from "@/constants/Functions";
 import ModalComponent from "@/components/ModalComponent";
 import ThemedScrollView from "@/components/ThemedScrollView";
 
@@ -58,10 +57,10 @@ export default function ProfileDetailsScreen() {
       loadingDialog.show();
       console.log("Profile details submitted:", data);
       await updateProfile(data);
-      showToast("success", "Profile details saved successfully!");
+      console.log("success", "Profile details saved successfully!");
       router.push("/home");
     } catch (err: any) {
-      showToast("error", err.message || "Failed to save profile details.");
+      console.log("error", err.message || "Failed to save profile details.");
     } finally {
       loadingDialog.hide();
     }

@@ -75,7 +75,7 @@ export default function ImagePickerComponent({
       }
     } catch (error) {
       console.error("Error picking image:", error);
-      Alert.alert("Error", "Could not pick image. Please try again.");
+      console.log("Error", "Could not pick image. Please try again.");
     }
   };
 

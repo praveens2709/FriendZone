@@ -18,11 +18,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { Feather } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
-import {
-  getUserAvatar,
-  showToast,
-  getUserStatusLabel,
-} from "@/constants/Functions";
+import { getUserStatusLabel } from "@/constants/Functions";
 import KnockService, {
   KnockRequest,
   UserSearchResult,
@@ -36,6 +32,7 @@ import { useAuth } from "@/context/AuthContext";
 import ThemedScrollView from "@/components/ThemedScrollView";
 import CategoryLoader from "@/components/CategoryLoader";
 import PostGridLoader from "@/components/PostgridLoader";
+import { useSocket } from "@/context/SocketContext";
 
 interface ExploreDisplayUser {
   id: string;
@@ -51,7 +48,8 @@ const categoriesData = [
   {
     id: "profileBased",
     label: "Profiles",
-    mainImage: "https://i.pinimg.com/474x/26/f0/29/26f029e054e73facfb522b2abed7e49d.jpg",
+    mainImage:
+      "https://i.pinimg.com/474x/26/f0/29/26f029e054e73facfb522b2abed7e49d.jpg",
     avatars: [
       "https://randomuser.me/api/portraits/women/11.jpg",
       "https://randomuser.me/api/portraits/men/21.jpg",
@@ -62,7 +60,8 @@ const categoriesData = [
   {
     id: "locationBased",
     label: "Nearby",
-    mainImage: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ5dQyKA-MZ5CYCviWJr80rng1OHJcn5jAaSw&s",
+    mainImage:
+      "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ5dQyKA-MZ5CYCviWJr80rng1OHJcn5jAaSw&s",
     avatars: [
       "https://randomuser.me/api/portraits/men/51.jpg",
       "https://randomuser.me/api/portraits/women/61.jpg",
@@ -71,7 +70,8 @@ const categoriesData = [
   {
     id: "birthdays",
     label: "Birthdays",
-    mainImage: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQCIyUj-DZtOHXgViANsPt1M4VtXowny1FzlQ&s",
+    mainImage:
+      "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQCIyUj-DZtOHXgViANsPt1M4VtXowny1FzlQ&s",
     avatars: [
       "https://randomuser.me/api/portraits/women/71.jpg",
       "https://randomuser.me/api/portraits/men/81.jpg",
@@ -80,17 +80,38 @@ const categoriesData = [
 ];
 
 const postsData: PostItem[] = [
-  { id: "1", thumbnail: "https://randomuser.me/api/portraits/women/71.jpg", type: "image" },
-  { id: "2", thumbnail: "https://randomuser.me/api/portraits/men/81.jpg", type: "video" },
-  { id: "3", thumbnail: "https://randomuser.me/api/portraits/women/61.jpg", type: "image" },
-  { id: "4", thumbnail: "https://randomuser.me/api/portraits/men/51.jpg", type: "image" },
-  { id: "5", thumbnail: "https://randomuser.me/api/portraits/women/11.jpg", type: "video" },
+  {
+    id: "1",
+    thumbnail: "https://randomuser.me/api/portraits/women/71.jpg",
+    type: "image",
+  },
+  {
+    id: "2",
+    thumbnail: "https://randomuser.me/api/portraits/men/81.jpg",
+    type: "video",
+  },
+  {
+    id: "3",
+    thumbnail: "https://randomuser.me/api/portraits/women/61.jpg",
+    type: "image",
+  },
+  {
+    id: "4",
+    thumbnail: "https://randomuser.me/api/portraits/men/51.jpg",
+    type: "image",
+  },
+  {
+    id: "5",
+    thumbnail: "https://randomuser.me/api/portraits/women/11.jpg",
+    type: "video",
+  },
 ];
 
 export default function ExploreScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { accessToken, user } = useAuth();
+  const { socket } = useSocket();
 
   const [isSearching, setIsSearching] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -154,7 +175,7 @@ export default function ExploreScreen() {
         if (k.user.id === currentUserId) return;
         const existing = usersMap.get(k.user.id);
         if (existing) {
-          if (existing.relationToMe === "knocker" && k.status === "lockedIn") {
+          if (k.status === "lockedIn") {
             usersMap.set(k.user.id, {
               ...existing,
               status: k.status,
@@ -183,6 +204,7 @@ export default function ExploreScreen() {
     async (query: string) => {
       if (!accessToken || !user?._id) {
         setIsSearching(false);
+        setRefreshing(false);
         return;
       }
       console.log("🌐 Fetching users for query:", query);
@@ -204,7 +226,7 @@ export default function ExploreScreen() {
         setUsers(processedUsers);
       } catch (error) {
         console.error("❌ Failed to fetch users:", error);
-        showToast("error", "Failed to load users.");
+        console.log("error", "Failed to load users.");
         usersRef.current = [];
         setUsers([]);
       } finally {
@@ -214,6 +236,27 @@ export default function ExploreScreen() {
     },
     [accessToken, user?._id, determineUserRelation]
   );
+
+  useEffect(() => {
+    if (!socket || !accessToken || !user) {
+      return;
+    }
+
+    const handleStatusChange = async () => {
+      console.log(
+        `[ExploreScreen] Received knockStatusChanged. Re-fetching users.`
+      );
+      if (searchQueryRef.current.length > 0) {
+        await fetchUsers(searchQueryRef.current);
+      }
+    };
+
+    socket.on("knockStatusChanged", handleStatusChange);
+
+    return () => {
+      socket.off("knockStatusChanged", handleStatusChange);
+    };
+  }, [socket, accessToken, user, fetchUsers]);
 
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -256,7 +299,6 @@ export default function ExploreScreen() {
     if (searchQuery.length > 0) {
       fetchUsers(searchQuery);
     } else {
-      // Simulate fetching for non-search content
       setTimeout(() => setRefreshing(false), 1500);
     }
   }, [fetchUsers, searchQuery]);
@@ -280,7 +322,7 @@ export default function ExploreScreen() {
           params: {
             id: chatResponse.chatId,
             chatName: targetUser.username,
-            chatAvatar: getUserAvatar(targetUser),
+            chatAvatar: targetUser.avatar || "",
             isRestricted: String(chatResponse.isRestricted),
             firstMessageByKnockerId: chatResponse.firstMessageByKnockerId || "",
           },
@@ -288,21 +330,21 @@ export default function ExploreScreen() {
       } else if (targetUser.relationToMe === "knocker") {
         if (targetUser.knockId) {
           await KnockService.knockBack(targetUser.knockId, accessToken);
-          showToast(
+          console.log(
             "success",
             `You knocked back ${targetUser.username}! You are now LockedIn!`
           );
         } else {
-          showToast("error", "Knock ID not found for knock back action.");
+          console.log("error", "Knock ID not found for knock back action.");
         }
       } else if (targetUser.relationToMe === "stranger") {
         await KnockService.knockUser(targetUser.id, accessToken);
-        showToast("success", `Knock sent to ${targetUser.username}!`);
+        console.log("success", `Knock sent to ${targetUser.username}!`);
       }
       await fetchUsers(searchQueryRef.current);
     } catch (error: any) {
       console.error("❌ Action failed:", error);
-      showToast(
+      console.log(
         "error",
         error.response?.data?.message || "Failed to perform action."
       );
@@ -328,19 +370,19 @@ export default function ExploreScreen() {
         buttonText = "Message";
         buttonBackgroundColor = colors.buttonBackgroundSecondary;
         buttonBorderColor = colors.border;
-        buttonTextColor = colors.buttonText;
+        buttonTextColor = colors.text;
         break;
       case "knocker":
         buttonText = "Knock Back";
         buttonBackgroundColor = colors.primary;
-        buttonBorderColor = colors.border;
-        buttonTextColor = colors.text;
+        buttonBorderColor = colors.primary;
+        buttonTextColor = colors.buttonText;
         break;
       case "knocked":
-        buttonText = "Knocking";
+        buttonText = "Knocked";
         buttonBackgroundColor = colors.primary;
-        buttonBorderColor = colors.border;
-        buttonTextColor = colors.text;
+        buttonBorderColor = colors.primary;
+        buttonTextColor = colors.buttonText;
         isDisabled = true;
         break;
       case "stranger":
@@ -350,6 +392,14 @@ export default function ExploreScreen() {
         buttonBorderColor = colors.border;
         buttonTextColor = colors.text;
         break;
+    }
+
+    if (item.relationToMe === "knocked" && item.status === "pending") {
+      buttonText = "Requested";
+      buttonBackgroundColor = colors.buttonBackgroundSecondary;
+      buttonBorderColor = colors.border;
+      buttonTextColor = colors.textDim;
+      isDisabled = true;
     }
 
     const description = getUserStatusLabel(item.status, item.relationToMe);
@@ -396,7 +446,9 @@ export default function ExploreScreen() {
     if (searchQuery.length > 0) {
       if (showSearchLoader) {
         return (
-          <ThemedView style={[styles.loaderContainer, {paddingHorizontal: 15}]}>
+          <ThemedView
+            style={[styles.loaderContainer, { paddingHorizontal: 15 }]}
+          >
             {[...Array(5)].map((_, i) => (
               <UserSearchLoader key={i} />
             ))}
@@ -428,6 +480,13 @@ export default function ExploreScreen() {
             </ThemedView>
           )}
           keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+            />
+          }
         />
       );
     } else {
@@ -441,13 +500,13 @@ export default function ExploreScreen() {
           </ThemedView>
         );
       }
-      
+
       return (
         <ThemedScrollView
           style={styles.scrollView}
           contentContainerStyle={{
             flexGrow: 1,
-            justifyContent: 'flex-start'
+            justifyContent: "flex-start",
           }}
           refreshControl={
             <RefreshControl
@@ -466,10 +525,12 @@ export default function ExploreScreen() {
                   label={item.label}
                   mainImage={item.mainImage}
                   avatars={item.avatars}
-                  onPress={() => router.push({
-                    pathname: "/(tabs)/explore/CategoryDetailScreen",
-                    params: { categoryId: item.id, categoryName: item.label }
-                  })}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/(tabs)/explore/CategoryDetailScreen",
+                      params: { categoryId: item.id, categoryName: item.label },
+                    })
+                  }
                 />
               )}
               horizontal
@@ -531,7 +592,10 @@ export default function ExploreScreen() {
                 autoCorrect={false}
               />
               {searchQuery.length > 0 && (
-                <TouchableOpacity onPress={handleClearSearch} style={styles.clearIcon}>
+                <TouchableOpacity
+                  onPress={handleClearSearch}
+                  style={styles.clearIcon}
+                >
                   <Feather name="x" size={20} color={colors.textDim} />
                 </TouchableOpacity>
               )}
@@ -595,6 +659,6 @@ const styles = StyleSheet.create({
   },
   postGridSection: {
     paddingHorizontal: 2,
-    paddingBottom: Platform.OS === 'ios' ? 60 : 0
+    paddingBottom: Platform.OS === "ios" ? 60 : 0,
   },
 });

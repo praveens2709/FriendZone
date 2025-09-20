@@ -1,6 +1,6 @@
-const Notification = require('../models/Notification');
-const Knock = require('../models/Knock');
-const User = require('../models/User');
+import Notification from '../models/Notification.js';
+import Knock from '../models/Knock.js';
+import User from '../models/User.js';
 
 const emitUnreadNotificationCount = async (io, userId) => {
     try {
@@ -11,7 +11,7 @@ const emitUnreadNotificationCount = async (io, userId) => {
     }
 };
 
-exports.getUserNotifications = async (req, res) => {
+export const getUserNotifications = async (req, res) => {
     const userId = req.user.id;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 15;
@@ -81,7 +81,7 @@ exports.getUserNotifications = async (req, res) => {
     }
 };
 
-exports.getUnreadNotificationCount = async (req, res) => {
+export const getUnreadNotificationCount = async (req, res) => {
     const userId = req.user.id;
     try {
         const unreadCount = await Notification.countDocuments({ recipient: userId, isRead: false });
@@ -92,7 +92,7 @@ exports.getUnreadNotificationCount = async (req, res) => {
     }
 };
 
-exports.markNotificationAsRead = async (req, res, io) => {
+export const markNotificationAsRead = async (req, res, io) => {
     const userId = req.user.id;
     const { id } = req.params;
 
@@ -119,7 +119,7 @@ exports.markNotificationAsRead = async (req, res, io) => {
     }
 };
 
-exports.markAllNotificationsAsRead = async (req, res, io) => {
+export const markAllNotificationsAsRead = async (req, res, io) => {
     const userId = req.user.id;
 
     try {
@@ -140,7 +140,7 @@ exports.markAllNotificationsAsRead = async (req, res, io) => {
     }
 };
 
-exports.createNotification = async ({
+export const createNotification = async ({
     recipientId,
     senderId,
     type,
@@ -220,7 +220,7 @@ exports.createNotification = async ({
     }
 };
 
-exports.deleteNotificationsByKnockId = async (recipientId, knockId) => {
+export const deleteNotificationsByKnockId = async (recipientId, knockId) => {
     try {
         await Notification.deleteMany({
             recipient: recipientId,
@@ -233,7 +233,7 @@ exports.deleteNotificationsByKnockId = async (recipientId, knockId) => {
     }
 };
 
-exports.markNotificationAsReadAndProcessGameInvite = async (gameSessionId, userId, status) => {
+export const markNotificationAsReadAndProcessGameInvite = async (gameSessionId, userId, status) => {
     try {
         await Notification.updateMany(
             {
@@ -241,19 +241,16 @@ exports.markNotificationAsReadAndProcessGameInvite = async (gameSessionId, userI
                 relatedEntityId: gameSessionId,
                 relatedEntityType: 'GameSession',
                 type: 'game_invite',
-                'metadata.status': 'pending' // Only update pending invites
+                'metadata.status': 'pending'
             },
             {
                 $set: {
                     isRead: true,
-                    'metadata.status': status // 'accepted' or 'declined'
+                    'metadata.status': status
                 }
             }
         );
-        // Also ensure unread count is updated
-        // You might call emitUnreadNotificationCount here if needed
     } catch (error) {
         console.error(`Error processing game invite notification for user ${userId} and session ${gameSessionId}:`, error);
-        // Do not throw, as this is a background update
     }
 };

@@ -1,4 +1,3 @@
-// app/(auth)/forget-password.tsx
 import React from "react";
 import { StyleSheet, TextInput, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
@@ -10,7 +9,7 @@ import Button from "@/components/Button";
 import { useTheme } from "@/context/ThemeContext";
 import { useLoadingDialog } from "@/context/LoadingContext";
 import AuthServices from "@/services/AuthService";
-import { HandleApiError, showToast } from "@/constants/Functions";
+import { HandleApiError } from "@/constants/Functions";
 import AuthFormLayout from "@/components/AuthFormLayout";
 
 type TFormData = {
@@ -28,7 +27,7 @@ export default function ForgetPasswordScreen() {
     try {
       loadingDialog.show();
       const res = await AuthServices.forgetPassword({ email });
-      showToast("success", res.message);
+      console.log("success", res.message);
       router.push({
         pathname: "/(auth)/verify-otp",
         params: { email, purpose: "forgot-password" },

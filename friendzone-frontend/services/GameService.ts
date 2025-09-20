@@ -1,4 +1,3 @@
-// services/GameService.ts
 import { _post, _get } from "../configs/api-methods.config";
 
 interface SendInviteResponse {

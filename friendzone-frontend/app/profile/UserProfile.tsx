@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback } from "react";
 import {
   StyleSheet,
   Image,
-  View,
   ActivityIndicator,
   Dimensions,
   TouchableOpacity,
@@ -17,11 +16,7 @@ import { useAuth } from "@/context/AuthContext";
 import KnockService, { UserAvatar } from "@/services/knockService";
 import ProfileServices from "@/services/ProfileService";
 import ChatService from "@/services/ChatService";
-import {
-  showToast,
-  getUserAvatar,
-  getUserStatusLabel,
-} from "@/constants/Functions";
+import { getUserStatusLabel } from "@/constants/Functions";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { User } from "@/types/user.type";
 import CommonHeader from "@/components/CommonHeader";
@@ -29,9 +24,8 @@ import BackButton from "@/components/BackButton";
 import UserAvatarComponent from "@/components/UserAvatar";
 import ThemedModal from "@/components/ThemedModal";
 import Button from "@/components/Button";
-import PostGrid, { PostItem } from "@/components/PostGrid";
+import { PostItem } from "@/components/PostGrid";
 import PostService from "@/services/PostService";
-import { Post as PostType } from "@/types/post.type";
 import { LinearGradient } from "expo-linear-gradient";
 
 interface ExploreDisplayUser {
@@ -74,82 +68,90 @@ export default function UserProfileScreen() {
 
   const fetchUserProfile = useCallback(async () => {
     if (!userId || !accessToken || !user?._id) {
-        setIsLoading(false);
-        return;
+      setIsLoading(false);
+      return;
     }
 
     try {
-        const [
-            profile,
-            knockersResponse,
-            knockedResponse,
-            knockersForUserResponse,
-            profileCounts
-        ] = await Promise.all([
-            ProfileServices.getProfileById(accessToken, userId as string),
-            KnockService.getKnockers(accessToken),
-            KnockService.getKnocked(accessToken),
-            KnockService.getKnockersForUser(accessToken, userId as string),
-            KnockService.getCountsForUser(accessToken, userId as string)
-        ]);
+      const [
+        profile,
+        knockersResponse,
+        knockedResponse,
+        knockersForUserResponse,
+        profileCounts,
+      ] = await Promise.all([
+        ProfileServices.getProfileById(accessToken, userId as string),
+        KnockService.getKnockers(accessToken),
+        KnockService.getKnocked(accessToken),
+        KnockService.getKnockersForUser(accessToken, userId as string),
+        KnockService.getCountsForUser(accessToken, userId as string),
+      ]);
 
-        const targetProfile = profile;
-        
-        setKnockersCount(profileCounts.knockersCount);
-        setKnockingCount(profileCounts.knockingCount);
-        setLockedInCount(profileCounts.lockedInCount);
-        
-        setMutualConnections(knockersForUserResponse);
+      const targetProfile = profile;
 
-        const isKnocker = knockersResponse.find(
-            (k) => k.user.id === targetProfile._id
-        );
-        const isKnocked = knockedResponse.find(
-            (k) => k.user.id === targetProfile._id
-        );
+      setKnockersCount(profileCounts.knockersCount);
+      setKnockingCount(profileCounts.knockingCount);
+      setLockedInCount(profileCounts.lockedInCount);
 
-        let currentRelation: ExploreDisplayUser["relationToMe"] = "stranger";
-        let currentStatus:
-            | "pending"
-            | "lockedIn"
-            | "onesidedlock"
-            | "declined"
-            | undefined = undefined;
-        let currentKnockId = undefined;
+      setMutualConnections(knockersForUserResponse);
 
-        if (isKnocker && isKnocked && isKnocker.status === "lockedIn" && isKnocked.status === "lockedIn") {
-            currentRelation = "lockedIn";
-            currentStatus = "lockedIn";
-            currentKnockId = isKnocker.id;
-        } else if (isKnocker) {
-            currentRelation = "knocker";
-            currentStatus = isKnocker.status;
-            currentKnockId = isKnocker.id;
-        } else if (isKnocked) {
-            currentRelation = "knocked";
-            currentStatus = isKnocked.status;
-            currentKnockId = isKnocked.id;
-        }
+      const isKnocker = knockersResponse.find(
+        (k) => k.user.id === targetProfile._id
+      );
+      const isKnocked = knockedResponse.find(
+        (k) => k.user.id === targetProfile._id
+      );
 
-        setRelationToMe(currentRelation);
-        setKnockId(currentKnockId);
-        setKnockStatus(currentStatus);
-        setUserProfile(targetProfile);
+      let currentRelation: ExploreDisplayUser["relationToMe"] = "stranger";
+      let currentStatus:
+        | "pending"
+        | "lockedIn"
+        | "onesidedlock"
+        | "declined"
+        | undefined = undefined;
+      let currentKnockId = undefined;
+
+      if (
+        isKnocker &&
+        isKnocked &&
+        isKnocker.status === "lockedIn" &&
+        isKnocked.status === "lockedIn"
+      ) {
+        currentRelation = "lockedIn";
+        currentStatus = "lockedIn";
+        currentKnockId = isKnocker.id;
+      } else if (isKnocker) {
+        currentRelation = "knocker";
+        currentStatus = isKnocker.status;
+        currentKnockId = isKnocker.id;
+      } else if (isKnocked) {
+        currentRelation = "knocked";
+        currentStatus = isKnocked.status;
+        currentKnockId = isKnocked.id;
+      }
+
+      setRelationToMe(currentRelation);
+      setKnockId(currentKnockId);
+      setKnockStatus(currentStatus);
+      setUserProfile(targetProfile);
     } catch (error) {
-        console.error("Failed to fetch user profile:", error);
-        showToast("error", "Failed to load user profile.");
-        setUserProfile(null);
+      console.error("Failed to fetch user profile:", error);
+      console.log("error", "Failed to load user profile.");
+      setUserProfile(null);
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   }, [userId, accessToken, user?._id]);
 
   const fetchUserPosts = useCallback(async () => {
     if (!accessToken || !userId) return;
     try {
-      const postsForUser = await PostService.getPostsByUserId(accessToken, userId as string);
+      const postsForUser = await PostService.getPostsByUserId(
+        accessToken,
+        userId as string
+      );
       setPostsCount(postsForUser.length);
-      const formattedPosts: PostItem[] = postsForUser.map(post => ({
+      const formattedPosts: PostItem[] = postsForUser.map((post) => ({
         id: post._id,
         thumbnail: post.images[0]?.url,
         isMultiple: post.images.length > 1,
@@ -161,42 +163,47 @@ export default function UserProfileScreen() {
     }
   }, [accessToken, userId]);
 
-
   useEffect(() => {
     fetchUserProfile();
     fetchUserPosts();
   }, [fetchUserProfile, fetchUserPosts]);
 
-  const handlePressPost = useCallback((item: PostItem) => {
-    router.push({
-      pathname: "/posts/[postId]",
-      params: { postId: item.id }
-    });
-  }, [router]);
+  const handlePressPost = useCallback(
+    (item: PostItem) => {
+      router.push({
+        pathname: "/posts/[postId]",
+        params: { postId: item.id },
+      });
+    },
+    [router]
+  );
 
-const confirmUnknockAction = async (targetUser: User) => {
+  const confirmUnknockAction = async (targetUser: User) => {
     setShowUnknockConfirmModal(false);
     if (!accessToken || actionLoadingId || !targetUser._id) {
-        return;
+      return;
     }
     setActionLoadingId(targetUser._id);
 
     try {
-        if (relationToMe === "lockedIn") {
-            await KnockService.breakLock(targetUser._id, accessToken);
-            showToast("success", `You have unknocked ${targetUser.firstName}.`);
-        } else if (knockId) {
-            await KnockService.unknockUser(knockId, accessToken);
-            showToast("success", `You have unknocked ${targetUser.firstName}.`);
-        } else {
-            showToast("error", "Knock ID not found for unknock action.");
-        }
-        fetchUserProfile();
+      if (relationToMe === "lockedIn") {
+        await KnockService.breakLock(targetUser._id, accessToken);
+        console.log("success", `You have unknocked ${targetUser.firstName}.`);
+      } else if (knockId) {
+        await KnockService.unknockUser(knockId, accessToken);
+        console.log("success", `You have unknocked ${targetUser.firstName}.`);
+      } else {
+        console.log("error", "Knock ID not found for unknock action.");
+      }
+      fetchUserProfile();
     } catch (error: any) {
-        console.error("Action failed:", error);
-        showToast("error", error.response?.data?.message || "Failed to perform action.");
+      console.error("Action failed:", error);
+      console.log(
+        "error",
+        error.response?.data?.message || "Failed to perform action."
+      );
     } finally {
-        setActionLoadingId(null);
+      setActionLoadingId(null);
     }
   };
 
@@ -226,32 +233,29 @@ const confirmUnknockAction = async (targetUser: User) => {
           params: {
             id: chatResponse.chatId,
             chatName: `${targetUser.firstName} ${targetUser.lastName}`,
-            chatAvatar: getUserAvatar({
-              avatar: targetUser.profileImage ?? null,
-              username: `${targetUser.firstName} ${targetUser.lastName || ""}`,
-            }),
+            chatAvatar: targetUser.profileImage || "",
             isRestricted: String(chatResponse.isRestricted),
             firstMessageByKnockerId: chatResponse.firstMessageByKnockerId || "",
           },
         });
       } else if (actionType === "knock") {
         await KnockService.knockUser(targetUser._id, accessToken);
-        showToast("success", `Knock sent to ${targetUser.firstName}!`);
+        console.log("success", `Knock sent to ${targetUser.firstName}!`);
       } else if (actionType === "knockBack") {
         if (knockId) {
           await KnockService.knockBack(knockId, accessToken);
-          showToast(
+          console.log(
             "success",
             `You knocked back ${targetUser.firstName}! You are now LockedIn!`
           );
         } else {
-          showToast("error", "Knock ID not found for knock back action.");
+          console.log("error", "Knock ID not found for knock back action.");
         }
       }
       fetchUserProfile();
     } catch (error: any) {
       console.error("Action failed:", error);
-      showToast(
+      console.log(
         "error",
         error.response?.data?.message || "Failed to perform action."
       );
@@ -369,15 +373,7 @@ const confirmUnknockAction = async (targetUser: User) => {
     return (
       <ThemedView>
         <ThemedView style={styles.profileInfoContainer}>
-          <UserAvatarComponent
-            imageUri={getUserAvatar({
-              avatar: userProfile.profileImage ?? null,
-              username: `${userProfile.firstName} ${
-                userProfile.lastName || ""
-              }`,
-            })}
-            size={80}
-          />
+          <UserAvatarComponent imageUri={userProfile.profileImage} size={80} />
           <ThemedView style={styles.userInfoAndStats}>
             <ThemedView style={styles.usernameAndStatus}>
               <ThemedText style={styles.fullName}>
@@ -393,9 +389,7 @@ const confirmUnknockAction = async (targetUser: User) => {
             </ThemedView>
             <ThemedView style={styles.statsContainer}>
               <ThemedView style={styles.statItem}>
-                <ThemedText style={styles.statNumber}>
-                  {postsCount}
-                </ThemedText>
+                <ThemedText style={styles.statNumber}>{postsCount}</ThemedText>
                 <ThemedText
                   style={[styles.statLabel, { color: colors.textDim }]}
                 >
@@ -523,18 +517,17 @@ const confirmUnknockAction = async (targetUser: User) => {
   const renderNoPostsContent = () => (
     <ThemedView style={styles.noPostsContainer}>
       <Ionicons name="images" size={60} color={colors.textDim} />
-      <ThemedText style={styles.noPostsText}>
-        No posts yet
-      </ThemedText>
-      <ThemedText style={[styles.privateProfileSubText, { color: colors.textDim }]}>
+      <ThemedText style={styles.noPostsText}>No posts yet</ThemedText>
+      <ThemedText
+        style={[styles.privateProfileSubText, { color: colors.textDim }]}
+      >
         This user hasn't posted anything yet.
       </ThemedText>
     </ThemedView>
   );
 
   const isPrivateAndNotConnected =
-    userProfile?.isPrivate &&
-    relationToMe !== "lockedIn";
+    userProfile?.isPrivate && relationToMe !== "lockedIn";
 
   if (isLoading) {
     return (
@@ -565,7 +558,7 @@ const confirmUnknockAction = async (targetUser: User) => {
     <LinearGradient colors={colors.gradient} style={styles.gradientContainer}>
       <ThemedSafeArea style={styles.container}>
         <CommonHeader
-          leftContent={<BackButton color={colors.text}/>}
+          leftContent={<BackButton color={colors.text} />}
           title={
             userProfile
               ? `${userProfile.firstName} ${userProfile.lastName || ""}`.trim()
@@ -573,7 +566,7 @@ const confirmUnknockAction = async (targetUser: User) => {
           }
           rightContent1={
             <TouchableOpacity
-              onPress={() => showToast("info", "More info about this user.")}
+              onPress={() => console.log("info", "More info about this user.")}
             >
               <Feather name="info" size={24} color={colors.text} />
             </TouchableOpacity>
@@ -590,15 +583,22 @@ const confirmUnknockAction = async (targetUser: User) => {
               style={styles.postItemContainer}
               onPress={() => handlePressPost(item)}
             >
-              <Image source={{ uri: item.thumbnail }} style={styles.postImage} />
+              <Image
+                source={{ uri: item.thumbnail }}
+                style={styles.postImage}
+              />
               {item.isMultiple && (
-                <View style={styles.multipleIconContainer}>
+                <ThemedView style={styles.multipleIconContainer}>
                   <Ionicons name="copy-outline" size={16} color="white" />
-                </View>
+                </ThemedView>
               )}
             </TouchableOpacity>
           )}
-          ListEmptyComponent={isPrivateAndNotConnected ? renderPrivateProfileContent : renderNoPostsContent}
+          ListEmptyComponent={
+            isPrivateAndNotConnected
+              ? renderPrivateProfileContent
+              : renderNoPostsContent
+          }
           contentContainerStyle={{ flexGrow: 1 }}
         />
         <ThemedModal
@@ -616,11 +616,11 @@ const confirmUnknockAction = async (targetUser: User) => {
             Are you sure you want to unknock {userProfile?.firstName}?
           </ThemedText>
 
-          <ThemedView style={styles.buttonRow}>
+          <ThemedView style={styles.modalButtons}>
             <Button
               title="Cancel"
               onPress={() => setShowUnknockConfirmModal(false)}
-              style={[styles.button, { marginRight: 8 }]}
+              style={styles.button}
             />
             <Button
               title="Unknock"
@@ -717,6 +717,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     width: "100%",
     paddingHorizontal: 20,
+    marginBottom: 20,
+    gap: 10,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-around",
     marginBottom: 20,
     gap: 10,
   },

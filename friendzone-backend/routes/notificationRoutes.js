@@ -1,10 +1,10 @@
-const express = require('express');
-const { protect } = require('../middleware/authMiddleware');
-const notificationController = require('../controllers/notificationController');
+import { Router } from 'express';
+import { protect } from '../middleware/authMiddleware.js';
+import * as notificationController from '../controllers/notificationController.js';
 
-const router = express.Router();
+const router = Router();
 
-module.exports = (io, userSocketMap) => {
+export default (io, userSocketMap) => {
     router.get('/', protect, notificationController.getUserNotifications);
     router.get('/unread-count', protect, notificationController.getUnreadNotificationCount);
     router.put('/:id/read', protect, (req, res) => notificationController.markNotificationAsRead(req, res, io));

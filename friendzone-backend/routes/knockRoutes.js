@@ -1,10 +1,10 @@
-const express = require('express');
-const { protect } = require('../middleware/authMiddleware');
-const knockController = require('../controllers/knockController');
+import { Router } from 'express';
+import { protect } from '../middleware/authMiddleware.js';
+import * as knockController from '../controllers/knockController.js';
 
-const router = express.Router();
+const router = Router();
 
-module.exports = (io, userSocketMap) => {
+export default (io, userSocketMap) => {
   router.post('/', protect, (req, res, next) => {
     req.io = io;
     req.userSocketMap = userSocketMap;
@@ -23,14 +23,12 @@ module.exports = (io, userSocketMap) => {
     knockController.knockBack(req, res, next);
   });
 
-  // This route is now optional if you only use the new unknock route
   router.put('/:id/decline', protect, (req, res, next) => {
     req.io = io;
     req.userSocketMap = userSocketMap;
     knockController.declineKnock(req, res, next);
   });
 
-  // --- NEW UNKNOCK ROUTE ---
   router.delete('/:id/unknock', protect, (req, res, next) => {
     req.io = io;
     req.userSocketMap = userSocketMap;

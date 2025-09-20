@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
-  View,
   TouchableOpacity,
   TextInput,
   ScrollView,
@@ -21,7 +20,7 @@ import { Image } from "expo-image";
 import BackButton from "@/components/BackButton";
 import ThemedModal from "@/components/ThemedModal";
 import useCurrentLocation from "@/hooks/useCurrentLocation";
-import { countWords, getAddressFromCoords, showToast } from "@/constants/Functions";
+import { countWords, getAddressFromCoords } from "@/constants/Functions";
 import LocationSearch from "@/components/LocationSearch";
 import Button from "@/components/Button";
 import { MediaAsset, Track } from "@/types/media.type";
@@ -48,7 +47,7 @@ export default function CaptionScreen() {
       try {
         setSelectedAssets(JSON.parse(params.selectedAssets as string));
       } catch {
-        showToast("error", "Failed to load selected images");
+        console.log("error", "Failed to load selected images");
       }
     }
     if (params.selectedTrack) {
@@ -64,12 +63,12 @@ export default function CaptionScreen() {
 
   const handlePost = async () => {
     if (!accessToken) {
-      showToast("error", "Please log in to create a post.");
+      console.log("error", "Please log in to create a post.");
       return;
     }
 
     if (!selectedAssets.length) {
-      showToast("error", "No images to post");
+      console.log("error", "No images to post");
       return;
     }
 
@@ -82,7 +81,7 @@ export default function CaptionScreen() {
         const fileType = uriParts[uriParts.length - 1];
         const fileName = `image_${asset.id}.${fileType}`;
         const mimeType = `image/${fileType}`;
-        
+
         formData.append("images", {
           uri: asset.uri,
           name: fileName,
@@ -99,11 +98,11 @@ export default function CaptionScreen() {
       }
 
       await PostService.createPost(formData, accessToken);
-      showToast("success", "Post created successfully!");
+      console.log("success", "Post created successfully!");
       router.push("/(tabs)/home");
     } catch (error) {
       console.error("Failed to create post:", error);
-      showToast(
+      console.log(
         "error",
         "Failed to create post. Please check your network and try again."
       );
@@ -113,18 +112,18 @@ export default function CaptionScreen() {
   };
 
   const renderImagePreview = (asset: MediaAsset, index: number) => (
-    <View key={asset.id} style={styles.imagePreviewContainer}>
+    <ThemedView key={asset.id} style={styles.imagePreviewContainer}>
       <Image
         source={{ uri: asset.uri }}
         style={styles.imagePreview}
         contentFit="cover"
       />
       {selectedAssets.length > 1 && (
-        <View style={styles.imageNumberBadge}>
+        <ThemedView style={styles.imageNumberBadge}>
           <ThemedText style={styles.imageNumberText}>{index + 1}</ThemedText>
-        </View>
+        </ThemedView>
       )}
-    </View>
+    </ThemedView>
   );
 
   return (
@@ -158,7 +157,7 @@ export default function CaptionScreen() {
           style={styles.container}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.imagesContainer}>
+          <ThemedView style={styles.imagesContainer}>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -166,7 +165,7 @@ export default function CaptionScreen() {
             >
               {selectedAssets.map(renderImagePreview)}
             </ScrollView>
-          </View>
+          </ThemedView>
 
           {selectedTrack && (
             <ThemedView
@@ -182,7 +181,7 @@ export default function CaptionScreen() {
                 source={{ uri: selectedTrack.artworkUrl100 }}
                 style={[styles.songArtwork, { borderColor: colors.border }]}
               />
-              <View style={styles.songTextContainer}>
+              <ThemedView style={styles.songTextContainer}>
                 <ThemedText
                   style={[styles.songTitle, { color: colors.text }]}
                   numberOfLines={1}
@@ -195,7 +194,7 @@ export default function CaptionScreen() {
                 >
                   {selectedTrack.artistName}
                 </ThemedText>
-              </View>
+              </ThemedView>
               <MaterialCommunityIcons
                 name="music"
                 size={20}
@@ -204,7 +203,7 @@ export default function CaptionScreen() {
             </ThemedView>
           )}
 
-          <View style={styles.inputContainer}>
+          <ThemedView style={styles.inputContainer}>
             <TextInput
               style={[
                 styles.captionInput,
@@ -220,16 +219,16 @@ export default function CaptionScreen() {
               multiline
               textAlignVertical="top"
             />
-            <View style={styles.characterCount}>
+            <ThemedView style={styles.characterCount}>
               <ThemedText
                 style={[styles.characterCountText, { color: colors.textDim }]}
               >
                 {countWords(caption)}/200 words
               </ThemedText>
-            </View>
-          </View>
+            </ThemedView>
+          </ThemedView>
 
-          <View style={styles.inputContainer}>
+          <ThemedView style={styles.inputContainer}>
             <TouchableOpacity
               style={[
                 styles.locationInputContainer,
@@ -274,7 +273,7 @@ export default function CaptionScreen() {
                 </ThemedText>
               )}
             </TouchableOpacity>
-          </View>
+          </ThemedView>
         </ScrollView>
       </ThemedSafeArea>
 
@@ -288,8 +287,8 @@ export default function CaptionScreen() {
             onPress={Keyboard.dismiss}
             accessible={false}
           >
-            <View style={{ flex: 1 }}>
-              <View style={styles.modalHeader}>
+            <ThemedView style={{ flex: 1 }}>
+              <ThemedView style={styles.modalHeader}>
                 <TouchableOpacity onPress={() => setShowLocationModal(false)}>
                   <MaterialCommunityIcons
                     name="close"
@@ -300,8 +299,8 @@ export default function CaptionScreen() {
                 <ThemedText style={[styles.modalTitle, { color: colors.text }]}>
                   Search Location
                 </ThemedText>
-                <View style={{ width: 24 }} />
-              </View>
+                <ThemedView style={{ width: 24 }} />
+              </ThemedView>
 
               <LocationSearch
                 placeholder="Search for a location..."
@@ -336,7 +335,7 @@ export default function CaptionScreen() {
                   </ThemedText>
                 </Button>
               )}
-            </View>
+            </ThemedView>
           </TouchableWithoutFeedback>
         </ThemedModal>
       )}

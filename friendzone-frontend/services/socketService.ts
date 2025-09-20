@@ -1,5 +1,3 @@
-// services/socketService.ts
- 
 import { io, Socket } from 'socket.io-client';
 import { API_BASE_URL } from '@/constants/const';
 

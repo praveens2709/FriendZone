@@ -10,7 +10,6 @@ import {
   handleBackspace,
   handleInputChange,
   OTP_LENGTH,
-  showToast,
 } from "@/constants/Functions";
 import AuthServices from "@/services/AuthService";
 import { ThemedView } from "@/components/ThemedView";
@@ -66,7 +65,7 @@ const VerifyOtpScreen = () => {
     try {
       loading.show();
       const res = await AuthServices.verifyEmail({ email, otp, purpose });
-      showToast("success", res.message);
+      console.log("success", res.message);
 
       if (purpose === "signup") {
         if (res?.tokens) await auth.signIn(res.tokens);
@@ -96,7 +95,7 @@ const VerifyOtpScreen = () => {
       setCode(Array(OTP_LENGTH).fill(""));
       setActiveIndex(0);
       setTimer(OTP_DURATION);
-      showToast("success", "OTP resent successfully.");
+      console.log("success", "OTP resent successfully.");
       inputs.current[0]?.focus();
     } catch (err) {
       HandleApiError(err);

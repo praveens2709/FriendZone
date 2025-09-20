@@ -1,4 +1,16 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
+
+const unreadCountSchema = new mongoose.Schema({
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
+  count: {
+    type: Number,
+    default: 0,
+  },
+});
 
 const chatSchema = new mongoose.Schema({
   participants: [{
@@ -14,6 +26,20 @@ const chatSchema = new mongoose.Schema({
   name: {
     type: String,
     trim: true,
+    required: function() {
+      return this.type === 'group';
+    },
+  },
+  groupAvatar: {
+    type: String,
+    default: null,
+  },
+  groupAdmin: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: function() {
+      return this.type === 'group';
+    },
   },
   lastMessage: {
     type: mongoose.Schema.Types.ObjectId,
@@ -32,15 +58,20 @@ const chatSchema = new mongoose.Schema({
     ref: 'User',
     default: null,
   },
-  unreadCounts: [{
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-    },
-    count: {
-      type: Number,
-      default: 0,
-    },
+  // New field to track if users are "locked in" (both have sent messages)
+  isLockedIn: {
+    type: Boolean,
+    default: false,
+  },
+  // Track which participants have sent at least one message
+  participantsWhoSentMessages: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  }],
+  unreadCounts: [unreadCountSchema],
+  deletedBy: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
   }],
 }, { timestamps: true });
 
@@ -59,4 +90,7 @@ chatSchema.pre('save', async function(next) {
   next();
 });
 
-module.exports = mongoose.model('Chat', chatSchema);
+chatSchema.index({ participants: 1, type: 1 });
+chatSchema.index({ "unreadCounts.user": 1 });
+
+export default mongoose.model('Chat', chatSchema);

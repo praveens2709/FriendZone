@@ -302,7 +302,7 @@ const SnakeLadderBoard: React.FC<SnakeLadderBoardProps> = ({
           <Button title="Play Again" onPress={onPlayAgain} style={styles.fullWidthButton} />
         ) : (
           <>
-            <Button title="Play" onPress={onPlay} style={[styles.actionButton, styles.actionButtonMargin]} />
+            <Button title="Play" onPress={onPlay} style={[styles.actionButton]} />
             <Button title="Quit" onPress={() => setShowQuitModal(true)} style={styles.actionButton} />
           </>
         )}
@@ -319,7 +319,7 @@ const SnakeLadderBoard: React.FC<SnakeLadderBoardProps> = ({
             <Button
               title="Cancel"
               onPress={() => setShowQuitModal(false)}
-              style={[styles.actionButton, styles.actionButtonMargin]}
+              style={styles.actionButton}
             />
             <Button
               title="Yes, Quit"
@@ -423,16 +423,13 @@ const styles = StyleSheet.create({
   actionButton: {
     flex: 1,
   },
-  actionButtonMargin: {
-    marginRight: 8,
-  },
   fullWidthButton: {
     width: '100%',
   },
   modalButtonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: 10,
     marginBottom: 20,
   },
   modalTitle: {

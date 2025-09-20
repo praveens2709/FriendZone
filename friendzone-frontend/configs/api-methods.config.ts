@@ -27,17 +27,24 @@ export const _get = async <T>(url: string, accessToken?: string, params?: any): 
 export const _post = async <T>(
   url: string,
   data?: any,
-  accessToken?: string
+  accessToken?: string,
+  extraConfig: { headers?: any } = {}
 ): Promise<T> => {
   const endpoint = url.split('/').filter(Boolean).pop();
   const headers: any = {};
 
-  headers.Authorization = accessToken ? `Bearer ${accessToken}` : '';
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
 
-  if (data instanceof FormData) headers['Content-Type'] = 'multipart/form-data';
+  if (data instanceof FormData) {
+    headers['Content-Type'] = 'multipart/form-data';
+  }
 
   try {
-    const response: AxiosResponse<T, any> = await httpClient.post<T>(url, data || {}, { headers });
+    const response: AxiosResponse<T, any> = await httpClient.post<T>(url, data || {}, {
+      headers: { ...headers, ...extraConfig.headers },
+    });
     return response.data;
   } catch (error) {
     console.error(`${endpoint} request error: `, error);

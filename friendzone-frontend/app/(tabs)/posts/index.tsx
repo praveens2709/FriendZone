@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet,
-  View,
   TouchableOpacity,
   Dimensions,
   FlatList,
   Image,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
@@ -29,7 +27,6 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
 } from "react-native-reanimated";
-import { showToast } from "@/constants/Functions";
 import { MediaAsset } from "@/types/media.type";
 
 const { width } = Dimensions.get("window");
@@ -70,7 +67,7 @@ export default function PostsScreen() {
         await fetchMediaAssets();
       } else {
         setHasPermission(false);
-        Alert.alert(
+        console.log(
           "Permission Required",
           "Camera and gallery permissions are needed to create a new post."
         );
@@ -211,7 +208,7 @@ export default function PostsScreen() {
           }
         />
         {isSelected && (
-          <View
+          <ThemedView
             style={[styles.selectionOverlay, { borderColor: colors.border }]}
           >
             <MaterialCommunityIcons
@@ -220,7 +217,7 @@ export default function PostsScreen() {
               color={colors.text}
               style={styles.checkIcon}
             />
-          </View>
+          </ThemedView>
         )}
       </TouchableOpacity>
     );
@@ -228,7 +225,7 @@ export default function PostsScreen() {
 
   const handleNextPress = async () => {
     if (selectedAssets.length === 0) {
-      showToast(
+      console.log(
         "No Media Selected",
         "Please select at least one photo to continue."
       );
@@ -244,7 +241,7 @@ export default function PostsScreen() {
       !firstAsset.width ||
       !firstAsset.height
     ) {
-      showToast("Error", "Could not get selected image details.");
+      console.log("Error", "Could not get selected image details.");
       setIsLoading(false);
       return;
     }
@@ -337,7 +334,7 @@ export default function PostsScreen() {
         });
       } catch (fallbackError) {
         console.error("Fallback also failed:", fallbackError);
-        Alert.alert("Error", "Failed to process the image. Please try again.");
+        console.log("Error", "Failed to process the image. Please try again.");
       }
     } finally {
       setIsLoading(false);
@@ -555,16 +552,16 @@ export default function PostsScreen() {
   const renderContent = () => {
     if (isLoading) {
       return (
-        <View style={styles.centeredContainer}>
+        <ThemedView style={styles.centeredContainer}>
           <ActivityIndicator size="small" color={colors.primary} />
           <ThemedText style={{ marginTop: 10 }}>Loading media...</ThemedText>
-        </View>
+        </ThemedView>
       );
     }
 
     if (!hasPermission) {
       return (
-        <View style={styles.centeredContainer}>
+        <ThemedView style={styles.centeredContainer}>
           <ThemedText style={{ textAlign: "center" }}>
             Permission to access camera and gallery is required to create a new
             post.
@@ -577,7 +574,7 @@ export default function PostsScreen() {
               Grant Permissions
             </ThemedText>
           </TouchableOpacity>
-        </View>
+        </ThemedView>
       );
     }
 
@@ -586,7 +583,9 @@ export default function PostsScreen() {
 
     return (
       <ThemedView style={{ flex: 1 }}>
-        <View style={[styles.previewContainer, { backgroundColor: "#000" }]}>
+        <ThemedView
+          style={[styles.previewContainer, { backgroundColor: "#000" }]}
+        >
           {previewAsset ? (
             <GestureDetector gesture={combinedGesture}>
               <Animated.Image
@@ -596,14 +595,14 @@ export default function PostsScreen() {
               />
             </GestureDetector>
           ) : (
-            <View style={styles.previewPlaceholder}>
+            <ThemedView style={styles.previewPlaceholder}>
               <ThemedText style={[styles.subText, { color: colors.textDim }]}>
                 Select a photo to preview
               </ThemedText>
-            </View>
+            </ThemedView>
           )}
-        </View>
-        <View style={styles.recentsHeader}>
+        </ThemedView>
+        <ThemedView style={styles.recentsHeader}>
           <ThemedText style={styles.recentsText}>Recents</ThemedText>
           <TouchableOpacity
             style={[
@@ -622,7 +621,7 @@ export default function PostsScreen() {
               color={isMultiSelect ? colors.background : colors.text}
             />
           </TouchableOpacity>
-        </View>
+        </ThemedView>
         <FlatList
           data={mediaAssets}
           renderItem={renderAssetItem}

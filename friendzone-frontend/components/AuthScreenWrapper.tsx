@@ -1,7 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import {
   StyleSheet,
-  SafeAreaView,
   ViewStyle,
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";

@@ -1,16 +1,25 @@
-import { _get, _post } from "../configs/api-methods.config";
+import { _get, _post, _delete } from "../configs/api-methods.config";
+
+export interface LastMessagePreview {
+  id: string | null;
+  senderId: string | null;
+  content: string;
+  type: "text" | "image" | "video" | "audio" | string;
+  read?: boolean;
+}
 
 export interface ChatPreviewResponse {
   id: string;
   name: string;
   avatar: string | null;
-  lastMessage: string;
+  lastMessage: LastMessagePreview;
   timestamp: string;
   unreadCount: number;
   type: "private" | "group";
   otherParticipantId: string | null;
   isRestricted: boolean;
   firstMessageByKnockerId: string | null;
+  isLockedIn: boolean;
 }
 
 export interface GetChatsResponse {
@@ -20,13 +29,34 @@ export interface GetChatsResponse {
   totalChats: number;
 }
 
+export interface Attachment {
+  type: string;
+  url: string;
+  fileName: string;
+  size: number;
+  duration?: number;
+}
+
+export interface ReplyToMessage {
+  id: string;
+  text?: string;
+  sender?: {
+    id: string;
+    firstName: string;
+    lastName?: string;
+  };
+  attachments?: Attachment[];
+}
+
 export interface MessageResponse {
   id: string;
   sender: string;
-  text: string;
+  text?: string;
+  attachments?: Attachment[];
   timestamp: string;
   read: boolean;
   isTemp?: boolean;
+  replyTo?: ReplyToMessage | null;
 }
 
 export interface GetMessagesResponse {
@@ -36,6 +66,7 @@ export interface GetMessagesResponse {
   totalMessages: number;
   isRestricted: boolean;
   firstMessageByKnockerId: string | null;
+  isLockedIn: boolean;
 }
 
 interface RawApiMessage {
@@ -48,6 +79,8 @@ interface RawApiMessage {
   updatedAt: string;
   __v: number;
   read?: boolean;
+  attachments?: Attachment[];
+  replyTo?: ReplyToMessage | null;
 }
 
 interface RawApiGetMessagesResponse {
@@ -57,6 +90,7 @@ interface RawApiGetMessagesResponse {
   totalMessages: number;
   isRestricted: boolean;
   firstMessageByKnockerId: string | null;
+  isLockedIn: boolean;
 }
 
 export interface CreateChatResponse {
@@ -64,6 +98,12 @@ export interface CreateChatResponse {
   chatId: string;
   isRestricted: boolean;
   firstMessageByKnockerId: string | null;
+  isLockedIn: boolean;
+}
+
+export interface CreateGroupChatResponse {
+  message: string;
+  chatId: string;
 }
 
 export interface ChatDetailsResponse {
@@ -79,6 +119,12 @@ export interface ChatDetailsResponse {
   type: "private" | "group";
   isRestricted: boolean;
   firstMessageByKnockerId: string | null;
+  isLockedIn: boolean;
+}
+
+export interface DeleteChatsResponse {
+    message: string;
+    deletedChats: string[];
 }
 
 class ChatService {
@@ -119,6 +165,7 @@ class ChatService {
           totalMessages: data.totalMessages || 0,
           isRestricted: data.isRestricted || false,
           firstMessageByKnockerId: data.firstMessageByKnockerId || null,
+          isLockedIn: data.isLockedIn || false,
         };
       }
 
@@ -128,9 +175,11 @@ class ChatService {
             id: msg.id,
             sender: msg.sender,
             text: msg.text,
+            attachments: msg.attachments,
             timestamp: msg.timestamp || new Date().toISOString(),
             read: msg.read ?? false,
             isTemp: false,
+            replyTo: msg.replyTo || null,
           };
         }
       );
@@ -142,6 +191,7 @@ class ChatService {
         totalMessages: data.totalMessages,
         isRestricted: data.isRestricted,
         firstMessageByKnockerId: data.firstMessageByKnockerId,
+        isLockedIn: data.isLockedIn,
       };
     } catch (error: any) {
       throw error;
@@ -152,7 +202,8 @@ class ChatService {
     chatId: string,
     token: string
   ): Promise<ChatDetailsResponse> {
-    return await _get(`chats/${chatId}`, token);
+    const data: ChatDetailsResponse = await _get(`chats/${chatId}`, token);
+    return data;
   }
 
   static async createChat(
@@ -160,6 +211,18 @@ class ChatService {
     recipientId: string
   ): Promise<CreateChatResponse> {
     return await _post("chats", { recipientId }, token);
+  }
+
+  static async createGroupChat(
+    token: string,
+    participants: string[],
+    name: string
+  ): Promise<CreateGroupChatResponse> {
+    const payload = {
+      participants,
+      name,
+    };
+    return await _post("chats/group", payload, token);
   }
 
   static async markMessagesAsRead(
@@ -171,6 +234,69 @@ class ChatService {
     } catch (error: any) {
       console.error("Failed to mark messages as read:", error);
     }
+  }
+
+  static async sendMessageWithAttachment(
+    token: string,
+    chatId: string,
+    clientTempId: string,
+    files: any[],
+    isNewChatFromCreation: boolean,
+    replyToId?: string | null,
+  ): Promise<MessageResponse> {
+    try {
+      const formData = new FormData();
+      formData.append('chatId', chatId);
+      formData.append('clientTempId', clientTempId);
+      formData.append('isNewChatFromCreation', isNewChatFromCreation.toString());
+      if (replyToId) {
+        formData.append('replyToId', replyToId);
+      }
+
+      files.forEach((file, index) => {
+        formData.append('files', {
+          uri: file.uri,
+          name: file.name || `file-${index}-${Date.now()}`,
+          type: file.mimeType || file.type,
+        } as any);
+
+        if (file.durationMillis !== undefined) {
+          formData.append(`file_duration_${index}`, file.durationMillis.toString());
+        }
+      });
+      
+      const response = await _post<MessageResponse>(
+        'chats/send-media', 
+        formData, 
+        token
+      );
+
+      return response;
+    } catch (error: any) {
+      throw error;
+    }
+  }
+
+  static async deleteChats(
+    token: string,
+    chatIds: string[],
+    deleteForEveryone: boolean = false
+  ): Promise<DeleteChatsResponse> {
+    if (!Array.isArray(chatIds) || chatIds.length === 0) {
+      throw new Error("Chat IDs must be a non-empty array.");
+    }
+    return await _post("chats/delete", { chatIds, deleteForEveryone }, token);
+  }
+
+  static async deleteMessage(
+    token: string,
+    messageId: string,
+    deleteForEveryone: boolean
+  ): Promise<void> {
+    if (!messageId) {
+      throw new Error("Message ID is required.");
+    }
+    return await _post("chats/message/delete", { messageId, deleteForEveryone }, token);
   }
 }
 

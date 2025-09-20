@@ -1,4 +1,4 @@
-const getInitialGameState = (participants, initiatorId) => {
+export const getInitialGameState = (participants, initiatorId) => {
     console.log('[ticTacToeEngine] Generating initial game state for active game.');
     const playerX = participants.find(p => p.userId === initiatorId);
     const playerO = participants.find(p => p.userId !== initiatorId);
@@ -25,7 +25,7 @@ const getInitialGameState = (participants, initiatorId) => {
     return gameState;
 };
 
-const getPendingGameState = (participants, initiatorId) => {
+export const getPendingGameState = (participants, initiatorId) => {
     console.log('[ticTacToeEngine] Generating pending game state.');
     const initiator = participants.find(p => p.userId === initiatorId);
     const gameState = {
@@ -42,7 +42,7 @@ const getPendingGameState = (participants, initiatorId) => {
     return gameState;
 };
 
-const checkWin = (board) => {
+export const checkWin = (board) => {
     const winPatterns = [
         [0, 1, 2], [3, 4, 5], [6, 7, 8],
         [0, 3, 6], [1, 4, 7], [2, 5, 8],
@@ -58,11 +58,11 @@ const checkWin = (board) => {
     return null;
 };
 
-const isBoardFull = (board) => {
+export const isBoardFull = (board) => {
     return board.every(cell => cell !== null);
 };
 
-const applyMove = (gameState, playerId, move) => {
+export const applyMove = (gameState, playerId, move) => {
     console.log(`[ticTacToeEngine] Applying move for player ${playerId} at position ${move.position}.`);
     if (move.type !== 'placeSymbol' || typeof move.position !== 'number' || move.position < 0 || move.position > 8) {
         console.error('[ticTacToeEngine] Invalid move: Missing or invalid position.');
@@ -130,7 +130,7 @@ const applyMove = (gameState, playerId, move) => {
     return updatedState;
 };
 
-const getMessage = (gameState, currentUserId) => {
+export const getMessage = (gameState, currentUserId) => {
     const { status, winner, currentPlayer, players, initiatorId } = gameState;
 
     if (status === 'completed') {
@@ -154,13 +154,4 @@ const getMessage = (gameState, currentUserId) => {
         }
     }
     return "Game is in an unknown state.";
-};
-
-module.exports = {
-    getInitialGameState,
-    getPendingGameState,
-    applyMove,
-    checkWin,
-    isBoardFull,
-    getMessage
 };

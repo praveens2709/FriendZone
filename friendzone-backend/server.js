@@ -1,46 +1,48 @@
-// server.js (main file)
-require("dotenv").config();
-const express = require("express");
-const cors = require("cors");
-const http = require("http");
-const socketIo = require("socket.io");
-const connectDB = require("./config/db");
+import dotenv from "dotenv";
+import express from "express";
+import cors from "cors";
+import http from "http";
+import { Server } from "socket.io";
+import connectDB from "./config/db.js";
+import path from "path";
+import { fileURLToPath } from "url";
 
-const authRoutes = require("./routes/authRoutes");
-const profileRoutes = require("./routes/profileRoutes");
-const chatRoutes = require("./routes/chatRoutes");
-const notificationRoutes = require("./routes/notificationRoutes");
-const knockRoutes = require("./routes/knockRoutes");
-const gameRoutes = require("./routes/gameRoutes");
-const postRoutes = require('./routes/postRoutes');
+import authRoutes from "./routes/authRoutes.js";
+import profileRoutes from "./routes/profileRoutes.js";
+import chatRoutes from "./routes/chatRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
+import knockRoutes from "./routes/knockRoutes.js";
+import gameRoutes from "./routes/gameRoutes.js";
+import postRoutes from "./routes/postRoutes.js";
 
-const chatController = require("./controllers/chatController");
-const notificationController = require("./controllers/notificationController");
-const postController = require('./controllers/postController');
+import * as chatController from "./controllers/chatController.js";
 
-const User = require("./models/User");
-const Chat = require("./models/Chat");
-const Notification = require("./models/Notification");
+import Chat from "./models/Chat.js";
 
-const registerGameSocketHandlers = require('./socketHandlers/gameSocketHandlers');
+import registerGameSocketHandlers from "./socketHandlers/gameSocketHandlers.js";
+
+dotenv.config();
 
 connectDB();
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, {
+const io = new Server(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST", "PUT"],
   },
 });
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 app.use(cors());
 app.use(express.json());
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 const userSocketMap = new Map();
 
-// Make Socket.IO available to all routes
 app.set("socketio", io);
 app.set("userSocketMap", userSocketMap);
 
@@ -50,7 +52,7 @@ app.use("/api/chats", chatRoutes(io, userSocketMap));
 app.use("/api/notifications", notificationRoutes(io, userSocketMap));
 app.use("/api/knock", knockRoutes(io, userSocketMap));
 app.use("/api/games", gameRoutes(io, userSocketMap));
-app.use('/api/posts', postRoutes); // Use post routes
+app.use("/api/posts", postRoutes);
 
 io.on("connection", (socket) => {
   console.log(`User connected: ${socket.id}`);
@@ -78,8 +80,9 @@ io.on("connection", (socket) => {
       }
 
       socket.join(`notifications-${userId}`);
-      console.log(`User ${userId} joined notifications room notifications-${userId}`);
-
+      console.log(
+        `User ${userId} joined notifications room notifications-${userId}`
+      );
     } catch (error) {
       console.error(
         `Error joining user ${userId} to chats/notifications on setUserId:`,
@@ -110,7 +113,6 @@ io.on("connection", (socket) => {
         io: io,
         userSocketMap: userSocketMap,
       });
-
       if (!message) {
         console.log(
           `Message failed for chat ${chatId}, clientTempId ${clientTempId}. saveMessage likely handled failure.`
@@ -121,9 +123,13 @@ io.on("connection", (socket) => {
 
   socket.on("markMessagesAsRead", async ({ chatId, userId }) => {
     try {
-      const success = await chatController.markMessagesAsRead({ chatId, userId });
+      const success = await chatController.markMessagesAsRead({
+        chatId,
+        userId,
+      });
       if (success) {
-        const chat = await Chat.findById(chatId).populate("participants", "firstName lastName profileImage")
+        const chat = await Chat.findById(chatId)
+          .populate("participants", "firstName lastName profileImage")
           .populate({
             path: "lastMessage",
             select: "text sender createdAt",
@@ -131,31 +137,60 @@ io.on("connection", (socket) => {
               path: "sender",
               select: "firstName lastName",
             },
-          }).lean();
+          })
+          .lean();
 
         if (chat) {
           const userSocketId = userSocketMap.get(userId.toString());
           if (userSocketId) {
-            const unreadCountForUser = chat.unreadCounts.find(uc => uc.user.toString() === userId.toString())?.count || 0;
-            const otherParticipantFromTheirView = chat.participants.find(p => p._id.toString() !== userId.toString());
-
-            const lastMessageText = chat.lastMessage ? chat.lastMessage.text : "No messages yet";
-            const lastMessageSenderPrefix = chat.lastMessage && chat.lastMessage.sender ?
-              (chat.lastMessage.sender._id.toString() === userId ? "You: " : `${chat.lastMessage.sender.firstName}: `) : "";
+            const unreadCountForUser =
+              chat.unreadCounts.find(
+                (uc) => uc.user.toString() === userId.toString()
+              )?.count || 0;
+            const otherParticipantFromTheirView = chat.participants.find(
+              (p) => p._id.toString() !== userId.toString()
+            );
+            const lastMessageText = chat.lastMessage
+              ? chat.lastMessage.text
+              : "No messages yet";
+            const lastMessageSenderPrefix =
+              chat.lastMessage && chat.lastMessage.sender
+                ? chat.lastMessage.sender._id.toString() === userId
+                  ? "You: "
+                  : `${chat.lastMessage.sender.firstName}: `
+                : "";
 
             const chatPreviewData = {
               id: chat._id.toString(),
-              name: chat.type === "group" ? chat.name : (otherParticipantFromTheirView ? `${otherParticipantFromTheirView.firstName} ${otherParticipantFromTheirView.lastName || ""}`.trim() : "Unknown User"),
-              avatar: chat.type === "group" ? null : (otherParticipantFromTheirView ? chatController.getUserAvatar(otherParticipantFromTheirView) : null),
+              name:
+                chat.type === "group"
+                  ? chat.name
+                  : otherParticipantFromTheirView
+                  ? `${otherParticipantFromTheirView.firstName} ${
+                      otherParticipantFromTheirView.lastName || ""
+                    }`.trim()
+                  : "Unknown User",
+              avatar:
+                chat.type === "group"
+                  ? null
+                  : otherParticipantFromTheirView
+                  ? otherParticipantFromTheirView.profileImage || null
+                  : null,
               lastMessage: `${lastMessageSenderPrefix}${lastMessageText}`,
-              timestamp: chat.lastMessageAt ? chat.lastMessageAt.toISOString() : (chat.createdAt ? chat.createdAt.toISOString() : new Date().toISOString()),
+              timestamp: chat.lastMessageAt
+                ? chat.lastMessageAt.toISOString()
+                : chat.createdAt
+                ? chat.createdAt.toISOString()
+                : new Date().toISOString(),
               unreadCount: unreadCountForUser,
               type: chat.type,
-              otherParticipantId: otherParticipantFromTheirView ? otherParticipantFromTheirView._id.toString() : null,
+              otherParticipantId: otherParticipantFromTheirView
+                ? otherParticipantFromTheirView._id.toString()
+                : null,
               isRestricted: chat.isRestricted,
-              firstMessageByKnockerId: chat.firstMessageByKnockerId?.toString() || null,
+              firstMessageByKnockerId:
+                chat.firstMessageByKnockerId?.toString() || null,
             };
-
             io.to(userSocketId).emit("chatPreviewUpdate", chatPreviewData);
           }
           io.to(chatId).emit("messagesRead", { chatId, userId });
@@ -175,7 +210,6 @@ io.on("connection", (socket) => {
   });
 
   registerGameSocketHandlers(io, userSocketMap, socket);
-
 
   socket.on("disconnect", () => {
     console.log(`User disconnected: ${socket.id}`);
