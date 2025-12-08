@@ -231,7 +231,6 @@ export default function InviteFriendsToGameScreen() {
             leftContent={<BackButton color={OVERLAY_PRIMARY_TEXT_COLOR}/>}
             title={gameName}
             titleColor={OVERLAY_PRIMARY_TEXT_COLOR}
-            showBottomBorder={true}
           />
 
           {isSinglePlayerGame ? (

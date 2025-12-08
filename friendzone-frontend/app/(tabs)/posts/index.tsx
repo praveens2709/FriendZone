@@ -187,7 +187,7 @@ export default function PostsScreen() {
           <MaterialCommunityIcons
             name="camera"
             size={44}
-            color={colors.primary}
+            color={colors.text}
           />
         </TouchableOpacity>
       );

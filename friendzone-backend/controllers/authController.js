@@ -1,11 +1,41 @@
-import dotenv from 'dotenv';
-import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
-import User from '../models/User.js';
-import { generateAccessToken, generateRefreshToken } from '../utils/jwt.js';
-import { sendOTPEmail } from '../services/emailService.js';
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
+import User from "../models/User.js";
+import { generateAccessToken, generateRefreshToken } from "../utils/jwt.js";
+import { sendOTPEmail } from "../services/emailService.js";
 
-dotenv.config();
+const validatePassword = (password) => {
+  const minLength = 6;
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasSpecialChar = /[!$@%]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+
+  if (password.length < minLength) {
+    return {
+      valid: false,
+      message: "Password must be at least 6 characters long",
+    };
+  }
+  if (!hasUppercase) {
+    return {
+      valid: false,
+      message: "Password must contain at least one uppercase letter",
+    };
+  }
+  if (!hasSpecialChar) {
+    return {
+      valid: false,
+      message: "Password must contain at least one special character (!$@%)",
+    };
+  }
+  if (!hasNumber) {
+    return {
+      valid: false,
+      message: "Password must contain at least one number",
+    };
+  }
+  return { valid: true, message: "Password is valid" };
+};
 
 export const signup = async (req, res) => {
   const { email, password } = req.body;
@@ -13,55 +43,77 @@ export const signup = async (req, res) => {
 
   console.log(`[Signup Controller] Attempting signup for email: ${email}`);
 
+  const passwordValidation = validatePassword(password);
+  if (!passwordValidation.valid) {
+    return res.status(400).json({ message: passwordValidation.message });
+  }
+
   try {
     let user = await User.findOne({ email });
     if (user) {
-      console.log(`[Signup Controller] User already exists for email: ${email}`);
-      return res.status(400).json({ message: 'User already exists' });
+      console.log(
+        `[Signup Controller] User already exists for email: ${email}`
+      );
+      return res.status(400).json({ message: "User already exists" });
     }
     console.log(`[Signup Controller] Hashing password for email: ${email}`);
     const hashedPassword = await bcrypt.hash(password, 10);
-    console.log(`[Signup Controller] Password hashed successfully for email: ${email}`);
+    console.log(
+      `[Signup Controller] Password hashed successfully for email: ${email}`
+    );
 
     user = new User({
       email,
       password: hashedPassword,
       otp,
       otpExpires: Date.now() + 3 * 60 * 1000,
-      theme: 'light',
+      theme: "light",
     });
 
-    console.log(`[Signup Controller] Saving new user to DB for email: ${email}`);
+    console.log(
+      `[Signup Controller] Saving new user to DB for email: ${email}`
+    );
     await user.save();
-    console.log(`[Signup Controller] User saved successfully for email: ${email}`);
+    console.log(
+      `[Signup Controller] User saved successfully for email: ${email}`
+    );
 
     console.log(`[Signup Controller] Sending OTP email to: ${email}`);
     await sendOTPEmail(email, otp);
     console.log(`[Signup Controller] OTP email sent successfully to: ${email}`);
 
-    res.status(201).json({ message: 'OTP sent to email' });
-    console.log(`[Signup Controller] Signup successful, OTP sent response for email: ${email}`);
+    res.status(201).json({ message: "OTP sent to email" });
+    console.log(
+      `[Signup Controller] Signup successful, OTP sent response for email: ${email}`
+    );
   } catch (err) {
-    console.error(`[Signup Controller] Error during signup for email: ${email}`, err);
-    res.status(500).json({ message: 'Server error' });
+    console.error(
+      `[Signup Controller] Error during signup for email: ${email}`,
+      err
+    );
+    res.status(500).json({ message: "Server error" });
   }
 };
 
 export const verifyOTP = async (req, res) => {
   const { email, otp, purpose } = req.body;
 
-  console.log(`[Verify OTP Controller] Attempting to verify OTP for email: ${email}`);
+  console.log(
+    `[Verify OTP Controller] Attempting to verify OTP for email: ${email}`
+  );
 
   try {
     const user = await User.findOne({ email });
     if (!user) {
       console.log(`[Verify OTP Controller] User not found for email: ${email}`);
-      return res.status(400).json({ message: 'User not found' });
+      return res.status(400).json({ message: "User not found" });
     }
 
     if (user.otp !== otp || user.otpExpires < Date.now()) {
-      console.log(`[Verify OTP Controller] Invalid or expired OTP for email: ${email}`);
-      return res.status(400).json({ message: 'Invalid or expired OTP' });
+      console.log(
+        `[Verify OTP Controller] Invalid or expired OTP for email: ${email}`
+      );
+      return res.status(400).json({ message: "Invalid or expired OTP" });
     }
 
     user.isVerified = true;
@@ -75,13 +127,16 @@ export const verifyOTP = async (req, res) => {
     const refreshToken = generateRefreshToken(user);
 
     res.json({
-      message: 'Email verified successfully',
+      message: "Email verified successfully",
       tokens: { accessToken, refreshToken },
       theme: user.theme,
     });
   } catch (err) {
-    console.error(`[Verify OTP Controller] Error during OTP verification for ${email}`, err);
-    res.status(500).json({ message: 'Server error' });
+    console.error(
+      `[Verify OTP Controller] Error during OTP verification for ${email}`,
+      err
+    );
+    res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -111,85 +166,143 @@ export const login = async (req, res) => {
   try {
     const user = await User.findOne({ email });
     if (!user || !user.isVerified) {
-      console.log(`[Login Controller] User not found or not verified for email: ${email}`);
-      return res.status(400).json({ message: 'Invalid credentials or not verified' });
+      console.log(
+        `[Login Controller] User not found or not verified for email: ${email}`
+      );
+      return res
+        .status(400)
+        .json({ message: "Invalid credentials or not verified" });
     }
 
-    console.log(`[Login Controller] User found. Comparing passwords for email: ${email}`);
+    console.log(
+      `[Login Controller] User found. Comparing passwords for email: ${email}`
+    );
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       console.log(`[Login Controller] Password mismatch for email: ${email}`);
-      return res.status(400).json({ message: 'Invalid credentials' });
+      return res.status(400).json({ message: "Invalid credentials" });
     }
-    console.log(`[Login Controller] Password matched. Generating tokens for email: ${email}`);
+    console.log(
+      `[Login Controller] Password matched. Generating tokens for email: ${email}`
+    );
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
     console.log(`[Login Controller] Tokens generated for email: ${email}`);
     res.json({
-      message: 'Login successful',
+      message: "Login successful",
       tokens: { accessToken, refreshToken },
       theme: user.theme,
     });
-    console.log(`[Login Controller] Login successful, response sent for email: ${email}`);
+    console.log(
+      `[Login Controller] Login successful, response sent for email: ${email}`
+    );
   } catch (err) {
-    console.error(`[Login Controller] Error during login for email: ${email}`, err);
-    res.status(500).json({ message: 'Server error' });
+    console.error(
+      `[Login Controller] Error during login for email: ${email}`,
+      err
+    );
+    res.status(500).json({ message: "Server error" });
   }
 };
 
 export const updateTheme = async (req, res) => {
   const { theme } = req.body;
   const validThemes = [
-    'light', 'dark', 'oreo', 'yinyang', 'ocean', 'sunset', 'forest',
-    'midnight', 'candy', 'earth', 'desert', 'twilight', 'coral', 'mint',
-    'steel', 'royal', 'lavender', 'platinum', 'blush', 'rosegold',
-    'sky', 'cyberpunk', 'coffee', 'ice', 'sakura', 'fire'
+    "light",
+    "dark",
+    "oreo",
+    "yinyang",
+    "ocean",
+    "forest",
+    "midnight",
+    "candy",
+    "earth",
+    "desert",
+    "mint",
+    "steel",
+    "royal",
+    "lavender",
+    "platinum",
+    "blush",
+    "rosegold",
+    "coffee",
+    "ice",
+    "sakura",
+    "fire",
+    "mysticForest",
+    "seafoam",
+    "orchid",
+    "sky",
+    "aquamarine",
+    "cherryBlossom",
+    "graphite",
+    "sunset",
   ];
-  console.log(`[Update Theme Controller] Attempting to update theme to: ${theme} for user ID: ${req.user.id}`);
+  console.log(
+    `[Update Theme Controller] Attempting to update theme to: ${theme} for user ID: ${req.user.id}`
+  );
   if (!validThemes.includes(theme)) {
-    console.log(`[Update Theme Controller] Invalid theme name provided: ${theme}`);
-    return res.status(400).json({ message: 'Invalid theme name provided' });
+    console.log(
+      `[Update Theme Controller] Invalid theme name provided: ${theme}`
+    );
+    return res.status(400).json({ message: "Invalid theme name provided" });
   }
   try {
     const user = await User.findById(req.user.id);
     if (!user) {
-      console.log(`[Update Theme Controller] User not found for ID: ${req.user.id}`);
-      return res.status(404).json({ message: 'User not found' });
+      console.log(
+        `[Update Theme Controller] User not found for ID: ${req.user.id}`
+      );
+      return res.status(404).json({ message: "User not found" });
     }
-    console.log(`[Update Theme Controller] Updating theme from ${user.theme} to ${theme}`);
+    console.log(
+      `[Update Theme Controller] Updating theme from ${user.theme} to ${theme}`
+    );
     user.theme = theme;
     await user.save();
-    console.log(`[Update Theme Controller] Theme updated and saved successfully for user ID: ${user._id}`);
-    res.status(200).json({ message: 'Theme updated successfully', newTheme: user.theme });
+    console.log(
+      `[Update Theme Controller] Theme updated and saved successfully for user ID: ${user._id}`
+    );
+    res
+      .status(200)
+      .json({ message: "Theme updated successfully", newTheme: user.theme });
   } catch (err) {
-    console.error(`[Update Theme Controller] Error updating theme for user ID: ${req.user.id}`, err);
-    res.status(500).json({ message: 'Server error' });
+    console.error(
+      `[Update Theme Controller] Error updating theme for user ID: ${req.user.id}`,
+      err
+    );
+    res.status(500).json({ message: "Server error" });
   }
 };
 
 export const refreshToken = async (req, res) => {
   const { token } = req.body;
-  if (!token) return res.status(401).json({ message: 'No token provided' });
+  if (!token) return res.status(401).json({ message: "No token provided" });
   try {
     const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
     const user = await User.findById(decoded.id);
-    if (!user) return res.status(401).json({ message: 'Invalid refresh token' });
+    if (!user)
+      return res.status(401).json({ message: "Invalid refresh token" });
     const newAccessToken = generateAccessToken(user);
     res.json({ accessToken: newAccessToken });
   } catch (err) {
-    console.error('Refresh token error:', err);
-    res.status(403).json({ message: 'Invalid or expired refresh token' });
+    console.error("Refresh token error:", err);
+    res.status(403).json({ message: "Invalid or expired refresh token" });
   }
 };
 
 export const forgetPassword = async (req, res) => {
   const { email } = req.body;
-  console.log(`[Forget Password Controller] Received request for email: ${email}`);
+  console.log(
+    `[Forget Password Controller] Received request for email: ${email}`
+  );
   try {
     const user = await User.findOne({ email });
     if (!user) {
-      console.log(`[Forget Password Controller] No user found with email: ${email}`);
-      return res.status(404).json({ message: 'User not found' });
+      console.log(
+        `[Forget Password Controller] No user found with email: ${email}`
+      );
+      return res.status(404).json({ message: "User not found" });
     }
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
     user.otp = otp;
@@ -198,37 +311,91 @@ export const forgetPassword = async (req, res) => {
     console.log(`[Forget Password Controller] Sending OTP email to: ${email}`);
     await sendOTPEmail(email, otp);
     console.log(`[Forget Password Controller] OTP email sent successfully`);
-    res.status(200).json({ message: 'OTP sent for password reset' });
+    res.status(200).json({ message: "OTP sent for password reset" });
   } catch (err) {
     console.error(`[Forget Password Controller] Error:`, err);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: "Server error" });
   }
 };
 
 export const resetPassword = async (req, res) => {
   const { email, otp, newPassword } = req.body;
-  console.log(`[Reset Password Controller] Attempting reset for email: ${email}`);
-  if (!email || !otp || !newPassword || newPassword.trim().length < 6) {
-    return res.status(400).json({ message: 'Email, OTP, and valid password are required' });
+  console.log(
+    `[Reset Password Controller] Attempting reset for email: ${email}`
+  );
+
+  const passwordValidation = validatePassword(newPassword);
+  if (!passwordValidation.valid) {
+    return res.status(400).json({ message: passwordValidation.message });
   }
+
   try {
     const user = await User.findOne({ email });
     if (!user) {
       console.log(`[Reset Password Controller] User not found: ${email}`);
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
     if (user.otp !== otp || user.otpExpires < Date.now()) {
-      return res.status(400).json({ message: 'Invalid or expired OTP' });
+      return res.status(400).json({ message: "Invalid or expired OTP" });
     }
-    const hashedPassword = await bcrypt.hash(newPassword.trim(), 10);
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
     user.password = hashedPassword;
     user.otp = undefined;
     user.otpExpires = undefined;
     await user.save();
-    console.log(`[Reset Password Controller] Password reset successful for: ${email}`);
-    res.status(200).json({ message: 'Password reset successful' });
+    console.log(
+      `[Reset Password Controller] Password reset successful for: ${email}`
+    );
+    res.status(200).json({ message: "Password reset successful" });
   } catch (err) {
     console.error(`[Reset Password Controller] Error for ${email}`, err);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const changePassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  const userId = req.user.id;
+
+  console.log(
+    `[Change Password Controller] Attempting password change for user ID: ${userId}`
+  );
+
+  const passwordValidation = validatePassword(newPassword);
+  if (!passwordValidation.valid) {
+    return res.status(400).json({ message: passwordValidation.message });
+  }
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      console.log(
+        `[Change Password Controller] User not found for ID: ${userId}`
+      );
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      console.log(
+        `[Change Password Controller] Current password mismatch for user ID: ${userId}`
+      );
+      return res.status(400).json({ message: "Invalid current password" });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    await user.save();
+
+    console.log(
+      `[Change Password Controller] Password updated successfully for user ID: ${userId}`
+    );
+    res.status(200).json({ message: "Password updated successfully" });
+  } catch (err) {
+    console.error(
+      `[Change Password Controller] Error updating password for user ID: ${userId}`,
+      err
+    );
+    res.status(500).json({ message: "Server error" });
   }
 };

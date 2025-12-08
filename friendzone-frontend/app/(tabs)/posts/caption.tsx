@@ -416,10 +416,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalContainer: {
-    marginTop: 120,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 16,
     flex: 1,
   },
   modalHeader: {

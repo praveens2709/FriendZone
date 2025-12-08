@@ -1,5 +1,5 @@
-import React from "react";
-import { StyleSheet, TextInput, TouchableOpacity, Alert } from "react-native";
+import React, { useState } from "react";
+import { StyleSheet, TextInput, TouchableOpacity } from "react-native";
 import { useForm, Controller } from "react-hook-form";
 import { useRoute, RouteProp } from "@react-navigation/native";
 import { useRouter } from "expo-router";
@@ -12,6 +12,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { useLoadingDialog } from "@/context/LoadingContext";
 import AuthServices from "@/services/AuthService";
 import { HandleApiError } from "@/constants/Functions";
+import { Ionicons } from "@expo/vector-icons";
 
 type TRouteProp = RouteProp<
   {
@@ -34,9 +35,10 @@ export default function ResetPasswordScreen() {
   const loadingDialog = useLoadingDialog();
   const route = useRoute<TRouteProp>();
   const { email, otp } = route?.params;
-  //   console.log("yeassss",email, otp)
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const { control, handleSubmit, watch } = useForm<ResetPasswordForm>();
+  const { control, handleSubmit, watch, formState: { errors }, setError } = useForm<ResetPasswordForm>();
 
   const passwordValue = watch("password");
 
@@ -58,7 +60,12 @@ export default function ResetPasswordScreen() {
       console.log("success", res.message);
       router.replace("/(auth)/login");
     } catch (err) {
-      HandleApiError(err);
+        const serverMessage = (err as any)?.response?.data?.message || "An unknown error occurred.";
+        if (serverMessage) {
+            setError("password", { type: "server", message: serverMessage });
+        } else {
+            HandleApiError(err);
+        }
     } finally {
       loadingDialog.hide();
     }
@@ -73,20 +80,52 @@ export default function ResetPasswordScreen() {
           <Controller
             control={control}
             name="password"
-            rules={{ required: "Password is required" }}
+            rules={{
+              required: "New password is required.",
+              minLength: {
+                value: 6,
+                message: "Password must be at least 6 characters.",
+              },
+              pattern: {
+                value: /^(?=.*[A-Z])(?=.*[!$@%])(?=.*[0-9]).{6,}$/,
+                message: "Password must include a capital letter, number, and special character.",
+              },
+            }}
             render={({ field: { onChange, value } }) => (
-              <TextInput
-                placeholder="New Password"
-                secureTextEntry
-                autoCapitalize="none"
-                placeholderTextColor={colors.textDim}
-                style={[
-                  styles.input,
-                  { color: colors.text, borderColor: colors.border },
-                ]}
-                value={value}
-                onChangeText={onChange}
-              />
+              <>
+                <ThemedView style={styles.inputWrapper}>
+                  <TextInput
+                    placeholder="New Password"
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                    placeholderTextColor={colors.textDim}
+                    style={[
+                      styles.input,
+                      { 
+                        color: colors.text, 
+                        borderColor: errors.password ? colors.error : colors.border 
+                      },
+                    ]}
+                    value={value}
+                    onChangeText={onChange}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(!showPassword)}
+                    style={styles.eyeIcon}
+                  >
+                    <Ionicons
+                      name={showPassword ? "eye-off" : "eye"}
+                      size={20}
+                      color={colors.textDim}
+                    />
+                  </TouchableOpacity>
+                </ThemedView>
+                {errors.password && (
+                  <ThemedText style={[styles.errorText, { color: colors.error }]}>
+                    {errors.password.message}
+                  </ThemedText>
+                )}
+              </>
             )}
           />
 
@@ -99,18 +138,40 @@ export default function ResetPasswordScreen() {
                 val === passwordValue || "Passwords do not match",
             }}
             render={({ field: { onChange, value } }) => (
-              <TextInput
-                placeholder="Confirm New Password"
-                secureTextEntry
-                autoCapitalize="none"
-                placeholderTextColor={colors.textDim}
-                style={[
-                  styles.input,
-                  { color: colors.text, borderColor: colors.border },
-                ]}
-                value={value}
-                onChangeText={onChange}
-              />
+              <>
+                <ThemedView style={styles.inputWrapper}>
+                  <TextInput
+                    placeholder="Confirm New Password"
+                    secureTextEntry={!showConfirmPassword}
+                    autoCapitalize="none"
+                    placeholderTextColor={colors.textDim}
+                    style={[
+                      styles.input,
+                      { 
+                        color: colors.text, 
+                        borderColor: errors.confirmPassword ? colors.error : colors.border 
+                      },
+                    ]}
+                    value={value}
+                    onChangeText={onChange}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                    style={styles.eyeIcon}
+                  >
+                    <Ionicons
+                      name={showConfirmPassword ? "eye-off" : "eye"}
+                      size={20}
+                      color={colors.textDim}
+                    />
+                  </TouchableOpacity>
+                </ThemedView>
+                {errors.confirmPassword && (
+                  <ThemedText style={[styles.errorText, { color: colors.error }]}>
+                    {errors.confirmPassword.message}
+                  </ThemedText>
+                )}
+              </>
             )}
           />
 
@@ -150,12 +211,23 @@ const styles = StyleSheet.create({
   formContainer: {
     gap: 16,
   },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+  },
   input: {
-    width: "100%",
+    flex: 1,
     padding: 15,
     borderWidth: 1,
     borderRadius: 12,
     fontSize: 16,
+    height: 50,
+    paddingRight: 50,
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: 15,
   },
   resetButton: {
     marginTop: 8,
@@ -163,5 +235,11 @@ const styles = StyleSheet.create({
   backtologin: {
     alignSelf: "center",
     marginTop: 50,
+  },
+  errorText: {
+    fontSize: 12,
+    lineHeight: 14,
+    marginLeft: 10,
+    marginBottom: 10,
   },
 });

@@ -950,7 +950,6 @@ export default function ChatMessagesScreen() {
           <CommonHeader
             leftContent={<BackButton color={colors.text} />}
             title="Chat Not Found"
-            showBottomBorder={true}
           />
           <ThemedView style={styles.emptyScreenContent}>
             <ThemedText style={{ color: colors.textDim, fontSize: 16 }}>
@@ -1171,7 +1170,6 @@ export default function ChatMessagesScreen() {
             <Feather name="video" size={24} color={colors.text} />
           </TouchableOpacity>
         }
-        showBottomBorder={true}
       />
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingContainer}
@@ -1296,7 +1294,6 @@ export default function ChatMessagesScreen() {
                 <ThemedView style={styles.messageInputWrapper}>
                   <TextInput
                     style={[styles.messageInput, { color: colors.text }]}
-                    // Only show the placeholder if messages are not loading
                     placeholder={
                       !isLoadingMessages &&
                       chatIsRestricted &&
@@ -1364,21 +1361,21 @@ export default function ChatMessagesScreen() {
             <ThemedView
               style={[
                 styles.mediaPickerContainer,
-                { backgroundColor: colors.buttonBackgroundSecondary },
+                { backgroundColor: colors.backgroundSecondary },
               ]}
             >
               <TouchableOpacity
                 style={styles.mediaOption}
                 onPress={handleCameraPress}
               >
-                <Ionicons name="camera" size={30} color={colors.primary} />
+                <Ionicons name="camera" size={30} color={colors.text} />
                 <ThemedText style={styles.mediaOptionText}>Camera</ThemedText>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.mediaOption}
                 onPress={handleGalleryPress}
               >
-                <Ionicons name="image" size={30} color={colors.primary} />
+                <Ionicons name="image" size={30} color={colors.text} />
                 <ThemedText style={styles.mediaOptionText}>Image</ThemedText>
               </TouchableOpacity>
               <TouchableOpacity
@@ -1388,7 +1385,7 @@ export default function ChatMessagesScreen() {
                 <FontAwesome5
                   name="file-upload"
                   size={30}
-                  color={colors.primary}
+                  color={colors.text}
                 />
                 <ThemedText style={styles.mediaOptionText}>Document</ThemedText>
               </TouchableOpacity>

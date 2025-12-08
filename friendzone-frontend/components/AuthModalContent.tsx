@@ -38,7 +38,6 @@ export default function AuthModalContent({ initialMode, onCloseModal }: AuthModa
           </TouchableOpacity>
 
           <ThemedScrollView
-          style={{backgroundColor:"transparent"}}
           >
             {currentMode === 'login' ? (
               <LoginScreen isModal onSwitchToSignup={handleSwitchToSignup} onCloseModal={onCloseModal} />

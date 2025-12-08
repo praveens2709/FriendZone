@@ -14,7 +14,8 @@ import notificationRoutes from "./routes/notificationRoutes.js";
 import knockRoutes from "./routes/knockRoutes.js";
 import gameRoutes from "./routes/gameRoutes.js";
 import postRoutes from "./routes/postRoutes.js";
-
+import wordleRoutes from './routes/wordleRoutes.js';
+import * as wordleController from "./controllers/wordleController.js"; 
 import * as chatController from "./controllers/chatController.js";
 
 import Chat from "./models/Chat.js";
@@ -46,6 +47,10 @@ const userSocketMap = new Map();
 app.set("socketio", io);
 app.set("userSocketMap", userSocketMap);
 
+app.get("/", (req, res) => {
+  res.send("Server is running");
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/chats", chatRoutes(io, userSocketMap));
@@ -53,6 +58,7 @@ app.use("/api/notifications", notificationRoutes(io, userSocketMap));
 app.use("/api/knock", knockRoutes(io, userSocketMap));
 app.use("/api/games", gameRoutes(io, userSocketMap));
 app.use("/api/posts", postRoutes);
+app.use('/api/wordle', wordleRoutes(wordleController));
 
 io.on("connection", (socket) => {
   console.log(`User connected: ${socket.id}`);

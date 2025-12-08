@@ -600,7 +600,6 @@ export default function ChatsScreen() {
                 <Feather name="edit" size={25} color={colors.text} />
               </TouchableOpacity>
             }
-            showBottomBorder={true}
           />
           <ThemedView style={styles.initialLoadingContainer}>
             <ActivityIndicator size="small" color={colors.text} />
@@ -653,7 +652,6 @@ export default function ChatsScreen() {
           leftContent={headerLeftContent}
           title={headerTitle}
           rightContent1={headerRightContent}
-          showBottomBorder={true}
         />
 
         <ThemedView

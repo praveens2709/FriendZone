@@ -504,10 +504,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalContainer: {
-    marginTop: 120,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 16,
     flex: 1,
   },
   modalHeader: {

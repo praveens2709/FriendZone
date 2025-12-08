@@ -8,6 +8,7 @@ import {
   refreshToken,
   forgetPassword,
   resetPassword,
+  changePassword,
 } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
@@ -18,5 +19,6 @@ router.put('/update-theme', protect, updateTheme);
 router.post('/refresh-token', refreshToken);
 router.post('/forget-password', forgetPassword);
 router.post('/reset-password', resetPassword);
+router.put('/change-password', protect, changePassword);
 
 export default router;

@@ -293,7 +293,6 @@ export default function NewChatScreen() {
         <CommonHeader
           leftContent={<BackButton color={colors.text} />}
           title="New message"
-          showBottomBorder={true}
         />
         <KeyboardAvoidingView
           style={styles.content}
@@ -395,7 +394,7 @@ export default function NewChatScreen() {
                   >
                     {searchQuery.length > 0
                       ? "No users found matching your search."
-                      : "No eligible users to chat with yet. Connect with someone first!"}
+                      : "No chats yet. find someone and start talking!"}
                   </ThemedText>
                 </ThemedView>
               )}
@@ -489,7 +488,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 15,
   },
   emptyListContainer: {
-    flex: 1,
+    flex: 0.8,
     justifyContent: "center",
     alignItems: "center",
     paddingVertical: 20,

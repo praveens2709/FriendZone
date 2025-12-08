@@ -20,7 +20,7 @@ const ThemedScrollView = ({ children, style, lightColor, darkColor, ...rest }: P
       style={[
         styles.scroll,
         {
-          backgroundColor: isDark ? darkColor ?? colors.background : lightColor ?? colors.background,
+          backgroundColor: "transparent",
         },
         style,
       ]}

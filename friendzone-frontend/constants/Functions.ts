@@ -395,3 +395,18 @@ export const formatPostTimestamp = (dateString: string): string => {
     return format(date, "d MMMM yyyy");
   }
 };
+
+export const formatDateOfBirth = (date: Date | undefined | string): string => {
+  if (!date) {
+    return 'Not set';
+  }
+  const parsedDate = parseDateString(date);
+  if (!parsedDate) {
+    return 'Invalid date';
+  }
+  return parsedDate.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+};

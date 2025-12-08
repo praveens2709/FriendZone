@@ -5,6 +5,7 @@ import { useTheme } from "@/context/ThemeContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { HapticTab } from "@/components/HapticTab";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Feather, FontAwesome5, FontAwesome6, Octicons } from "@expo/vector-icons";
 
 export default function TabLayout() {
   const { colors } = useTheme();
@@ -55,9 +56,9 @@ export default function TabLayout() {
         options={{
           title: "Home",
           tabBarIcon: ({ focused }) => (
-            <Ionicons
-              name={focused ? "home" : "home-outline"}
-              size={26}
+            <Octicons
+              name={focused ? "home-fill" : "home"}
+              size={24}
               color={focused ? colors.tabBarActive : colors.tabBarInactive}
             />
           ),
@@ -68,9 +69,9 @@ export default function TabLayout() {
         options={{
           title: "Explore",
           tabBarIcon: ({ focused }) => (
-            <Ionicons
-              name={focused ? "search" : "search-outline"}
-              size={26}
+            <Feather
+              name={focused ? "search" : "search"}
+              size={25}
               color={focused ? colors.tabBarActive : colors.tabBarInactive}
             />
           ),
@@ -81,9 +82,9 @@ export default function TabLayout() {
         options={{
           title: "Posts",
           tabBarIcon: ({ focused }) => (
-            <Ionicons
-              name={focused ? "image" : "image-outline"}
-              size={26}
+            <FontAwesome6
+              name={focused ? "square-plus" : "plus-square"}
+              size={24}
               color={focused ? colors.tabBarActive : colors.tabBarInactive}
             />
           ),
@@ -98,7 +99,7 @@ export default function TabLayout() {
               name={
                 focused ? "game-controller" : "game-controller-outline"
               }
-              size={26}
+              size={28}
               color={focused ? colors.tabBarActive : colors.tabBarInactive}
             />
           ),
@@ -109,9 +110,9 @@ export default function TabLayout() {
         options={{
           title: "Profile",
           tabBarIcon: ({ focused }) => (
-            <Ionicons
-              name={focused ? "person" : "person-outline"}
-              size={26}
+            <FontAwesome5
+              name={focused ? "user-circle" : "user-circle"}
+              size={24}
               color={focused ? colors.tabBarActive : colors.tabBarInactive}
             />
           ),

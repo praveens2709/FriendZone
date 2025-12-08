@@ -31,7 +31,7 @@ export default function ThemedModal({
         <Pressable
           style={[
             styles.modalContent,
-            { backgroundColor: colors.backgroundSecondary, maxHeight: fullHeight ? "100%" : "80%", },
+            { backgroundColor: colors.backgroundSecondary, maxHeight: fullHeight ? "92%" : "80%", },
             containerStyle,
           ]}
           onPress={(e) => e.stopPropagation()}

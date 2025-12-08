@@ -179,7 +179,6 @@ export default function KnockRequestsScreen() {
         <CommonHeader
           leftContent={<BackButton color={colors.text} />}
           title="Knock Requests"
-          showBottomBorder={true}
         />
 
         {loading && !refreshing ? (

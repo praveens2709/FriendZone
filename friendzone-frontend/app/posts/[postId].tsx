@@ -159,7 +159,6 @@ export default function PostScreen() {
         <CommonHeader
           leftContent={<BackButton onPress={() => router.back()} color={colors.text} />}
           title="Posts"
-          showBottomBorder={true}
         />
         {renderContent()}
       </ThemedSafeArea>

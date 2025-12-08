@@ -128,7 +128,6 @@ export default function CategoryDetailScreen() {
         <CommonHeader
           leftContent={<BackButton color={colors.text} />}
           title={categoryName as string}
-          showBottomBorder={true}
         />
         {loading ? (
           <ThemedView style={styles.loadingContainer}>

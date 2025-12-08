@@ -69,7 +69,6 @@ export default function ProfileDetailsScreen() {
   return (
     <AuthFormLayout>
       <ThemedScrollView
-        style={{ backgroundColor: "transparent"}}
       >
         <ThemedView style={styles.container}>
           <ThemedText style={styles.title}>

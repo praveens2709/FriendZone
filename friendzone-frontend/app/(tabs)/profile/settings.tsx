@@ -1,173 +1,267 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, StatusBar, Switch, ActivityIndicator } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '@/context/ThemeContext';
-import Button from '@/components/Button';
-import { useRouter } from 'expo-router';
-import { useAuth } from '@/context/AuthContext';
-import { ThemedView } from '@/components/ThemedView';
-import CommonHeader from '@/components/CommonHeader';
-import ThemedSafeArea from '@/components/ThemedSafeArea';
-import BackButton from '@/components/BackButton';
-import ProfileServices from '@/services/ProfileService';
-import { ThemedText } from '@/components/ThemedText';
+import React, { useState, useMemo } from "react";
+import {
+  StyleSheet,
+  TouchableOpacity,
+  StatusBar,
+  TextInput,
+  View,
+} from "react-native";
+import { useRouter } from "expo-router";
+import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { ThemedText } from "@/components/ThemedText";
+import { ThemedView } from "@/components/ThemedView";
+import { useTheme } from "@/context/ThemeContext";
+import CommonHeader from "@/components/CommonHeader";
+import ThemedSafeArea from "@/components/ThemedSafeArea";
+import SettingsItem from "@/components/SettingsItem";
+import { useAuth } from "@/context/AuthContext";
+import { SectionType } from "@/types/settings.type";
+import BackButton from "@/components/BackButton";
+import ThemedScrollView from "@/components/ThemedScrollView";
+import AccountCentreModal from "@/components/AccountModal";
+import LogoutConfirmationModal from "@/components/modals/LogoutModal";
+
+const Divider = () => {
+  const { colors } = useTheme();
+  return <View style={[styles.divider, { backgroundColor: colors.border }]} />;
+};
 
 export default function SettingsScreen() {
-  const { colors } = useTheme();
   const router = useRouter();
-  const { signOut, accessToken, user } = useAuth();
-  const [isPrivateAccount, setIsPrivateAccount] = useState<boolean>(false);
-  const [loadingPrivacy, setLoadingPrivacy] = useState(true);
-  const fetchUserPrivacyStatus = useCallback(async () => {
-    if (!accessToken) {
-      setLoadingPrivacy(false);
-      return;
-    }
-    setLoadingPrivacy(true);
-    try {
-      const userProfile = await ProfileServices.getProfile(accessToken);
-      setIsPrivateAccount(userProfile.isPrivate);
-    } catch (error) {
-      console.error("Failed to fetch user privacy status:", error);
-      console.log("Error", "Could not load privacy settings.");
-    } finally {
-      setLoadingPrivacy(false);
-    }
-  }, [accessToken]);
+  const { colors } = useTheme();
+  const { signOut } = useAuth();
 
-  useEffect(() => {
-    fetchUserPrivacyStatus();
-  }, [fetchUserPrivacyStatus]);
-
-  const handleTogglePrivateAccount = async (newValue: boolean) => {
-    if (!accessToken) return;
-    setIsPrivateAccount(newValue);
-    try {
-      const response = await ProfileServices.togglePrivacy(newValue, accessToken);
-      console.log("Success", `Account is now ${response.isPrivate ? 'Private' : 'Public'}.`);
-    } catch (error) {
-      console.error("Failed to toggle private account status:", error);
-      setIsPrivateAccount(!newValue);
-      console.log("Error", "Failed to update privacy settings.");
-    }
-  };
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showAccountCentre, setShowAccountCentre] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const handleLogout = async () => {
     await signOut();
-    router.replace('/(auth)/AuthChoice');
-    console.log('[auth.signOut] Removing session');
+    router.replace("/(auth)/AuthChoice");
+    console.log("[auth.signOut] Removing session");
   };
 
+  const sections: SectionType[] = useMemo(
+    () => [
+      {
+        title: "Your account",
+        data: [
+          {
+            title: "Accounts Centre",
+            subTitle: "Password, security, personal details",
+            onPress: () => setShowAccountCentre(true),
+          },
+        ],
+      },
+      {
+        title: "How you use the app",
+        data: [
+          {
+            title: "Saved",
+            iconName: "bookmark-outline",
+            onPress: () => router.push("/profile/saved"),
+          },
+          {
+            title: "Archive",
+            iconName: "archive-outline",
+            onPress: () => router.push("/profile/archive"),
+          },
+          {
+            title: "Your activity",
+            iconName: "time-outline",
+            onPress: () => router.push("/profile/activity"),
+          },
+        ],
+      },
+      {
+        title: "Appearance & Preferences",
+        data: [
+          {
+            title: "Change Theme",
+            iconName: "color-palette-outline",
+            onPress: () => router.push("/profile/change-theme"),
+          },
+        ],
+      },
+      {
+        title: "Who can see your content",
+        data: [
+          {
+            title: "Account privacy",
+            subTitle: "Private",
+            iconName: "lock-closed-outline",
+            onPress: () => router.push("/profile/privacy"),
+          },
+          {
+            title: "Close Friends",
+            subTitle: "0",
+            iconName: "star-outline",
+            onPress: () => router.push("/profile/close-friends"),
+          },
+        ],
+      },
+      {
+        title: "More info and support",
+        data: [
+          {
+            title: "Help",
+            iconName: "help-circle-outline",
+            onPress: () => router.push("/profile/help"),
+          },
+          {
+            title: "About",
+            iconName: "information-circle-outline",
+            onPress: () => router.push("/profile/about"),
+          },
+        ],
+      },
+    ],
+    [router]
+  );
+
+  const filteredSections = useMemo(() => {
+    if (!searchQuery.trim()) return sections;
+    const query = searchQuery.toLowerCase();
+    return sections
+      .map((section) => ({
+        ...section,
+        data: section.data.filter(
+          (item) =>
+            item.title.toLowerCase().includes(query) ||
+            (item.subTitle && item.subTitle.toLowerCase().includes(query))
+        ),
+      }))
+      .filter((section) => section.data.length > 0);
+  }, [sections, searchQuery]);
+
   return (
-    <>
-      <LinearGradient colors={colors.gradient} style={styles.container}>
-        <ThemedSafeArea style={styles.safeAreaTransparentBg}>
-          <CommonHeader title="Settings" leftContent={<BackButton color={colors.text}/>}/>
+    <LinearGradient colors={colors.gradient} style={styles.container}>
+      <ThemedSafeArea style={styles.safeArea}>
+        <CommonHeader
+          title="Settings and activity"
+          leftContent={<BackButton color={colors.text} />}
+        />
+        <ThemedView
+          style={[
+            styles.searchContainer,
+            {
+              backgroundColor: colors.buttonBackgroundSecondary,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <Feather
+            name="search"
+            size={20}
+            color={colors.textDim}
+            style={styles.searchIcon}
+          />
+          <TextInput
+            style={[
+              styles.searchInput,
+              {
+                color: colors.text,
+                backgroundColor: colors.buttonBackgroundSecondary,
+              },
+            ]}
+            placeholder="Search settings"
+            placeholderTextColor={colors.textDim}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </ThemedView>
 
-          <ThemedView style={styles.settingsList}>
-            <Button
-              title="Change Theme"
-              onPress={() => router.push('/profile/change-theme')}
-              variant="setting-item"
-              iconName="color-palette-outline"
-            />
-
-            <Button
-              title="Activity"
-              onPress={() => { /* navigate to Activity screen */ }}
-              variant="setting-item"
-              iconName="time-outline"
-            />
-
-            {/* Privacy Section with Toggle */}
-            {loadingPrivacy ? (
-              <ThemedView style={styles.loadingPrivacyContainer}>
-                <ActivityIndicator size="small" color={colors.primary} />
-                <ThemedText style={{ color: colors.textDim, marginLeft: 10 }}>Loading privacy...</ThemedText>
+        <ThemedScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+          {filteredSections.map((section, index) => (
+            <ThemedView key={index}>
+              <ThemedView style={styles.sectionTitleWrapper}>
+                <ThemedText
+                  style={[styles.sectionTitle, { color: colors.textDim }]}
+                >
+                  {section.title}
+                </ThemedText>
               </ThemedView>
-            ) : (
-              <ThemedView style={[styles.settingItem, {backgroundColor: 'transparent'}]}>
-                <ThemedView style={styles.settingTextContainer}>
-                  <ThemedText style={styles.settingText}>Private Account</ThemedText>
-                  <ThemedText style={[styles.settingDescription, {color: colors.textDim}]}>
-                    {isPrivateAccount
-                      ? "Knock requests require your approval."
-                      : "Anyone can knock you directly without approval."
-                    }
-                  </ThemedText>
-                </ThemedView>
-                <Switch
-                  onValueChange={handleTogglePrivateAccount}
-                  value={isPrivateAccount}
-                  trackColor={{ false: colors.textDim, true: colors.primary }}
-                  thumbColor={colors.buttonText}
-                  ios_backgroundColor={colors.textDim}
+              {section.data.map((item, i) => (
+                <SettingsItem
+                  key={`${section.title}-${i}`}
+                  title={item.title}
+                  subTitle={item.subTitle}
+                  iconName={item.iconName as any}
+                  onPress={item.onPress}
                 />
-              </ThemedView>
-            )}
+              ))}
+              {index < filteredSections.length - 1 && <Divider />}
+            </ThemedView>
+          ))}
 
-            <Button
-              title="Log Out"
-              onPress={handleLogout}
-              style={styles.logoutButton}
-              textStyle={styles.logoutButtonText}
-            />
-          </ThemedView>
-        </ThemedSafeArea>
-      </LinearGradient>
-    </>
+          <TouchableOpacity
+            style={styles.logoutContainer}
+            onPress={() => setShowLogoutModal(true)}
+          >
+            <ThemedText style={[styles.logoutText, { color: colors.red }]}>
+              Log Out
+            </ThemedText>
+          </TouchableOpacity>
+          <AccountCentreModal
+            visible={showAccountCentre}
+            onClose={() => setShowAccountCentre(false)}
+          />
+        </ThemedScrollView>
+      </ThemedSafeArea>
+      <LogoutConfirmationModal
+        visible={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleLogout}
+      />
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  container: { flex: 1 },
+  safeArea: {
     flex: 1,
-  },
-  safeAreaTransparentBg: {
-    flex: 1,
+    backgroundColor: "transparent",
     paddingTop: StatusBar.currentHeight || 0,
-    backgroundColor: "transparent"
   },
-  settingsList: {
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 10,
+    marginHorizontal: 20,
+    marginVertical: 10,
+    paddingHorizontal: 10,
+    height: 45,
+    borderWidth: 1,
+  },
+  searchIcon: { marginRight: 10 },
+  searchInput: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 10,
+    height: "100%",
+    fontSize: 16,
+    lineHeight: 18,
   },
-  settingItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-    borderRadius: 0,
-    paddingVertical: 15,
-    marginVertical: 0,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.1)',
+  sectionTitleWrapper: {
+    marginHorizontal: 20,
   },
-  settingTextContainer: {
-    flex: 1,
-    marginRight: 10,
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginTop: 10,
+    marginBottom: 5,
   },
-  settingText: {
-    fontSize: 18,
+  divider: {
+    height: 3,
+    marginTop: 10,
   },
-  settingDescription: {
-    fontSize: 13,
-    marginTop: 2,
+  logoutContainer: {
+    marginTop: 10,
+    marginHorizontal: 20,
+    paddingBottom: 70,
   },
-  loadingPrivacyContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 15,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  logoutButton: {
-    marginTop: 30,
-  },
-  logoutButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  logoutText: {
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

@@ -6,8 +6,9 @@ export interface User {
   profileImage?: string;
   additionalImages?: string[];
   gender?: string;
-  dob?: string;
+  dob?: Date;
   bio?: string;
+  phone?: string;
   theme: string;
   isVerified: boolean;
   isPrivate: boolean;

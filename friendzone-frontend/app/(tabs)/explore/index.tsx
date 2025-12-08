@@ -617,7 +617,7 @@ export default function ExploreScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollView: { flex: 1, backgroundColor: "transparent" },
+  scrollView: { flex: 1 },
   safeArea: { flex: 1, backgroundColor: "transparent" },
   content: { flex: 1 },
   searchContainer: {

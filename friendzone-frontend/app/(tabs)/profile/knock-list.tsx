@@ -168,7 +168,6 @@ export default function KnockListScreen() {
         <CommonHeader
           leftContent={<BackButton color={colors.text} />}
           title={listType}
-          showBottomBorder={true}
         />
         {loading && listData.length === 0 ? (
           <ThemedView style={styles.loadingContainer}>

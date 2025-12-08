@@ -20,7 +20,7 @@ export default function ForgetPasswordScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const loadingDialog = useLoadingDialog();
-  const { control, handleSubmit } = useForm<TFormData>();
+  const { control, handleSubmit, formState: { errors } } = useForm<TFormData>();
 
   const onSubmit = async (formData: TFormData) => {
     const email = formData.email.trim();
@@ -50,18 +50,30 @@ export default function ForgetPasswordScreen() {
             name="email"
             rules={{ required: "Email is required" }}
             render={({ field: { onChange, value } }) => (
-              <TextInput
-                placeholder="Email"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                placeholderTextColor={colors.textDim}
-                style={[
-                  styles.input,
-                  { color: colors.text, borderColor: colors.border },
-                ]}
-                value={value}
-                onChangeText={onChange}
-              />
+              <>
+                <ThemedView style={styles.inputWrapper}>
+                  <TextInput
+                    placeholder="Email"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    placeholderTextColor={colors.textDim}
+                    style={[
+                      styles.input,
+                      { 
+                        color: colors.text, 
+                        borderColor: errors.email ? colors.error : colors.border 
+                      },
+                    ]}
+                    value={value}
+                    onChangeText={onChange}
+                  />
+                </ThemedView>
+                {errors.email && (
+                  <ThemedText style={[styles.errorText, { color: colors.error }]}>
+                    {errors.email.message}
+                  </ThemedText>
+                )}
+              </>
             )}
           />
 
@@ -75,7 +87,7 @@ export default function ForgetPasswordScreen() {
             onPress={() => router.back()}
           >
             <ThemedText
-              style={{ fontSize: 14, fontWeight: 600 }}
+              style={{ fontSize: 14, fontWeight: 500 }}
             >
               Back to Login
             </ThemedText>
@@ -101,12 +113,18 @@ const styles = StyleSheet.create({
   formContainer: {
     gap: 16,
   },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+  },
   input: {
     width: "100%",
     padding: 15,
     borderWidth: 1,
     borderRadius: 12,
     fontSize: 16,
+    height: 50,
   },
   backtologin: {
     alignSelf: "center",
@@ -114,5 +132,11 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     marginTop: 8,
+  },
+  errorText: {
+    fontSize: 12,
+    lineHeight: 14,
+    marginLeft: 10,
+    marginBottom: 10,
   },
 });

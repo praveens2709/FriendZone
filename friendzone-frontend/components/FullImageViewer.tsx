@@ -48,7 +48,6 @@ const FullImageViewer: React.FC<FullImageViewerProps> = ({
             </ThemedText>
           </ThemedView>
         }
-        showBottomBorder={true}
       />
     </ThemedView>
   );

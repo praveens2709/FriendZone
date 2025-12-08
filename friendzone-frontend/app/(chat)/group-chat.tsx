@@ -374,7 +374,6 @@ export default function GroupChatScreen() {
               </TouchableOpacity>
             ) : null
           }
-          showBottomBorder={true}
         />
         <ThemedText style={[styles.descriptionText, { color: colors.textDim }]}>
           Start your group chat by selecting at least 2 people and entering a
@@ -500,7 +499,7 @@ export default function GroupChatScreen() {
                   >
                     {searchQuery.length > 0
                       ? "No users found matching your search."
-                      : "No eligible users to add to group. Connect with someone first!"}
+                      : "No chats yet. find someone and start talking!"}
                   </ThemedText>
                 </ThemedView>
               )}
@@ -656,7 +655,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 15,
   },
   emptyListContainer: {
-    flex: 1,
+    flex: 0.8,
     justifyContent: "center",
     alignItems: "center",
     paddingVertical: 20,

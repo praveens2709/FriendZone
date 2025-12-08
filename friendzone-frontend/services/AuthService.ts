@@ -76,6 +76,18 @@ class AuthServices {
     }
   }
 
+  static async changePassword(
+    accessToken: string,
+    data: { currentPassword: string; newPassword: string }
+  ) {
+    try {
+      return await _put("auth/change-password", data, accessToken);
+    } catch (error) {
+      console.error("Error while changing password: ", error);
+      throw error;
+    }
+  }
+
   static async updateTheme(
     accessToken: string,
     theme: string

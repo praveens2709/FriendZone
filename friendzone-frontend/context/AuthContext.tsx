@@ -64,18 +64,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
   }, []);
 
-  const loadUserProfile = useCallback(async (tokenOverride?: string | null) => {
-    const token = tokenOverride || (await AsyncStorage.getItem("userToken"));
-    try {
-      if (token) {
-        const userProfile = await ProfileServices.getProfile(token);
-        setUser(userProfile);
+  const loadUserProfile = useCallback(
+    async (tokenOverride?: string | null) => {
+      const token = tokenOverride || (await AsyncStorage.getItem("userToken"));
+      try {
+        if (token) {
+          const userProfile = await ProfileServices.getProfile(token);
+          setUser(userProfile);
+        }
+      } catch (error: any) {
+        await signOut();
+        throw error;
       }
-    } catch (error: any) {
-      await signOut();
-      throw error;
-    }
-  }, [signOut]);
+    },
+    [signOut]
+  );
 
   const fetchProfile = useCallback(async () => {
     if (!accessToken) {
@@ -85,7 +88,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(userProfile);
     return userProfile;
   }, [accessToken]);
-
 
   useLayoutEffect(() => {
     (async () => {
@@ -165,14 +167,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const formData = new FormData();
-      formData.append("firstName", profileData.firstName);
-      formData.append("lastName", profileData.lastName);
-      formData.append("gender", profileData.gender);
+      if (profileData.firstName) {
+        formData.append("firstName", profileData.firstName);
+      }
+      
+      if (profileData.lastName) {
+        formData.append("lastName", profileData.lastName);
+      }
+      
+      if (profileData.bio !== undefined) {
+        formData.append("bio", profileData.bio);
+      }
+      
+      if (profileData.gender) {
+        formData.append("gender", profileData.gender);
+      }
       const dob =
         profileData.dob instanceof Date
           ? profileData.dob
           : new Date(profileData.dob);
-      formData.append("dob", dob.toISOString().split("T")[0]);
+      const formattedDob = `${dob.getFullYear()}-${(dob.getMonth() + 1)
+        .toString()
+        .padStart(2, "0")}-${dob.getDate().toString().padStart(2, "0")}`;
+      formData.append("dob", formattedDob);
 
       if (profileData.profileImage) {
         const uriParts = profileData.profileImage.split(".");
@@ -185,7 +202,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } as any);
       }
 
-      const response = await ProfileServices.updateProfile(formData, accessToken);
+      const response = await ProfileServices.updateProfile(
+        formData,
+        accessToken
+      );
       setUser(response.user);
     } catch (error) {
       console.error("Failed to update profile:", error);

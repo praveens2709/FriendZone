@@ -23,7 +23,9 @@ import { ThemedView } from "@/components/ThemedView";
 import PostComponent from "@/components/PostComponent";
 import PostService from "@/services/PostService";
 import { Post } from "@/types/post.type";
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from "@react-navigation/native";
+import StreakEndedModal from "@/components/modals/StreakEndedModal";
+import WordleGameModal from "@/components/modals/WordleGameModal";
 
 interface ViewableItem extends ViewToken {
   item: Post;
@@ -41,7 +43,11 @@ export default function HomeScreen() {
   const [postsLoading, setPostsLoading] = useState(true);
 
   const [isGloballyMuted, setIsGloballyMuted] = useState(false);
-  const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
+  const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(
+    null
+  );
+
+  const [showWordleGame, setShowWordleGame] = useState(false);
 
   const viewabilityConfig = {
     itemVisiblePercentThreshold: 50,
@@ -71,7 +77,7 @@ export default function HomeScreen() {
       };
     }, [])
   );
-  
+
   const totalUnreadChats = unreadChatIds.size;
 
   const fetchPosts = useCallback(async () => {
@@ -95,7 +101,7 @@ export default function HomeScreen() {
       const chats: ChatPreviewResponse[] = res.chats || [];
 
       const initialUnreadSet = new Set<string>();
-      chats.forEach(chat => {
+      chats.forEach((chat) => {
         if (chat.unreadCount > 0) {
           initialUnreadSet.add(chat.id);
         }
@@ -109,7 +115,9 @@ export default function HomeScreen() {
   const fetchInitialUnreadNotificationCount = useCallback(async () => {
     if (!accessToken) return;
     try {
-      const res = await NotificationService.getUnreadNotificationCount(accessToken);
+      const res = await NotificationService.getUnreadNotificationCount(
+        accessToken
+      );
       setHasUnreadNotifications(res.count > 0);
     } catch (err) {
       console.error("Error fetching initial unread notification count:", err);
@@ -122,7 +130,12 @@ export default function HomeScreen() {
       fetchInitialUnreadNotificationCount();
       fetchPosts();
     }
-  }, [isAuthenticated, fetchInitialUnreadChats, fetchInitialUnreadNotificationCount, fetchPosts]);
+  }, [
+    isAuthenticated,
+    fetchInitialUnreadChats,
+    fetchInitialUnreadNotificationCount,
+    fetchPosts,
+  ]);
 
   useEffect(() => {
     if (!socket || !user) return;
@@ -141,26 +154,43 @@ export default function HomeScreen() {
       });
     };
 
-    const handleUnreadNotificationCountUpdate = ({ count }: { count: number }) => {
+    const handleUnreadNotificationCountUpdate = ({
+      count,
+    }: {
+      count: number;
+    }) => {
       setHasUnreadNotifications(count > 0);
     };
 
     const handleNewPost = (newPost: Post) => {
-      setPosts(prevPosts => [newPost, ...prevPosts]);
+      setPosts((prevPosts) => [newPost, ...prevPosts]);
     };
 
     socket.on("chatPreviewUpdate", handleChatPreviewUpdate);
-    socket.on("unreadNotificationCountUpdate", handleUnreadNotificationCountUpdate);
+    socket.on(
+      "unreadNotificationCountUpdate",
+      handleUnreadNotificationCountUpdate
+    );
     socket.on("newPost", handleNewPost);
 
     return () => {
       socket.off("chatPreviewUpdate", handleChatPreviewUpdate);
-      socket.off("unreadNotificationCountUpdate", handleUnreadNotificationCountUpdate);
+      socket.off(
+        "unreadNotificationCountUpdate",
+        handleUnreadNotificationCountUpdate
+      );
       socket.off("newPost", handleNewPost);
     };
   }, [socket, user]);
 
-  if (authLoading) return <ActivityIndicator style={styles.activityIndicator} color={colors.primary} size="large" />;
+  if (authLoading)
+    return (
+      <ActivityIndicator
+        style={styles.activityIndicator}
+        color={colors.primary}
+        size="large"
+      />
+    );
 
   if (!isAuthenticated) return <Redirect href="/(auth)/AuthChoice" />;
 
@@ -170,30 +200,37 @@ export default function HomeScreen() {
         <CommonHeader
           leftContent={<ThemedText style={styles.title}>FriendZone</ThemedText>}
           rightContent1={
-            <TouchableOpacity onPress={() => router.push("/(notifications)")} style={styles.notificationIconContainer}>
+            <TouchableOpacity
+              onPress={() => router.push("/(notifications)")}
+              style={styles.notificationIconContainer}
+            >
               <SimpleLineIcons name="heart" size={24} color={colors.text} />
               {hasUnreadNotifications && (
-                <ThemedView style={[styles.notificationDot, { backgroundColor: 'red' }]} />
+                <ThemedView
+                  style={[styles.notificationDot, { backgroundColor: "red" }]}
+                />
               )}
             </TouchableOpacity>
           }
           rightContent2={
-            <TouchableOpacity onPress={() => router.push("/(chat)")} style={styles.chatIconContainer}>
+            <TouchableOpacity
+              onPress={() => router.push("/(chat)")}
+              style={styles.chatIconContainer}
+            >
               <Ionicons
                 name="chatbubble-outline"
                 size={25}
                 color={colors.text}
               />
               {totalUnreadChats > 0 && (
-                <ThemedView style={[styles.badge, { backgroundColor: 'red' }]}>
-                  <ThemedText style={[styles.badgeText, { color: '#fff' }]}>
-                    {totalUnreadChats > 99 ? '99+' : totalUnreadChats}
+                <ThemedView style={[styles.badge, { backgroundColor: "red" }]}>
+                  <ThemedText style={[styles.badgeText, { color: "#fff" }]}>
+                    {totalUnreadChats > 99 ? "99+" : totalUnreadChats}
                   </ThemedText>
                 </ThemedView>
               )}
             </TouchableOpacity>
           }
-          showBottomBorder={true}
         />
         <FlatList
           data={posts}
@@ -216,6 +253,18 @@ export default function HomeScreen() {
           windowSize={10}
           contentContainerStyle={styles.postListContainer}
         />
+        {/* <ThemedView>
+          <TouchableOpacity onPress={() => setShowWordleGame(true)}>
+            <ThemedText>Play Wordle</ThemedText>
+          </TouchableOpacity>
+
+          <StreakEndedModal onPlayAgain={() => setShowWordleGame(true)} />
+
+          <WordleGameModal
+            visible={showWordleGame}
+            onClose={() => setShowWordleGame(false)}
+          />
+        </ThemedView> */}
       </ThemedSafeArea>
     </LinearGradient>
   );
@@ -230,7 +279,7 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   postListContainer: {
-    paddingBottom: Platform.OS === 'ios' ? 50 : 20,
+    paddingBottom: Platform.OS === "ios" ? 50 : 20,
   },
   activityIndicator: {
     flex: 1,
@@ -240,11 +289,11 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   chatIconContainer: {
-    position: 'relative',
+    position: "relative",
     width: 25,
     height: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   badge: {
     position: "absolute",
@@ -262,14 +311,14 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   notificationIconContainer: {
-    position: 'relative',
+    position: "relative",
     width: 24,
     height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   notificationDot: {
-    position: 'absolute',
+    position: "absolute",
     top: 1,
     right: -2,
     width: 8,
