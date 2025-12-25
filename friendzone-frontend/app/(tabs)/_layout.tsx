@@ -90,21 +90,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="games"
-        options={{
-          title: "Games",
-          tabBarIcon: ({ focused }) => (
-            <Ionicons
-              name={
-                focused ? "game-controller" : "game-controller-outline"
-              }
-              size={28}
-              color={focused ? colors.tabBarActive : colors.tabBarInactive}
-            />
-          ),
-        }}
-      />
+
       <Tabs.Screen
         name="profile"
         options={{

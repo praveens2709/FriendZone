@@ -12,7 +12,6 @@ import React from "react";
 import Toast from "react-native-toast-message";
 import CustomToast from "@/components/CustomToast";
 import { ThemedView } from "@/components/ThemedView";
-import { GameProvider } from "@/context/GameContext";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 
 function RootLayoutContent() {
@@ -66,11 +65,9 @@ export default function RootLayout() {
         <LoadingDialogProvider>
           <AuthProvider>
             <SocketProvider>
-              <GameProvider>
-                <BottomSheetModalProvider>
-                  <RootLayoutContent />
-                </BottomSheetModalProvider>
-              </GameProvider>
+              <BottomSheetModalProvider>
+                <RootLayoutContent />
+              </BottomSheetModalProvider>
             </SocketProvider>
           </AuthProvider>
         </LoadingDialogProvider>

@@ -19,7 +19,6 @@ import NotificationService, {
   NotificationResponse,
 } from "@/services/NotificationService";
 import KnockService, { KnockRequest } from "@/services/knockService";
-import GameService from "@/services/GameService";
 import { useSocket } from "@/context/SocketContext";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -28,17 +27,8 @@ import {
 } from "@/constants/Functions";
 import UserAvatar from "@/components/UserAvatar";
 
-type GameInviteMetadata = {
-  gameId: string;
-  gameName: string;
-  initiatorUsername: string;
-  initiatorAvatar: string | null;
-  status: "pending" | "accepted" | "decline" | "in-progress";
-};
-
 type EnrichedNotificationItem = NotificationResponse & {
   knockStatus?: "pending" | "lockedIn" | "onesidedlock" | "declined" | null;
-  gameInviteMeta?: GameInviteMetadata;
   hasMutualKnockRequest?: boolean;
 };
 
@@ -86,9 +76,13 @@ export default function NotificationsScreen() {
   );
 
   const fetchNotifications = useCallback(
-    async (pageNum: number, isRefreshing = false) => {
+    async (
+      pageNum: number,
+      isRefreshing = false,
+      showLoading = true
+    ) => {
       console.log(
-        `[NotificationsScreen] Fetching notifications: page ${pageNum}, isRefreshing: ${isRefreshing}`
+        `[NotificationsScreen] Fetching notifications: page ${pageNum}, isRefreshing: ${isRefreshing}, showLoading: ${showLoading}`
       );
       if (!accessToken) {
         console.warn(
@@ -100,7 +94,7 @@ export default function NotificationsScreen() {
       if (isRefreshing) {
         setRefreshing(true);
         setPage(1);
-      } else if (pageNum === 1) {
+      } else if (pageNum === 1 && showLoading) {
         setLoading(true);
       }
 
@@ -139,10 +133,6 @@ export default function NotificationsScreen() {
               ...n,
               knockStatus: n.knockStatus || null,
               hasMutualKnockRequest,
-              gameInviteMeta:
-                n.type === "game_invite"
-                  ? (n.metadata as GameInviteMetadata)
-                  : undefined,
             } as EnrichedNotificationItem;
           })
         );
@@ -151,18 +141,17 @@ export default function NotificationsScreen() {
           pageNum === 1
             ? enrichedNotifications
             : [
-                ...prev,
-                ...enrichedNotifications.filter(
-                  (n) => !prev.some((p) => p.id === n.id)
-                ),
-              ]
+              ...prev,
+              ...enrichedNotifications.filter(
+                (n) => !prev.some((p) => p.id === n.id)
+              ),
+            ]
         );
 
         setTotalPages(res.totalPages);
         setHasMore(pageNum < res.totalPages);
         console.log(
-          `[NotificationsScreen] Total pages: ${res.totalPages}, Has more: ${
-            pageNum < res.totalPages
+          `[NotificationsScreen] Total pages: ${res.totalPages}, Has more: ${pageNum < res.totalPages
           }`
         );
       } catch (error) {
@@ -240,7 +229,8 @@ export default function NotificationsScreen() {
       console.log(
         "[NotificationsScreen] useFocusEffect triggered. Fetching and marking all as read."
       );
-      fetchNotifications(1);
+      // Pass showLoading = false so we don't trigger the full screen loader on every focus
+      fetchNotifications(1, false, false);
       fetchPendingKnockRequests();
       markAllNotificationsAsRead();
       return () => {
@@ -278,10 +268,6 @@ export default function NotificationsScreen() {
         ...n,
         knockStatus: n.knockStatus || null,
         hasMutualKnockRequest: false, // Will be updated if needed
-        gameInviteMeta:
-          n.type === "game_invite"
-            ? (n.metadata as GameInviteMetadata)
-            : undefined,
       };
       setNotifications((prev) =>
         prev.some((p) => p.id === n.id) ? prev : [enrichedN, ...prev]
@@ -469,94 +455,7 @@ export default function NotificationsScreen() {
     }
   };
 
-  const handleGameInviteAction = async (
-    notificationId: string,
-    gameSessionId: string,
-    action: "accept" | "decline",
-    gameIdFromNotification: string
-  ) => {
-    console.log(
-      `[NotificationsScreen] handleGameInviteAction called: notification ${notificationId}, session ${gameSessionId}, action: ${action}`
-    );
-    if (!accessToken) {
-      console.warn(
-        "[NotificationsScreen] handleGameInviteAction: No accessToken available."
-      );
-      console.log("Error", "Authentication required.");
-      return;
-    }
-    if (!socket || !user) {
-      console.warn(
-        "[NotificationsScreen] handleGameInviteAction: Socket or user not available."
-      );
-      console.log("Error", "Socket connection not ready.");
-      return;
-    }
 
-    setActionLoadingId(notificationId);
-
-    try {
-      if (action === "accept") {
-        console.log(
-          `[NotificationsScreen] Attempting to accept game invite for session: ${gameSessionId}`
-        );
-        await GameService.acceptGameInvite(accessToken, gameSessionId);
-        console.log("success", "Game invite accepted!");
-
-        console.log(
-          `[NotificationsScreen] Emitting 'joinGameSession' for user ${user._id} to room ${gameSessionId} after accept.`
-        );
-        socket.emit("joinGameSession", gameSessionId);
-
-        setNotifications((prev) =>
-          prev.map((n) =>
-            n.id === notificationId
-              ? {
-                  ...n,
-                  gameInviteMeta: { ...n.gameInviteMeta!, status: "accepted" },
-                }
-              : n
-          )
-        );
-        console.log(
-          `[NotificationsScreen] Game invite ${notificationId} accepted in UI.`
-        );
-      } else {
-        console.log(
-          `[NotificationsScreen] Attempting to decline game invite for session: ${gameSessionId}`
-        );
-        await GameService.declineGameInvite(accessToken, gameSessionId);
-        console.log("info", "Game invite declined.");
-        setNotifications((prev) =>
-          prev.map((n) =>
-            n.id === notificationId
-              ? {
-                  ...n,
-                  gameInviteMeta: { ...n.gameInviteMeta!, status: "decline" },
-                }
-              : n
-          )
-        );
-        console.log(
-          `[NotificationsScreen] Game invite ${notificationId} declined in UI.`
-        );
-      }
-    } catch (error: any) {
-      console.log(
-        "error",
-        error.response?.data?.message || `Failed to ${action} invite.`
-      );
-      console.error(
-        `[NotificationsScreen] Error ${action}ing invite for ${gameSessionId}:`,
-        error
-      );
-    } finally {
-      setActionLoadingId(null);
-      console.log(
-        `[NotificationsScreen] Action finished for notification: ${notificationId}.`
-      );
-    }
-  };
 
   const renderKnockActionButton = (item: EnrichedNotificationItem) => {
     const knockId = item.relatedEntityId;
@@ -687,12 +586,14 @@ export default function NotificationsScreen() {
       console.log(`[NotificationsScreen] Tapped notification item: ${item.id}`);
       markNotificationAsRead(item.id);
       if (item.type === "message" && item.relatedEntityId) {
+        const chatId = item.relatedEntityId;
         console.log(
-          `[NotificationsScreen] Navigating to chat: ${item.relatedEntityId}`
+          `[NotificationsScreen] Navigating to chat: ${chatId}`
         );
         router.push({
-          pathname: `/(chat)/${item.relatedEntityId}`,
+          pathname: "/(chat)/[id]",
           params: {
+            id: chatId,
             chatName: sender.username,
             chatAvatar: sender.avatar || "",
           },
@@ -702,134 +603,7 @@ export default function NotificationsScreen() {
 
     const isLoadingAction = actionLoadingId === item.id;
 
-    if (
-      item.type === "game_invite" &&
-      item.relatedEntityId &&
-      item.gameInviteMeta
-    ) {
-      console.log(
-        `[NotificationsScreen] Rendering game invite notification: ${item.id}`
-      );
-      const gameInviteMeta = item.gameInviteMeta;
-      const inviteStatus = gameInviteMeta.status || "pending";
-      const isProcessed = ["accepted", "decline", "in-progress"].includes(
-        inviteStatus
-      );
 
-      return (
-        <TouchableOpacity
-          style={[
-            styles.notificationItem,
-            isNew && {
-              backgroundColor: colors.buttonBackgroundSecondary + "1A",
-            },
-          ]}
-          onPress={onPressNotificationItem}
-          disabled={isLoadingAction || isProcessed}
-        >
-          <UserAvatar
-            imageUri={gameInviteMeta.initiatorAvatar || sender.avatar}
-            size={45}
-            style={styles.notificationAvatar}
-          />
-          <ThemedView style={styles.notificationContent}>
-            <ThemedView style={styles.notificationMessageWrapper}>
-              <ThemedText style={styles.notificationText}>
-                <ThemedText style={styles.notificationUsername}>
-                  {gameInviteMeta.initiatorUsername || sender.username}
-                </ThemedText>{" "}
-                invited you to play{" "}
-                <ThemedText style={styles.notificationGameName}>
-                  {gameInviteMeta.gameName || "a game"}
-                </ThemedText>
-                !
-              </ThemedText>
-              <ThemedText
-                style={[
-                  styles.notificationTimestamp,
-                  { color: colors.textDim },
-                ]}
-              >
-                {formatNotificationTimestamp(item.timestamp)}
-              </ThemedText>
-            </ThemedView>
-            <ThemedView style={styles.notificationActions}>
-              {isLoadingAction ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : isProcessed ? (
-                <ThemedText
-                  style={[
-                    styles.gameInviteStatusText,
-                    {
-                      color:
-                        inviteStatus === "accepted" ||
-                        inviteStatus === "in-progress"
-                          ? colors.success
-                          : colors.error,
-                    },
-                  ]}
-                >
-                  {inviteStatus === "accepted"
-                    ? "Accepted"
-                    : inviteStatus === "in-progress"
-                    ? "Joined"
-                    : "Declined"}
-                </ThemedText>
-              ) : (
-                <>
-                  <TouchableOpacity
-                    style={[
-                      styles.gameActionButton,
-                      { backgroundColor: colors.success },
-                    ]}
-                    onPress={() =>
-                      handleGameInviteAction(
-                        item.id,
-                        item.relatedEntityId!,
-                        "accept",
-                        item.gameInviteMeta?.gameId!
-                      )
-                    }
-                  >
-                    <ThemedText
-                      style={[
-                        styles.gameActionButtonText,
-                        { color: colors.buttonText },
-                      ]}
-                    >
-                      Accept
-                    </ThemedText>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.gameActionButton,
-                      { backgroundColor: colors.error, marginLeft: 8 },
-                    ]}
-                    onPress={() =>
-                      handleGameInviteAction(
-                        item.id,
-                        item.relatedEntityId!,
-                        "decline",
-                        item.gameInviteMeta?.gameId!
-                      )
-                    }
-                  >
-                    <ThemedText
-                      style={[
-                        styles.gameActionButtonText,
-                        { color: colors.buttonText },
-                      ]}
-                    >
-                      Decline
-                    </ThemedText>
-                  </TouchableOpacity>
-                </>
-              )}
-            </ThemedView>
-          </ThemedView>
-        </TouchableOpacity>
-      );
-    }
 
     const isKnockNotif =
       item.type === "activity" &&
@@ -904,7 +678,7 @@ export default function NotificationsScreen() {
                   style={[
                     styles.friendRequestAvatars,
                     knockRequestDisplay.count === 0 &&
-                      styles.noRequestsAvatarWrapper,
+                    styles.noRequestsAvatarWrapper,
                   ]}
                 >
                   {knockRequestDisplay.count === 1 ? (
@@ -975,7 +749,7 @@ export default function NotificationsScreen() {
               contentContainerStyle={styles.notificationListContent}
               ListEmptyComponent={() =>
                 Object.keys(groupedNotifications).length === 0 &&
-                (!isProfilePrivate || privateKnockRequestsCount === 0) ? (
+                  (!isProfilePrivate || privateKnockRequestsCount === 0) ? (
                   <ThemedView style={styles.emptyListContainer}>
                     <ThemedText
                       style={{

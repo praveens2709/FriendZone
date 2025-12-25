@@ -6,7 +6,7 @@ interface ICreatePostResponse {
   post: Post;
 }
 
-interface IGetPostsResponse extends Array<Post> {}
+interface IGetPostsResponse extends Array<Post> { }
 
 interface IAddCommentResponse {
   message: string;
@@ -14,6 +14,16 @@ interface IAddCommentResponse {
 }
 
 class PostService {
+  static async getSavedPosts(token: string): Promise<Post[]> {
+    try {
+      const response = await _get<IGetPostsResponse>("posts/saved", token);
+      return response;
+    } catch (error) {
+      console.error("Error fetching saved posts:", error);
+      throw error;
+    }
+  }
+
   static async createPost(formData: FormData, token: string): Promise<Post> {
     try {
       const response = await _post<ICreatePostResponse>("posts", formData, token);
@@ -33,7 +43,7 @@ class PostService {
       throw error;
     }
   }
-  
+
   static async getPostById(token: string, postId: string): Promise<Post> {
     try {
       const response = await _get<Post>(`posts/${postId}`, token);
@@ -43,7 +53,7 @@ class PostService {
       throw error;
     }
   }
-  
+
   static async getPostsByUserId(token: string, userId: string): Promise<Post[]> {
     try {
       const response = await _get<IGetPostsResponse>(`posts/user/${userId}`, token);
@@ -86,7 +96,7 @@ class PostService {
       throw error;
     }
   }
-  
+
   static async toggleSave(postId: string, token: string): Promise<IToggleSaveResponse> {
     try {
       return await _post<IToggleSaveResponse>(`posts/${postId}/save`, {}, token);
@@ -106,13 +116,13 @@ class PostService {
   }
 
   static async sharePostToChat(postId: string, chatId: string, token: string): Promise<void> {
-  try {
-    await _post(`posts/${postId}/share-to-chat`, { chatId }, token);
-  } catch (error) {
-    console.error("Error while sharing post to chat:", error);
-    throw error;
+    try {
+      await _post(`posts/${postId}/share-to-chat`, { chatId }, token);
+    } catch (error) {
+      console.error("Error while sharing post to chat:", error);
+      throw error;
+    }
   }
-}
 }
 
 export default PostService;

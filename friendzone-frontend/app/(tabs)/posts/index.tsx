@@ -554,7 +554,7 @@ export default function PostsScreen() {
       return (
         <ThemedView style={styles.centeredContainer}>
           <ActivityIndicator size="small" color={colors.primary} />
-          <ThemedText style={{ marginTop: 10 }}>Loading media...</ThemedText>
+          <ThemedText style={[{ marginTop: 10, color: colors.textDim }]}>Loading media...</ThemedText>
         </ThemedView>
       );
     }

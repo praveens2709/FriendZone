@@ -40,6 +40,7 @@ import {
   BottomSheetTextInput,
 } from "@gorhom/bottom-sheet";
 import * as Haptics from "expo-haptics";
+import { useRouter } from "expo-router";
 import { Post, Comment } from "@/types/post.type";
 import PostService from "@/services/PostService";
 import { useAuth } from "@/context/AuthContext";
@@ -66,6 +67,44 @@ interface PostComponentProps {
   isGloballyMuted: boolean;
   setIsGloballyMuted: (isMuted: boolean) => void;
 }
+
+const PostToast = ({
+  message,
+  visible,
+  colors,
+}: {
+  message: string;
+  visible: boolean;
+  colors: any;
+}) => {
+  if (!visible) return null;
+  return (
+    <MotiView
+      from={{ opacity: 0, translateY: 20 }}
+      animate={{ opacity: 1, translateY: 0 }}
+      exit={{ opacity: 0, translateY: 20 }}
+      style={{
+        position: "absolute",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: "rgba(26, 26, 26, 0.95)", // Dark background like Instagram
+        paddingVertical: 12,
+        paddingHorizontal: 15,
+        justifyContent: "space-between",
+        alignItems: "center",
+        flexDirection: "row",
+        zIndex: 1000,
+        borderTopWidth: 1,
+        borderTopColor: "rgba(255,255,255,0.1)",
+      }}
+    >
+      <ThemedText style={{ color: "#FFF", fontWeight: "600", fontSize: 13 }}>
+        {message}
+      </ThemedText>
+    </MotiView>
+  );
+};
 
 const CommentInput = React.memo(
   ({
@@ -130,6 +169,7 @@ const PostComponent = ({
 }: PostComponentProps) => {
   const { colors } = useTheme();
   const { user, accessToken } = useAuth();
+  const router = useRouter();
 
   const safeLikes = Array.isArray(post.likes) ? post.likes : [];
   const safeSaves = Array.isArray(post.saves) ? post.saves : [];
@@ -142,6 +182,10 @@ const PostComponent = ({
   const [commentCount, setCommentCount] = useState(safeComments.length);
   const [commentText, setCommentText] = useState("");
   const [isCommentSending, setIsCommentSending] = useState(false);
+
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [showFullCaption, setShowFullCaption] = useState(false);
@@ -474,10 +518,29 @@ const PostComponent = ({
   const handleSavePress = useCallback(async () => {
     if (!accessToken) return;
     try {
+      // Optimistic update
+      const newIsSaved = !isSaved;
+      setIsSaved(newIsSaved);
+
+      const message = newIsSaved ? "Saved to collection" : "Removed from collection";
+      setToastMessage(message);
+      setToastVisible(true);
+
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+      toastTimeoutRef.current = setTimeout(() => {
+        setToastVisible(false);
+      }, 2000);
+
       const response = await PostService.toggleSave(post._id, accessToken);
-      setIsSaved(response.saved);
+      // Revert if API response mismatches optimistic (unlikely but good practice)
+      if (response.saved !== newIsSaved) {
+        setIsSaved(response.saved);
+      }
+
       optionsModalRef.current?.dismiss();
     } catch (error) {
+      // Revert on error
+      setIsSaved(!isSaved);
       console.error("Failed to toggle save:", error);
     }
   }, [isSaved, accessToken, post._id]);
@@ -552,7 +615,19 @@ const PostComponent = ({
   return (
     <ThemedView style={styles.postContainer}>
       <ThemedView style={styles.postHeader}>
-        <TouchableOpacity style={styles.userInfoContainer}>
+        <TouchableOpacity
+          style={styles.userInfoContainer}
+          onPress={() => {
+            if (post.user._id !== user?._id) {
+              router.push({
+                pathname: "/profile/UserProfile",
+                params: { userId: post.user._id }
+              });
+            } else {
+              router.push("/(tabs)/profile");
+            }
+          }}
+        >
           <ThemedView
             style={[
               styles.userImageBorder,
@@ -671,6 +746,7 @@ const PostComponent = ({
               </TouchableOpacity>
             </MotiView>
           )}
+          <PostToast message={toastMessage} visible={toastVisible} colors={colors} />
         </ThemedView>
       </TouchableWithoutFeedback>
       <ThemedView style={styles.postFooter}>

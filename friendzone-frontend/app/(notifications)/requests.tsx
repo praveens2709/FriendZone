@@ -184,7 +184,7 @@ export default function KnockRequestsScreen() {
         {loading && !refreshing ? (
           <ThemedView style={styles.initialLoadingContainer}>
             <ActivityIndicator size="small" color={colors.primary} />
-            <ThemedText type="subtitle" style={{ color: colors.textDim }}>
+            <ThemedText style={{ color: colors.textDim }}>
               Loading requests...
             </ThemedText>
           </ThemedView>

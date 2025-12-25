@@ -377,9 +377,8 @@ export default function UserProfileScreen() {
           <ThemedView style={styles.userInfoAndStats}>
             <ThemedView style={styles.usernameAndStatus}>
               <ThemedText style={styles.fullName}>
-                {`${userProfile.firstName} ${
-                  userProfile.lastName || ""
-                }`.trim()}
+                {`${userProfile.firstName} ${userProfile.lastName || ""
+                  }`.trim()}
               </ThemedText>
               <ThemedText
                 style={[styles.statusLabel, { color: colors.textDim }]}
@@ -535,7 +534,7 @@ export default function UserProfileScreen() {
         style={[styles.centered, { backgroundColor: colors.background }]}
       >
         <ActivityIndicator size="small" color={colors.text} />
-        <ThemedText type="subtitle" style={{ color: colors.textDim }}>
+        <ThemedText style={{ color: colors.textDim }}>
           Loading profile...
         </ThemedText>
       </ThemedView>

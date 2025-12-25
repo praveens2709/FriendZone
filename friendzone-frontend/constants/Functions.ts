@@ -326,9 +326,8 @@ export const getAddressFromCoords = async (lat: number, lng: number) => {
       longitude: lng,
     });
     if (result) {
-      return `${result.name ? result.name + ", " : ""}${
-        result.city ? result.city + ", " : ""
-      }${result.country || ""}`;
+      return `${result.name ? result.name + ", " : ""}${result.city ? result.city + ", " : ""
+        }${result.country || ""}`;
     }
     return `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
   } catch (error) {
@@ -346,6 +345,9 @@ export const fetchPlaces = async (input: string) => {
       )}&key=${GOOGLE_MAPS_API_KEY}&language=en`
     );
     const json = await response.json();
+    if (json.status !== "OK" && json.status !== "ZERO_RESULTS") {
+      console.error("Google Places API Error:", json.status, json.error_message);
+    }
     return json.predictions || [];
   } catch (error) {
     console.error("fetchPlaces error:", error);

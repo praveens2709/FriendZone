@@ -4,6 +4,7 @@ import * as postController from '../controllers/postController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 router.get('/', protect, postController.getFeedPosts);
+router.get('/saved', protect, postController.getSavedPosts);
 router.get('/my-posts', protect, postController.getMyPosts);
 router.get('/user/:userId', protect, postController.getPostsByUserId);
 router.get('/:postId', protect, postController.getPostById);

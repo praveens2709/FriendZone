@@ -26,6 +26,12 @@ const userSchema = new mongoose.Schema(
       },
     ],
     isPrivate: { type: Boolean, default: false },
+    savedPosts: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Post",
+      },
+    ],
 
     chats: [
       {

@@ -83,6 +83,35 @@ export const getMyPosts = async (req, res) => {
   }
 };
 
+export const getSavedPosts = async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const user = await User.findById(userId).populate({
+      path: "savedPosts",
+      populate: [
+        { path: "user", select: "firstName lastName profileImage" },
+        { path: "comments.user", select: "firstName lastName profileImage" },
+      ],
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Filter out null posts (in case original post was deleted)
+    const savedPosts = user.savedPosts.filter((post) => post !== null);
+    // Reverse to show most recently saved first if array order is preserved,
+    // otherwise manual sort might be needed if savedPosts are just IDs.
+    // Mongoose array push preserves order, so last saved is last in array.
+    // user.savedPosts.reverse();
+
+    res.json(savedPosts.reverse());
+  } catch (error) {
+    console.error("Error fetching saved posts:", error);
+    res.status(500).json({ message: "Server error fetching saved posts." });
+  }
+};
+
 export const getFeedPosts = async (req, res) => {
   const userId = req.user.id;
   try {
@@ -138,7 +167,7 @@ export const getPostById = async (req, res) => {
     const post = await Post.findById(postId)
       .populate('user', 'firstName lastName profileImage')
       .populate('comments.user', 'firstName lastName profileImage');
-      
+
     if (!post) {
       return res.status(404).json({ message: 'Post not found.' });
     }
@@ -212,20 +241,33 @@ export const toggleSave = async (req, res) => {
     const userId = req.user.id;
 
     const post = await Post.findById(postId);
-    if (!post) return res.status(404).json({ message: 'Post not found.' });
+    if (!post) return res.status(404).json({ message: "Post not found." });
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found." });
 
     const hasSaved = post.saves.includes(userId);
     if (hasSaved) {
       post.saves.pull(userId);
+      user.savedPosts.pull(postId);
     } else {
       post.saves.push(userId);
+      // Avoid duplicates if any
+      if (!user.savedPosts.includes(postId)) {
+        user.savedPosts.push(postId);
+      }
     }
 
-    await post.save();
-    res.json({ success: true, saved: !hasSaved, savesCount: post.saves.length });
+    await Promise.all([post.save(), user.save()]);
+
+    res.json({
+      success: true,
+      saved: !hasSaved,
+      savesCount: post.saves.length,
+    });
   } catch (error) {
     console.error("Error toggling save:", error);
-    res.status(500).json({ message: 'Server error.' });
+    res.status(500).json({ message: "Server error." });
   }
 };
 
@@ -285,7 +327,7 @@ export const sharePostToChat = async (req, res) => {
     chat.lastMessage = newMessage._id;
     chat.lastMessageAt = newMessage.timestamp;
     await chat.save();
-    
+
     if (io) {
       io.to(chatId).emit('newChatMessage', { chatId, message: newMessage });
     }

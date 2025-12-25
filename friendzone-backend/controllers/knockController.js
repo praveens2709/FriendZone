@@ -29,7 +29,7 @@ export const knockUser = async (req, res) => {
     const isKnockerPrivate = knockerUser.isPrivate;
 
     let newKnockStatus = 'onesidedlock';
-    
+
     if (isKnockedUserPrivate) {
       newKnockStatus = 'pending';
     } else if (mutualKnock && !isKnockedUserPrivate && !isKnockerPrivate) {
@@ -41,24 +41,24 @@ export const knockUser = async (req, res) => {
     const newKnock = await Knock.create({ knocker: knockerId, knocked: knockedId, status: newKnockStatus });
 
     if (newKnockStatus === 'lockedIn') {
-        await NotificationController.createNotification({
-            recipientId: knockerId,
-            senderId: knockedId,
-            type: 'activity',
-            content: `You knocked back ${knockedUser.firstName} ${knockedUser.lastName || ''}. You are now LockedIn!`,
-            relatedEntityId: newKnock._id,
-            relatedEntityType: 'Knock',
-            io
-        });
-        await NotificationController.createNotification({
-            recipientId: knockedId,
-            senderId: knockerId,
-            type: 'activity',
-            content: `knocked you back. You are now LockedIn!`,
-            relatedEntityId: newKnock._id,
-            relatedEntityType: 'Knock',
-            io
-        });
+      await NotificationController.createNotification({
+        recipientId: knockerId,
+        senderId: knockedId,
+        type: 'activity',
+        content: `You knocked back ${knockedUser.firstName} ${knockedUser.lastName || ''}. You are now LockedIn!`,
+        relatedEntityId: newKnock._id,
+        relatedEntityType: 'Knock',
+        io
+      });
+      await NotificationController.createNotification({
+        recipientId: knockedId,
+        senderId: knockerId,
+        type: 'activity',
+        content: `knocked you back. You are now LockedIn!`,
+        relatedEntityId: newKnock._id,
+        relatedEntityType: 'Knock',
+        io
+      });
 
     } else if (newKnockStatus === 'onesidedlock') {
       const receiverNotification = await NotificationController.createNotification({
@@ -130,14 +130,14 @@ export const knockBack = async (req, res) => {
 
     if (isKnockerPrivate) {
       const mutualKnock = await Knock.findOne({ knocker: userId, knocked: originalKnockerId });
-      
+
       if (mutualKnock && mutualKnock.status === 'pending') {
         existingKnock.status = 'lockedIn';
         await existingKnock.save();
 
         mutualKnock.status = 'lockedIn';
         await mutualKnock.save();
-        
+
         const originalKnockerSocketId = userSocketMap.get(originalKnockerId.toString());
         const acceptorSocketId = userSocketMap.get(userId);
 
@@ -161,7 +161,7 @@ export const knockBack = async (req, res) => {
           knocked: originalKnockerId,
           status: 'pending'
         });
-        
+
         const originalKnockerSocketId = userSocketMap.get(originalKnockerId.toString());
         if (originalKnockerSocketId) {
           io.to(originalKnockerSocketId).emit('newKnockRequest', {
@@ -177,9 +177,9 @@ export const knockBack = async (req, res) => {
             timestamp: newKnock.createdAt
           });
         }
-    
+
         const acceptorSocketId = userSocketMap.get(userId);
-        if(acceptorSocketId) {
+        if (acceptorSocketId) {
           io.to(acceptorSocketId).emit('knockStatusUpdated', {
             knockId: newKnock._id,
             newStatus: 'pending'
@@ -235,7 +235,7 @@ export const knockBack = async (req, res) => {
         io.to(acceptorSocketId).emit('newNotification', acceptorNotification);
       }
     }
-    
+
     const acceptorSocketId = userSocketMap.get(userId);
     if (acceptorSocketId) {
       io.to(acceptorSocketId).emit('knockStatusChanged', { userId: userId });
@@ -288,7 +288,7 @@ export const acceptKnock = async (req, res) => {
       if (acceptorSocketId) {
         io.to(acceptorSocketId).emit('knockRequestRemoved', existingKnock._id.toString());
       }
-      
+
       knockerNotificationContent = `accepted your knock request. You are now LockedIn!`;
       receiverNotificationContent = `knocked you back. You are now LockedIn!`;
 
@@ -341,43 +341,43 @@ export const acceptKnock = async (req, res) => {
         }
       }
     } else if (!knockerUser.isPrivate && acceptorUser.isPrivate) {
-        const mutualKnock3 = await Knock.findOne({ knocker: userId, knocked: originalKnockerId, status: 'pending' });
-        if (mutualKnock3) {
-            newStatus = 'lockedIn';
-            mutualKnock3.status = 'lockedIn';
-            await mutualKnock3.save();
-            existingKnock.status = newStatus;
-            await existingKnock.save();
-            
-            const acceptorSocketId = userSocketMap.get(userId);
-            if (acceptorSocketId) {
-              io.to(acceptorSocketId).emit('knockRequestRemoved', existingKnock._id.toString());
-            }
-            
-            knockerNotificationContent = `accepted your knock request. You are now LockedIn!`;
-            receiverNotificationContent = `knocked you back. You are now LockedIn!`;
-
-            const originalKnockerSocketId = userSocketMap.get(originalKnockerId);
-            const acceptorSocketId2 = userSocketMap.get(userId);
-            if (originalKnockerSocketId) {
-              io.to(originalKnockerSocketId).emit('knockStatusUpdated', {
-                knockId: mutualKnock3._id,
-                newStatus: 'lockedIn'
-              });
-            }
-            if (acceptorSocketId2) {
-              io.to(acceptorSocketId2).emit('knockStatusUpdated', {
-                knockId: existingKnock._id,
-                newStatus: 'lockedIn'
-              });
-            }
-        }
-    }
-    
-    // In all other cases, simply update the existing knock to onesidedlock
-    if (newStatus === 'onesidedlock') {
+      const mutualKnock3 = await Knock.findOne({ knocker: userId, knocked: originalKnockerId, status: 'pending' });
+      if (mutualKnock3) {
+        newStatus = 'lockedIn';
+        mutualKnock3.status = 'lockedIn';
+        await mutualKnock3.save();
         existingKnock.status = newStatus;
         await existingKnock.save();
+
+        const acceptorSocketId = userSocketMap.get(userId);
+        if (acceptorSocketId) {
+          io.to(acceptorSocketId).emit('knockRequestRemoved', existingKnock._id.toString());
+        }
+
+        knockerNotificationContent = `accepted your knock request. You are now LockedIn!`;
+        receiverNotificationContent = `knocked you back. You are now LockedIn!`;
+
+        const originalKnockerSocketId = userSocketMap.get(originalKnockerId);
+        const acceptorSocketId2 = userSocketMap.get(userId);
+        if (originalKnockerSocketId) {
+          io.to(originalKnockerSocketId).emit('knockStatusUpdated', {
+            knockId: mutualKnock3._id,
+            newStatus: 'lockedIn'
+          });
+        }
+        if (acceptorSocketId2) {
+          io.to(acceptorSocketId2).emit('knockStatusUpdated', {
+            knockId: existingKnock._id,
+            newStatus: 'lockedIn'
+          });
+        }
+      }
+    }
+
+    // In all other cases, simply update the existing knock to onesidedlock
+    if (newStatus === 'onesidedlock') {
+      existingKnock.status = newStatus;
+      await existingKnock.save();
     }
 
 
@@ -632,30 +632,31 @@ export const getKnockersForUser = async (req, res) => {
 
 export const breakLock = async (req, res) => {
   const myUserId = req.user.id;
-  const { otherUserId } = req.body;
+  const { otherUserId, knockedId } = req.body;
+  const targetId = otherUserId || knockedId;
   const io = req.io;
   const userSocketMap = req.userSocketMap;
 
   try {
-    const otherUserKnock = await Knock.findOne({ knocker: otherUserId, knocked: myUserId });
+    const otherUserKnock = await Knock.findOne({ knocker: targetId, knocked: myUserId });
 
     if (!otherUserKnock || otherUserKnock.status !== 'lockedIn') {
-        return res.status(404).json({ message: 'Knock not found or not in a LockedIn state.' });
+      return res.status(404).json({ message: 'Knock not found or not in a LockedIn state.' });
     }
 
     otherUserKnock.status = 'onesidedlock';
     await otherUserKnock.save();
 
-    await Knock.findOneAndDelete({ knocker: myUserId, knocked: otherUserId, status: 'lockedIn' });
+    await Knock.findOneAndDelete({ knocker: myUserId, knocked: targetId, status: 'lockedIn' });
 
     const mySocketId = userSocketMap.get(myUserId);
     if (mySocketId) {
       io.to(mySocketId).emit('knockStatusChanged', { userId: myUserId });
     }
 
-    const otherUserSocketId = userSocketMap.get(otherUserId);
+    const otherUserSocketId = userSocketMap.get(targetId);
     if (otherUserSocketId) {
-        io.to(otherUserSocketId).emit('knockStatusChanged', { userId: otherUserId });
+      io.to(otherUserSocketId).emit('knockStatusChanged', { userId: targetId });
     }
 
     res.status(200).json({ success: true, message: 'Connection unknocked from your side successfully.' });

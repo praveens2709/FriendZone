@@ -28,11 +28,11 @@ interface ViewableItem extends ViewToken {
 }
 
 export default function PostScreen() {
-  const { postId } = useLocalSearchParams();
+  const { postId, source } = useLocalSearchParams();
   const { accessToken } = useAuth();
   const { colors } = useTheme();
   const router = useRouter();
-  
+
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [initialIndex, setInitialIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -64,20 +64,25 @@ export default function PostScreen() {
         setError("Invalid post ID or authentication token.");
         return;
       }
-      
+
       try {
         const clickedPost = await PostService.getPostById(accessToken, postId);
-        
+
         if (!clickedPost) {
           setError("Post not found.");
           setLoading(false);
           return;
         }
 
-        const fetchedUserPosts = await PostService.getPostsByUserId(accessToken, clickedPost.user._id);
+        let fetchedUserPosts: Post[] = [];
+        if (source === 'saved') {
+          fetchedUserPosts = await PostService.getSavedPosts(accessToken);
+        } else {
+          fetchedUserPosts = await PostService.getPostsByUserId(accessToken, clickedPost.user._id);
+        }
 
         const initialPostIndex = fetchedUserPosts.findIndex(p => p._id === postId);
-        
+
         if (initialPostIndex >= 0) {
           setInitialIndex(initialPostIndex);
           setCurrentlyPlayingId(fetchedUserPosts[initialPostIndex]._id);
@@ -95,14 +100,14 @@ export default function PostScreen() {
     };
 
     fetchPosts();
-  }, [postId, accessToken]);
+  }, [postId, accessToken, source]);
 
   const renderContent = () => {
     if (loading) {
       return (
         <ThemedView style={styles.centeredContainer}>
           <ActivityIndicator />
-          <ThemedText style={styles.loadingText}>Loading posts...</ThemedText>
+          <ThemedText style={[styles.loadingText, { color: colors.textDim }]}>Loading posts...</ThemedText>
         </ThemedView>
       );
     }
@@ -127,8 +132,8 @@ export default function PostScreen() {
       <FlatList
         data={userPosts}
         renderItem={({ item }) => (
-          <PostComponent 
-            post={item} 
+          <PostComponent
+            post={item}
             currentlyPlayingId={currentlyPlayingId}
             setCurrentlyPlayingId={setCurrentlyPlayingId}
             isActive={currentlyPlayingId === item._id}

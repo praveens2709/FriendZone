@@ -115,7 +115,9 @@ export default function ProfileScreen() {
 
   const [userPosts, setUserPosts] = useState<PostType[]>([]);
   const [savedPosts, setSavedPosts] = useState<PostType[]>([]);
-  const [loadingPosts, setLoadingPosts] = useState(true);
+  const userPostsRef = React.useRef(userPosts);
+  const savedPostsRef = React.useRef(savedPosts);
+  const [loadingPosts, setLoadingPosts] = useState(false);
   const [activeTab, setActiveTab] = useState("posts");
   const [refreshing, setRefreshing] = useState(false);
 
@@ -158,18 +160,27 @@ export default function ProfileScreen() {
       return;
     }
 
-    setLoadingPosts(true);
+    const currentData = activeTab === "posts" ? userPostsRef.current : savedPostsRef.current;
+    const shouldShowLoading = !currentData || currentData.length === 0;
+
+    if (shouldShowLoading) {
+      setLoadingPosts(true);
+    }
+
     try {
-      const allPosts = await PostService.getPosts(accessToken);
-      const posts = allPosts.filter((post) => post.user._id === user._id);
-      setUserPosts(posts);
-      setSavedPosts([]);
+      if (activeTab === "posts") {
+        const posts = await PostService.getPosts(accessToken);
+        setUserPosts(posts);
+      } else {
+        const saved = await PostService.getSavedPosts(accessToken);
+        setSavedPosts(saved);
+      }
     } catch (error) {
-      console.error("Failed to fetch user posts:", error);
+      console.error("Failed to fetch posts:", error);
     } finally {
       setLoadingPosts(false);
     }
-  }, [user, accessToken]);
+  }, [user, accessToken, activeTab]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -183,7 +194,10 @@ export default function ProfileScreen() {
     if (postData) {
       router.push({
         pathname: "/posts/[postId]",
-        params: { postId: postData._id },
+        params: {
+          postId: postData._id,
+          source: activeTab === "saved" ? "saved" : undefined,
+        },
       });
     }
   };
@@ -201,6 +215,14 @@ export default function ProfileScreen() {
     setShowAvatarModal(false);
     // Here you would typically update the user's avatar
   };
+
+  useEffect(() => {
+    userPostsRef.current = userPosts;
+  }, [userPosts]);
+
+  useEffect(() => {
+    savedPostsRef.current = savedPosts;
+  }, [savedPosts]);
 
   useEffect(() => {
     fetchKnockData();
@@ -224,7 +246,7 @@ export default function ProfileScreen() {
     return (
       <ThemedSafeArea style={styles.centered}>
         <ActivityIndicator size="small" color={colors.text} />
-        <ThemedText type="subtitle" style={{ color: colors.textDim }}>
+        <ThemedText style={{ color: colors.textDim }}>
           Loading profile...
         </ThemedText>
       </ThemedSafeArea>
@@ -267,7 +289,8 @@ export default function ProfileScreen() {
     <TouchableOpacity
       key={uniqueKey}
       style={styles.statItem}
-      onPress={() => navigateToKnockList(type, list)}
+      onPress={() => label !== "Posts" && navigateToKnockList(type, list)}
+      activeOpacity={label === "Posts" ? 1 : 0.7}
     >
       <ThemedText
         type="subtitle"
@@ -653,7 +676,7 @@ export default function ProfileScreen() {
         onClose={() => setShowMainModal(false)}
       >
         <ThemedView style={[styles.mainModal, { borderColor: colors.border }]}>
-          <TouchableOpacity style={styles.modalItem} onPress={() => {}}>
+          <TouchableOpacity style={styles.modalItem} onPress={() => { }}>
             <UserAvatar imageUri={user.profileImage} size={42} />
             <ThemedView style={{ flex: 1, marginLeft: 10 }}>
               <ThemedText
@@ -995,10 +1018,10 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
+    paddingVertical: 50,
+    justifyContent: "flex-start",
     alignItems: "center",
-    paddingTop: 80,
+    minHeight: 200, // Ensure it takes some space to center the visual
   },
   noPostsContainer: {
     flex: 0.8,
