@@ -19,6 +19,7 @@ import NotificationService, {
   NotificationResponse,
 } from "@/services/NotificationService";
 import KnockService, { KnockRequest } from "@/services/knockService";
+import MeetingService from "@/services/MeetingService";
 import { useSocket } from "@/context/SocketContext";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -455,6 +456,49 @@ export default function NotificationsScreen() {
     }
   };
 
+  const handleMeetingResponse = async (
+    notificationId: string,
+    meetingId: string,
+    response: "accepted" | "declined"
+  ) => {
+    if (!accessToken) {
+      console.log("Error", "Authentication required.");
+      return;
+    }
+
+    setActionLoadingId(notificationId);
+
+    try {
+      await MeetingService.respondToInvitation(meetingId, response, accessToken);
+
+      // Update notification locally
+      setNotifications((prev) =>
+        prev.map((n) => {
+          if (n.id === notificationId) {
+            return {
+              ...n,
+              metadata: {
+                ...n.metadata,
+                status: response,
+              },
+            };
+          }
+          return n;
+        })
+      );
+
+      console.log(`Meeting invite ${response}`);
+    } catch (error: any) {
+      console.log(
+        "error",
+        error.response?.data?.message || `Failed to ${response} invite.`
+      );
+      console.error("Error responding to meeting invite:", error);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
 
 
   const renderKnockActionButton = (item: EnrichedNotificationItem) => {
@@ -548,6 +592,77 @@ export default function NotificationsScreen() {
     return null;
   };
 
+  const renderMeetingActionButtons = (item: EnrichedNotificationItem) => {
+    const meetingId = item.metadata?.meetingId || item.relatedEntityId;
+    const inviteStatus = item.metadata?.status;
+    const isLoading = actionLoadingId === item.id;
+
+    if (!meetingId) return null;
+
+    // Already responded
+    if (inviteStatus === 'accepted') {
+      return (
+        <TouchableOpacity
+          style={[
+            styles.knockBackButton,
+            { backgroundColor: colors.primary + "30", borderWidth: 1, borderColor: colors.primary },
+          ]}
+          disabled={true}
+        >
+          <ThemedText style={[styles.knockButtonText, { color: colors.primary }]}>
+            Accepted
+          </ThemedText>
+        </TouchableOpacity>
+      );
+    }
+
+    if (inviteStatus === 'declined') {
+      return (
+        <TouchableOpacity
+          style={[
+            styles.knockBackButton,
+            { backgroundColor: colors.buttonBackgroundSecondary, borderWidth: 1, borderColor: colors.border },
+          ]}
+          disabled={true}
+        >
+          <ThemedText style={[styles.knockButtonText, { color: colors.textDim }]}>
+            Declined
+          </ThemedText>
+        </TouchableOpacity>
+      );
+    }
+
+    // Pending - show accept/decline
+    return (
+      <ThemedView style={styles.meetingActionButtons}>
+        <TouchableOpacity
+          style={[
+            styles.meetingDeclineButton,
+            { borderColor: colors.border },
+          ]}
+          onPress={() => handleMeetingResponse(item.id, meetingId, 'declined')}
+          disabled={isLoading}
+        >
+          <ThemedText style={[styles.knockButtonText, { color: colors.textDim }]}>
+            Decline
+          </ThemedText>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.meetingAcceptButton,
+            { backgroundColor: isLoading ? colors.primary + "50" : colors.primary },
+          ]}
+          onPress={() => handleMeetingResponse(item.id, meetingId, 'accepted')}
+          disabled={isLoading}
+        >
+          <ThemedText style={[styles.knockButtonText, { color: colors.buttonText }]}>
+            {isLoading ? "..." : "Accept"}
+          </ThemedText>
+        </TouchableOpacity>
+      </ThemedView>
+    );
+  };
+
   const renderNotificationItem = ({
     item,
   }: {
@@ -598,6 +713,8 @@ export default function NotificationsScreen() {
             chatAvatar: sender.avatar || "",
           },
         });
+      } else if (item.type === "meeting_invite" && item.relatedEntityId) {
+        router.push("/(tabs)/meetings");
       }
     };
 
@@ -610,6 +727,8 @@ export default function NotificationsScreen() {
       item.relatedEntityType === "Knock" &&
       (item.content?.includes("knocked on you.") ||
         item.content?.includes("accepted your knock request."));
+
+    const isMeetingInvite = item.type === "meeting_invite";
 
     return (
       <TouchableOpacity
@@ -640,6 +759,15 @@ export default function NotificationsScreen() {
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : (
                 renderKnockActionButton(item)
+              )}
+            </ThemedView>
+          )}
+          {isMeetingInvite && (
+            <ThemedView style={styles.notificationActions}>
+              {isLoadingAction ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                renderMeetingActionButtons(item)
               )}
             </ThemedView>
           )}
@@ -974,5 +1102,33 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     minWidth: 60,
     textAlign: "center",
+  },
+  meetingActionButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "transparent",
+  },
+  meetingDeclineButton: {
+    paddingVertical: 2,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    height: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    minWidth: 70,
+    borderWidth: 1,
+    backgroundColor: "transparent",
+  },
+  meetingAcceptButton: {
+    paddingVertical: 2,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    height: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    minWidth: 70,
+    borderWidth: 1,
+    backgroundColor: "transparent",
   },
 });

@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
+import { useSavedPosts } from "@/context/SavedPostsContext";
 import CommonHeader from "@/components/CommonHeader";
 import BackButton from "@/components/BackButton";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
@@ -21,7 +22,11 @@ export default function SavedPostsScreen() {
     const { accessToken } = useAuth();
     const router = useRouter();
 
-    const [savedPosts, setSavedPosts] = useState<Post[]>([]);
+    const { savedPostIds } = useSavedPosts();
+    const [fetchedPosts, setFetchedPosts] = useState<Post[]>([]);
+
+    // Filter fetched posts against the global set of saved IDs to instantly remove unsaved ones
+    const displayedPosts = fetchedPosts.filter(post => savedPostIds.has(post._id));
     const [loading, setLoading] = useState(true);
 
     const fetchSavedPosts = useCallback(async () => {
@@ -29,7 +34,7 @@ export default function SavedPostsScreen() {
         setLoading(true);
         try {
             const posts = await PostService.getSavedPosts(accessToken);
-            setSavedPosts(posts);
+            setFetchedPosts(posts);
         } catch (error) {
             console.error("Failed to fetch saved posts:", error);
         } finally {
@@ -48,7 +53,7 @@ export default function SavedPostsScreen() {
         });
     };
 
-    const postsForGrid: PostItem[] = savedPosts.map((post) => ({
+    const postsForGrid: PostItem[] = displayedPosts.map((post) => ({
         id: post._id,
         thumbnail: post.images[0]?.url,
         isMultiple: post.images.length > 1,
@@ -67,7 +72,7 @@ export default function SavedPostsScreen() {
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="small" color={colors.primary} />
                     </View>
-                ) : savedPosts.length > 0 ? (
+                ) : displayedPosts.length > 0 ? (
                     <ThemedScrollView contentContainerStyle={styles.scrollContent}>
                         <PostGrid posts={postsForGrid} onPressPost={handlePressPost} />
                     </ThemedScrollView>

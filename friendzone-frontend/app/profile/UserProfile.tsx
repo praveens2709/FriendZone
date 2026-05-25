@@ -526,7 +526,9 @@ export default function UserProfileScreen() {
   );
 
   const isPrivateAndNotConnected =
-    userProfile?.isPrivate && relationToMe !== "lockedIn";
+    userProfile?.isPrivate &&
+    relationToMe !== "lockedIn" &&
+    !(relationToMe === "knocked" && knockStatus === "onesidedlock");
 
   if (isLoading) {
     return (

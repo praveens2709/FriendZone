@@ -2,10 +2,15 @@ import { Tabs } from "expo-router";
 import React from "react";
 import { Platform, StyleSheet } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { HapticTab } from "@/components/HapticTab";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather, FontAwesome5, FontAwesome6, Octicons } from "@expo/vector-icons";
+import {
+  Feather,
+  FontAwesome5,
+  Octicons,
+  Ionicons,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
 
 export default function TabLayout() {
   const { colors } = useTheme();
@@ -57,7 +62,7 @@ export default function TabLayout() {
           title: "Home",
           tabBarIcon: ({ focused }) => (
             <Octicons
-              name={focused ? "home-fill" : "home"}
+              name={focused ? "home" : "home"}
               size={24}
               color={focused ? colors.tabBarActive : colors.tabBarInactive}
             />
@@ -70,8 +75,8 @@ export default function TabLayout() {
           title: "Explore",
           tabBarIcon: ({ focused }) => (
             <Feather
-              name={focused ? "search" : "search"}
-              size={25}
+              name="search"
+              size={24}
               color={focused ? colors.tabBarActive : colors.tabBarInactive}
             />
           ),
@@ -80,17 +85,29 @@ export default function TabLayout() {
       <Tabs.Screen
         name="posts"
         options={{
-          title: "Posts",
+          title: "Post",
           tabBarIcon: ({ focused }) => (
-            <FontAwesome6
-              name={focused ? "square-plus" : "plus-square"}
+            <Ionicons
+              name={focused ? "add-circle" : "add-circle-outline"}
+              size={28}
+              color={focused ? colors.tabBarActive : colors.tabBarInactive}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="meetings"
+        options={{
+          title: "Meetings",
+          tabBarIcon: ({ focused }) => (
+            <MaterialCommunityIcons
+              name={focused ? "calendar-clock" : "calendar-clock-outline"}
               size={24}
               color={focused ? colors.tabBarActive : colors.tabBarInactive}
             />
           ),
         }}
       />
-
       <Tabs.Screen
         name="profile"
         options={{

@@ -12,7 +12,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useLocalSearchParams } from "expo-router";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import CommonHeader from "@/components/CommonHeader";
 import { Image } from "expo-image";
@@ -348,20 +348,34 @@ export default function EditPostScreen() {
             </ThemedText>
             <ThemedView style={{ width: 24 }} />
           </ThemedView>
-          <TextInput
-            placeholder="Search music..."
-            placeholderTextColor={colors.text}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
+          <ThemedView
             style={[
-              styles.input,
+              styles.searchContainer,
               {
-                color: colors.text,
                 backgroundColor: colors.buttonBackgroundSecondary,
                 borderColor: colors.border,
               },
             ]}
-          />
+          >
+            <Feather
+              name="search"
+              size={20}
+              color={colors.textDim}
+              style={styles.searchIcon}
+            />
+            <TextInput
+              placeholder="Search music..."
+              placeholderTextColor={colors.textDim}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              style={[
+                styles.searchInput,
+                {
+                  color: colors.text,
+                },
+              ]}
+            />
+          </ThemedView>
           <FlatList
             data={searchResults}
             keyExtractor={(item, index) =>
@@ -513,14 +527,24 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalTitle: { fontSize: 18, fontWeight: "bold" },
-  input: {
-    height: 50,
-    borderRadius: 12,
-    fontSize: 16,
-    lineHeight: 18,
-    paddingHorizontal: 15,
-    marginBottom: 15,
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 10,
+    marginVertical: 10,
+    paddingHorizontal: 10,
+    height: 45,
     borderWidth: 1,
+    marginBottom: 15,
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    height: "100%",
+    fontSize: 16,
+    lineHeight: 18.8,
   },
   listContainer: { paddingBottom: 20, marginTop: 8 },
   trackRow: {

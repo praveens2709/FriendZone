@@ -782,7 +782,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: "100%",
     fontSize: 16,
-    lineHeight: 18,
+    lineHeight: 18.8,
   },
   chatListContent: {
     flexGrow: 1,

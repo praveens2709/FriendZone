@@ -286,7 +286,7 @@ export default function GroupChatScreen() {
       console.log(
         "error",
         error.response?.data?.message ||
-          "Failed to create group chat. Please try again."
+        "Failed to create group chat. Please try again."
       );
     } finally {
       setIsCreatingChat(false);
@@ -633,6 +633,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: "100%",
     fontSize: 16,
+    lineHeight: 18.8,
   },
   searchLoading: {
     marginLeft: 10,

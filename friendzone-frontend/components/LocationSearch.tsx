@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
 import { fetchPlaces } from "@/constants/Functions";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { ThemedView } from "./ThemedView";
 
 type Props = {
@@ -50,19 +50,30 @@ const LocationSearch = ({
 
   return (
     <ThemedView style={{ flex: 1 }}>
-      <ThemedView style={{ flexDirection: "row", alignItems: "center" }}>
+      <ThemedView
+        style={[
+          styles.searchContainer,
+          {
+            backgroundColor: colors.buttonBackgroundSecondary,
+            borderColor: colors.border,
+          },
+        ]}
+      >
+        <Feather
+          name="search"
+          size={20}
+          color={colors.textDim}
+          style={styles.searchIcon}
+        />
         <TextInput
           placeholder={placeholder}
-          placeholderTextColor={colors.text}
+          placeholderTextColor={colors.textDim}
           value={value}
           onChangeText={onChangeText}
           style={[
-            styles.input,
+            styles.searchInput,
             {
-              flex: 1,
               color: colors.text,
-              backgroundColor: colors.buttonBackgroundSecondary,
-              borderColor: colors.border,
             },
           ]}
           onFocus={() => setIsTyping(true)}
@@ -71,12 +82,12 @@ const LocationSearch = ({
         {value.length > 0 && (
           <TouchableOpacity
             onPress={() => onChangeText("")}
-            style={{ marginLeft: -40, padding: 10 }}
+            style={styles.clearIcon}
           >
             <MaterialCommunityIcons
               name="close-circle"
               size={20}
-              color={colors.text}
+              color={colors.textDim}
             />
           </TouchableOpacity>
         )}
@@ -118,14 +129,25 @@ const LocationSearch = ({
 };
 
 const styles = StyleSheet.create({
-  input: {
-    height: 50,
-    borderRadius: 12,
-    fontSize: 16,
-    lineHeight: 18,
-    paddingHorizontal: 15,
-    marginBottom: 15,
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    height: 45,
     borderWidth: 1,
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    height: "100%",
+    fontSize: 16,
+    lineHeight: 18.8,
+  },
+  clearIcon: {
+    padding: 5,
   },
   listContainer: {
     marginTop: 8,

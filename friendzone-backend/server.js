@@ -14,6 +14,7 @@ import notificationRoutes from "./routes/notificationRoutes.js";
 import knockRoutes from "./routes/knockRoutes.js";
 import postRoutes from "./routes/postRoutes.js";
 import wordleRoutes from './routes/wordleRoutes.js';
+import meetingRoutes from './routes/meetingRoutes.js';
 import * as wordleController from "./controllers/wordleController.js";
 import * as chatController from "./controllers/chatController.js";
 
@@ -55,7 +56,7 @@ app.use("/api/notifications", notificationRoutes(io, userSocketMap));
 app.use("/api/knock", knockRoutes(io, userSocketMap));
 app.use("/api/posts", postRoutes);
 app.use('/api/wordle', wordleRoutes(wordleController));
-
+app.use('/api/meetings', meetingRoutes(io, userSocketMap));
 io.on("connection", (socket) => {
   console.log(`User connected: ${socket.id}`);
 

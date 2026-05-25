@@ -24,6 +24,7 @@ import {
 } from "@expo/vector-icons";
 import { ThemedView } from "@/components/ThemedView";
 import { useAuth } from "@/context/AuthContext";
+import { useSavedPosts } from "@/context/SavedPostsContext";
 import UserAvatar from "@/components/UserAvatar";
 import ThemedModal from "@/components/ThemedModal";
 import AuthModalContent from "@/components/AuthModalContent";
@@ -113,8 +114,10 @@ export default function ProfileScreen() {
   const [knockingList, setKnockingList] = useState<KnockRequest[]>([]);
   const [lockedInList, setLockedInList] = useState<KnockRequest[]>([]);
 
+  const { savedPostIds } = useSavedPosts();
   const [userPosts, setUserPosts] = useState<PostType[]>([]);
   const [savedPosts, setSavedPosts] = useState<PostType[]>([]);
+  const displayedSavedPosts = savedPosts.filter(p => savedPostIds.has(p._id));
   const userPostsRef = React.useRef(userPosts);
   const savedPostsRef = React.useRef(savedPosts);
   const [loadingPosts, setLoadingPosts] = useState(false);
@@ -308,7 +311,7 @@ export default function ProfileScreen() {
   );
 
   const postsForGrid: PostItem[] = (
-    activeTab === "posts" ? userPosts : savedPosts
+    activeTab === "posts" ? userPosts : displayedSavedPosts
   ).map((post) => ({
     id: post._id,
     thumbnail: post.images[0]?.url,

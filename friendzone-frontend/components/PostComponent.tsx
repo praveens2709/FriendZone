@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
+import { useSavedPosts } from "@/context/SavedPostsContext";
 import {
   Entypo,
   Feather,
@@ -175,8 +176,9 @@ const PostComponent = ({
   const safeSaves = Array.isArray(post.saves) ? post.saves : [];
   const safeComments = Array.isArray(post.comments) ? post.comments : [];
 
+  const { isPostSaved, toggleSave } = useSavedPosts();
+  const isSaved = isPostSaved(post._id);
   const [isLiked, setIsLiked] = useState(safeLikes.includes(user?._id || ""));
-  const [isSaved, setIsSaved] = useState(safeSaves.includes(user?._id || ""));
   const [postLikesCount, setPostLikesCount] = useState(safeLikes.length);
   const [localComments, setLocalComments] = useState<Comment[]>(safeComments);
   const [commentCount, setCommentCount] = useState(safeComments.length);
@@ -518,11 +520,10 @@ const PostComponent = ({
   const handleSavePress = useCallback(async () => {
     if (!accessToken) return;
     try {
-      // Optimistic update
-      const newIsSaved = !isSaved;
-      setIsSaved(newIsSaved);
+      const wasSaved = isSaved;
+      await toggleSave(post._id);
 
-      const message = newIsSaved ? "Saved to collection" : "Removed from collection";
+      const message = !wasSaved ? "Saved to collection" : "Removed from collection";
       setToastMessage(message);
       setToastVisible(true);
 
@@ -531,19 +532,11 @@ const PostComponent = ({
         setToastVisible(false);
       }, 2000);
 
-      const response = await PostService.toggleSave(post._id, accessToken);
-      // Revert if API response mismatches optimistic (unlikely but good practice)
-      if (response.saved !== newIsSaved) {
-        setIsSaved(response.saved);
-      }
-
       optionsModalRef.current?.dismiss();
     } catch (error) {
-      // Revert on error
-      setIsSaved(!isSaved);
       console.error("Failed to toggle save:", error);
     }
-  }, [isSaved, accessToken, post._id]);
+  }, [isSaved, accessToken, post._id, toggleSave]);
 
   const handleCommentSubmit = useCallback(async () => {
     if (!commentText.trim() || !accessToken) return;
@@ -1263,6 +1256,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: "100%",
     fontSize: 16,
+    lineHeight: 18.8,
   },
   searchLoading: {
     marginLeft: 10,

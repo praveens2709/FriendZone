@@ -36,6 +36,7 @@ export default function CaptionScreen() {
   const [selectedAssets, setSelectedAssets] = useState<MediaAsset[]>([]);
   const [caption, setCaption] = useState("");
   const [location, setLocation] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [isPosting, setIsPosting] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
@@ -53,7 +54,7 @@ export default function CaptionScreen() {
     if (params.selectedTrack) {
       try {
         setSelectedTrack(JSON.parse(params.selectedTrack as string));
-      } catch {}
+      } catch { }
     }
   }, [params.selectedAssets, params.selectedTrack]);
 
@@ -289,7 +290,10 @@ export default function CaptionScreen() {
           >
             <ThemedView style={{ flex: 1 }}>
               <ThemedView style={styles.modalHeader}>
-                <TouchableOpacity onPress={() => setShowLocationModal(false)}>
+                <TouchableOpacity onPress={() => {
+                  setSearchQuery("");
+                  setShowLocationModal(false);
+                }}>
                   <MaterialCommunityIcons
                     name="close"
                     size={24}
@@ -304,10 +308,11 @@ export default function CaptionScreen() {
 
               <LocationSearch
                 placeholder="Search for a location..."
-                value={location}
-                onChangeText={setLocation}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
                 onAddressSelect={(address) => {
                   setLocation(address);
+                  setSearchQuery("");
                   setShowLocationModal(false);
                 }}
               />

@@ -631,7 +631,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   searchIcon: { marginRight: 10 },
-  searchInput: { flex: 1, height: "100%", fontSize: 16 },
+  searchInput: {
+    flex: 1,
+    height: "100%",
+    fontSize: 16,
+    lineHeight: 18.8,
+  },
   searchLoading: { marginLeft: 10 },
   listContent: { flexGrow: 1, paddingHorizontal: 10 },
   separator: { height: StyleSheet.hairlineWidth, marginHorizontal: 15 },

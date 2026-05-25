@@ -1,0 +1,372 @@
+import React, { useState, useEffect } from "react";
+import {
+    StyleSheet,
+    View,
+    ScrollView,
+    TouchableOpacity,
+    Alert,
+    ActivityIndicator,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { useTheme } from "@/context/ThemeContext";
+import ThemedSafeArea from "@/components/ThemedSafeArea";
+import CommonHeader from "@/components/CommonHeader";
+import InviteParticipantsModal, { InviteeUser } from "@/components/InviteParticipantsModal";
+import BackButton from "@/components/BackButton";
+import { ThemedText } from "@/components/ThemedText";
+import { ThemedView } from "@/components/ThemedView";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import Button from "@/components/Button";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { useAuth } from "@/context/AuthContext";
+import MeetingService from "@/services/MeetingService";
+import { Meeting } from "@/types/meeting.type";
+import { format } from "date-fns";
+import UserAvatar from "@/components/UserAvatar";
+import UserProfileCard from "@/components/UserProfileCard";
+
+export default function MeetingDetailsScreen() {
+    const { colors } = useTheme();
+    const { accessToken, user } = useAuth();
+    const router = useRouter();
+    const { id } = useLocalSearchParams<{ id: string }>();
+    const [meeting, setMeeting] = useState<Meeting | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [actionLoading, setActionLoading] = useState(false);
+
+    // Add Participants Modal State
+    const [showInviteModal, setShowInviteModal] = useState(false);
+    const [invitedUserIds, setInvitedUserIds] = useState<Set<string>>(new Set());
+    const [invitingIds, setInvitingIds] = useState<Set<string>>(new Set());
+
+    useEffect(() => {
+        if (id && accessToken) {
+            fetchMeeting();
+        }
+    }, [id, accessToken]);
+
+    const fetchMeeting = async () => {
+        try {
+            const data = await MeetingService.getMeetingById(id!, accessToken!);
+            setMeeting(data);
+        } catch (error) {
+            console.error("Error fetching meeting:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleJoinMeeting = async () => {
+        if (!meeting) return;
+
+        setActionLoading(true);
+        try {
+            // If meeting is upcoming and user is host, start the meeting
+            if (meeting.status === "upcoming" && meeting.host._id === user?._id) {
+                await MeetingService.updateMeetingStatus(meeting._id, "live", accessToken!);
+            }
+
+            // Navigate to meeting room
+            router.push(`/live-meeting/${meeting._id}?isHost=${meeting.host._id === user?._id}`);
+        } catch (error) {
+            console.error("Error joining meeting:", error);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleCancelMeeting = async () => {
+        if (!meeting) return;
+
+        Alert.alert(
+            "Cancel Meeting",
+            "Are you sure you want to cancel this meeting?",
+            [
+                { text: "No", style: "cancel" },
+                {
+                    text: "Yes, Cancel",
+                    style: "destructive",
+                    onPress: async () => {
+                        setActionLoading(true);
+                        try {
+                            await MeetingService.deleteMeeting(meeting._id, accessToken!);
+                            router.back();
+                        } catch (error) {
+                            console.error("Error cancelling meeting:", error);
+                        } finally {
+                            setActionLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleInviteSingleUser = async (user: InviteeUser) => {
+        if (!accessToken || !meeting || invitingIds.has(user._id) || invitedUserIds.has(user._id)) return;
+
+        setInvitingIds(prev => new Set(prev).add(user._id));
+        try {
+            await MeetingService.addParticipants(meeting._id, [user._id], accessToken);
+            setInvitedUserIds(prev => new Set(prev).add(user._id));
+
+            // Refresh meeting details silently
+            fetchMeeting();
+        } catch (error: any) {
+            Alert.alert("Error", error?.response?.data?.message || "Failed to invite user");
+        } finally {
+            setInvitingIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(user._id);
+                return newSet;
+            });
+        }
+    };
+
+
+    if (loading) {
+        return (
+            <LinearGradient colors={colors.gradient} style={styles.container}>
+                <ThemedSafeArea style={styles.safeArea}>
+                    <CommonHeader title="Meeting Details" leftContent={<BackButton color={colors.text} />} />
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color={colors.primary} />
+                    </View>
+                </ThemedSafeArea>
+            </LinearGradient>
+        );
+    }
+
+    if (!meeting) {
+        return (
+            <LinearGradient colors={colors.gradient} style={styles.container}>
+                <ThemedSafeArea style={styles.safeArea}>
+                    <CommonHeader title="Meeting Details" leftContent={<BackButton color={colors.text} />} />
+                    <View style={styles.loadingContainer}>
+                        <ThemedText style={{ color: colors.textDim }}>Meeting not found</ThemedText>
+                    </View>
+                </ThemedSafeArea>
+            </LinearGradient>
+        );
+    }
+
+    const isHost = meeting.host._id === user?._id;
+    const startDate = new Date(meeting.startTime);
+
+    return (
+        <LinearGradient colors={colors.gradient} style={styles.container}>
+            <ThemedSafeArea style={styles.safeArea}>
+                <CommonHeader
+                    title="Meeting Details"
+                    leftContent={<BackButton color={colors.text} />}
+                    rightContent1={
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                            {isHost && (meeting.status === 'upcoming' || meeting.status === 'live') && (
+                                <TouchableOpacity onPress={() => setShowInviteModal(true)}>
+                                    <Ionicons name="person-add-outline" size={24} color={colors.text} />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    }
+                />
+
+                <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+                    {/* Status Badge */}
+                    <View style={styles.statusRow}>
+                        <View style={[
+                            styles.statusBadge,
+                            {
+                                backgroundColor: meeting.status === "live" ? "#EF4444" :
+                                    meeting.status === "upcoming" ? colors.primary : colors.border
+                            }
+                        ]}>
+                            <MaterialCommunityIcons name="video" size={14} color="white" />
+                            <ThemedText style={styles.statusText}>
+                                {meeting.status.toUpperCase()}
+                            </ThemedText>
+                        </View>
+                    </View>
+
+                    {/* Title */}
+                    <ThemedText style={[styles.title, { color: colors.text }]}>
+                        {meeting.title}
+                    </ThemedText>
+
+                    {/* Description */}
+                    {meeting.description && (
+                        <ThemedText style={[styles.description, { color: colors.textDim }]}>
+                            {meeting.description}
+                        </ThemedText>
+                    )}
+
+                    {/* Time Info */}
+                    <ThemedView style={[styles.infoCard, { backgroundColor: colors.buttonBackgroundSecondary }]}>
+                        <View style={styles.infoRow}>
+                            <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+                            <View style={styles.infoTextContainer}>
+                                <ThemedText style={[styles.infoLabel, { color: colors.textDim }]}>Date</ThemedText>
+                                <ThemedText style={[styles.infoValue, { color: colors.text }]}>
+                                    {format(startDate, "EEEE, MMMM d, yyyy")}
+                                </ThemedText>
+                            </View>
+                        </View>
+                        {meeting.endTime && (
+                            <>
+                                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                                <View style={styles.infoRow}>
+                                    <Ionicons name="time-outline" size={20} color={colors.primary} />
+                                    <View style={styles.infoTextContainer}>
+                                        <ThemedText style={[styles.infoLabel, { color: colors.textDim }]}>Time</ThemedText>
+                                        <ThemedText style={[styles.infoValue, { color: colors.text }]}>
+                                            {format(startDate, "h:mm a")}
+                                        </ThemedText>
+                                    </View>
+                                </View>
+                            </>
+                        )}
+                    </ThemedView>
+
+                    {/* Host */}
+                    <ThemedView style={[styles.infoCard, { backgroundColor: colors.buttonBackgroundSecondary }]}>
+                        <ThemedText style={[styles.sectionTitle, { color: colors.textDim }]}>HOST</ThemedText>
+                        <View style={styles.hostRow}>
+                            <UserAvatar imageUri={meeting.host.profileImage} size={40} />
+                            <View style={styles.hostInfo}>
+                                <ThemedText style={[styles.hostName, { color: colors.text }]}>
+                                    {meeting.host.firstName} {meeting.host.lastName}
+                                </ThemedText>
+                                {isHost && (
+                                    <ThemedText style={[styles.youBadge, { color: colors.primary }]}>You</ThemedText>
+                                )}
+                            </View>
+                        </View>
+                    </ThemedView>
+
+                    {/* Participants */}
+                    {meeting.participants.length > 0 && (
+                        <ThemedView style={[styles.infoCard, { backgroundColor: colors.buttonBackgroundSecondary }]}>
+                            <ThemedText style={[styles.sectionTitle, { color: colors.textDim }]}>
+                                PARTICIPANTS ({meeting.participants.length})
+                            </ThemedText>
+                            {meeting.participants.map((participant) => (
+                                <View key={participant.user._id} style={styles.participantRow}>
+                                    <UserAvatar imageUri={participant.user.profileImage} size={36} />
+                                    <View style={styles.participantInfo}>
+                                        <ThemedText style={[styles.participantName, { color: colors.text }]}>
+                                            {participant.user.firstName} {participant.user.lastName}
+                                        </ThemedText>
+                                        <ThemedText style={[styles.participantStatus, {
+                                            color: participant.status === "accepted" ? "#10B981" :
+                                                participant.status === "declined" ? "#EF4444" : colors.textDim
+                                        }]}>
+                                            {participant.status}
+                                        </ThemedText>
+                                    </View>
+                                </View>
+                            ))}
+                        </ThemedView>
+                    )}
+                </ScrollView>
+
+                {/* Action Buttons */}
+                {meeting.status !== "completed" && meeting.status !== "cancelled" && (
+                    <View style={styles.footer}>
+                        {isHost && meeting.status === "upcoming" && (
+                            <TouchableOpacity
+                                style={[styles.cancelButton, { borderColor: "#EF4444" }]}
+                                onPress={handleCancelMeeting}
+                                disabled={actionLoading}
+                            >
+                                <ThemedText style={{ color: "#EF4444", fontWeight: "600" }}>
+                                    Cancel Meeting
+                                </ThemedText>
+                            </TouchableOpacity>
+                        )}
+                        <Button
+                            title={actionLoading ? "Loading..." : (meeting.status === "live" ? "Join Now" : "Start Meeting")}
+                            onPress={handleJoinMeeting}
+                            disabled={actionLoading || (!isHost && meeting.status === "upcoming")}
+                        />
+                        {!isHost && meeting.status === "upcoming" && (
+                            <ThemedText style={[styles.waitingText, { color: colors.textDim }]}>
+                                Waiting for host to start the meeting
+                            </ThemedText>
+                        )}
+                    </View>
+                )}
+
+                <InviteParticipantsModal
+                    visible={showInviteModal}
+                    onClose={() => setShowInviteModal(false)}
+                    accessToken={accessToken!}
+                    currentUserId={user?._id!}
+                    mode="instant"
+                    invitedIds={invitedUserIds}
+                    invitingIds={invitingIds}
+                    onInviteUser={handleInviteSingleUser}
+                    existingParticipantIds={new Set(meeting.participants.map(p => p.user._id))}
+                />
+            </ThemedSafeArea>
+        </LinearGradient >
+    );
+}
+
+const styles = StyleSheet.create({
+    container: { flex: 1 },
+    safeArea: { flex: 1, backgroundColor: "transparent" },
+    content: { flex: 1 },
+    scrollContent: { padding: 20, paddingBottom: 120 },
+    loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+    statusRow: { marginBottom: 16 },
+    statusBadge: {
+        flexDirection: "row",
+        alignItems: "center",
+        alignSelf: "flex-start",
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        gap: 6,
+    },
+    statusText: { color: "white", fontSize: 12, fontWeight: "bold" },
+    title: { fontSize: 24, fontWeight: "bold", marginBottom: 8 },
+    description: { fontSize: 16, lineHeight: 22, marginBottom: 20 },
+    infoCard: { borderRadius: 16, padding: 16, marginBottom: 16 },
+    infoRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+    infoTextContainer: { flex: 1 },
+    infoLabel: { fontSize: 12, marginBottom: 2 },
+    infoValue: { fontSize: 16, fontWeight: "500" },
+    divider: { height: 1, marginVertical: 12 },
+    sectionTitle: { fontSize: 12, fontWeight: "600", marginBottom: 12, letterSpacing: 0.5 },
+    hostRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+    hostInfo: { flex: 1 },
+    hostName: { fontSize: 16, fontWeight: "600" },
+    youBadge: { fontSize: 12, fontWeight: "500" },
+    participantRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
+    participantInfo: { flex: 1 },
+    participantName: { fontSize: 14, fontWeight: "500" },
+    participantStatus: { fontSize: 12, textTransform: "capitalize" },
+    footer: { padding: 20, paddingBottom: 100, gap: 12 },
+    cancelButton: {
+        height: 50,
+        borderRadius: 25,
+        borderWidth: 1,
+        justifyContent: "center",
+        alignItems: "center"
+    },
+    waitingText: { fontSize: 12, textAlign: "center" },
+    statusButton: {
+        paddingVertical: 2,
+        paddingHorizontal: 12,
+        borderRadius: 20,
+        height: 30,
+        justifyContent: 'center',
+        alignItems: 'center',
+        minWidth: 90,
+        borderWidth: 1,
+    },
+    statusButtonText: {
+        fontSize: 13,
+        fontWeight: 'bold',
+    },
+    emptyText: { textAlign: 'center', marginTop: 30, fontSize: 16 },
+});

@@ -41,8 +41,23 @@ export interface MessageNotification extends BaseNotification {
   relatedEntityId: string;
 }
 
+export interface MeetingInviteNotification extends BaseNotification {
+  type: 'meeting_invite';
+  user: NotifyingUser;
+  relatedEntityId: string;
+  metadata?: {
+    meetingId: string;
+    meetingTitle: string;
+    startTime: string;
+    status: 'pending' | 'accepted' | 'declined';
+    [key: string]: any;
+  };
+}
+
 export type Notification =
   | FriendRequestNotification
   | AcceptedRequestNotification
   | ActivityNotification
-  | MessageNotification;
+  | MessageNotification
+  | MeetingInviteNotification;
+

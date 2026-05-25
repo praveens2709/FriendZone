@@ -5,7 +5,7 @@ const notificationSchema = new mongoose.Schema({
   sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   type: {
     type: String,
-    enum: ['knock', 'knock_accepted', 'activity', 'message', 'game_invite', 'game_activity', 'knock_request'], // ADDED 'knock_request'
+    enum: ['knock', 'knock_accepted', 'activity', 'message', 'game_invite', 'game_activity', 'knock_request', 'meeting_invite'],
     required: true,
   },
   content: { type: String, required: true },
@@ -15,7 +15,7 @@ const notificationSchema = new mongoose.Schema({
   },
   relatedEntityType: {
     type: String,
-    enum: ['User', 'Post', 'Story', 'Comment', 'Knock', 'GameSession'],
+    enum: ['User', 'Post', 'Story', 'Comment', 'Knock', 'GameSession', 'Meeting'],
   },
   isRead: { type: Boolean, default: false },
   metadata: { type: mongoose.Schema.Types.Mixed, default: {} },

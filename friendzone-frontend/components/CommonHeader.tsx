@@ -12,7 +12,7 @@ interface CommonHeaderProps {
   titleComponent?: React.ReactNode;
   showBottomBorder?: boolean;
   style?: any;
-  titleColor?: string; 
+  titleColor?: string;
 }
 
 export default function CommonHeader({
@@ -23,7 +23,7 @@ export default function CommonHeader({
   titleComponent,
   showBottomBorder = true,
   style,
-  titleColor, 
+  titleColor,
 }: CommonHeaderProps) {
   const { colors } = useTheme();
 
@@ -90,6 +90,7 @@ const styles = StyleSheet.create({
   },
   titleText: {
     fontSize: 18,
+    lineHeight: 18,
     fontWeight: 'bold',
   },
   rightContainer: {
