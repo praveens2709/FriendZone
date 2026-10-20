@@ -1,74 +1,74 @@
-import React from "react";
-import {
-  FlatList,
-  StyleSheet,
-} from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { FlatList, StyleSheet } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useTheme } from "@/context/ThemeContext";
-import { useRouter } from "expo-router";
+import { useAuth } from "@/context/AuthContext";
+import { useSocket } from "@/context/SocketContext";
+import StoryService from "@/services/StoryService";
 import StoryItem from "./StoryItem";
 import { ThemedView } from "./ThemedView";
-
-type Story = {
-  id: string;
-  name: string;
-  image: string;
-  isOwnStory?: boolean;
-  seen?: boolean;
-};
-
-const mockStories: Story[] = [
-  {
-    id: "1",
-    name: "Your Story",
-    image: "https://i.pravatar.cc/100?img=68",
-    isOwnStory: true,
-  },
-  {
-    id: "2",
-    name: "Alice",
-    image: "https://i.pravatar.cc/100?img=32",
-    seen: false,
-  },
-  {
-    id: "3",
-    name: "Bob",
-    image: "https://i.pravatar.cc/100?img=23",
-    seen: true,
-  },
-  {
-    id: "4",
-    name: "Charlie",
-    image: "https://i.pravatar.cc/100?img=12",
-    seen: false,
-  },
-  {
-    id: "5",
-    name: "David",
-    image: "https://i.pravatar.cc/100?img=45",
-    seen: true,
-  },
-];
+import { StoryRingItem } from "@/types/story.type";
 
 export default function StoryRingList() {
   const { colors } = useTheme();
   const router = useRouter();
+  const { user } = useAuth();
+  const { socket } = useSocket();
+  const [items, setItems] = useState<StoryRingItem[]>([]);
 
-  const sortedStories = [
-    ...mockStories.filter((s) => s.isOwnStory),
-    ...mockStories.filter((s) => !s.isOwnStory && !s.seen),
-    ...mockStories.filter((s) => !s.isOwnStory && s.seen),
-  ];
+  const load = useCallback(async () => {
+    try {
+      const groups = await StoryService.getStories();
+      const own = groups.find((g) => g.isOwnStory);
+      const others = groups.filter((g) => !g.isOwnStory);
+
+      setItems([
+        {
+          id: own?.id ?? user?._id ?? "me",
+          name: "Your story",
+          image: user?.profileImage ?? null,
+          isOwnStory: true,
+          seen: true,
+          empty: !own,
+        },
+        ...others.map((g) => ({
+          id: g.id,
+          name: g.name.split(" ")[0],
+          image: g.profilePic,
+          seen: g.seen,
+        })),
+      ]);
+    } catch {
+      setItems([
+        { id: user?._id ?? "me", name: "Your story", image: user?.profileImage ?? null, isOwnStory: true, seen: true, empty: true },
+      ]);
+    }
+  }, [user?._id, user?.profileImage]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
+
+  useEffect(() => {
+    if (!socket) return;
+    socket.on("storiesChanged", load);
+    return () => {
+      socket.off("storiesChanged", load);
+    };
+  }, [socket, load]);
+
+  if (items.length === 0) return null;
 
   return (
     <ThemedView style={styles.listContainer}>
       <FlatList
-        data={sortedStories}
+        data={items}
         horizontal
         showsHorizontalScrollIndicator={false}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <StoryItem item={item} colors={colors} router={router} />
-        )}
+        keyExtractor={(item) => `${item.id}-${item.isOwnStory ? "own" : "other"}`}
+        renderItem={({ item }) => <StoryItem item={item} colors={colors} router={router} />}
       />
     </ThemedView>
   );

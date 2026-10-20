@@ -8,29 +8,23 @@ import {
 import { ThemedText } from "@/components/ThemedText";
 import { Ionicons } from "@expo/vector-icons";
 import { ThemedView } from "./ThemedView";
+import { StoryRingItem } from "@/types/story.type";
 
-type Story = {
-  id: string;
-  name: string;
-  image: string;
-  isOwnStory?: boolean;
-  seen?: boolean;
-};
 
 export default function StoryItem({
   item,
   colors,
   router,
 }: {
-  item: Story;
+  item: StoryRingItem;
   colors: any;
   router: any;
 }) {
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
 
   const handlePress = () => {
-    if (item.isOwnStory) {
-      router.push(`/(stories)/${item.id}`);
+    if (item.empty) {
+      router.push("/(stories)/camera");
     } else {
       router.push(`/(stories)/${item.id}`);
     }
@@ -70,7 +64,13 @@ export default function StoryItem({
             },
           ]}
         >
-          <Image source={{ uri: item.image }} style={styles.image} />
+          {item.image ? (
+            <Image source={{ uri: item.image }} style={styles.image} />
+          ) : (
+            <ThemedView style={[styles.image, { backgroundColor: colors.border, alignItems: "center", justifyContent: "center" }]}>
+              <Ionicons name="person" size={34} color={colors.textDim} />
+            </ThemedView>
+          )}
 
           {item.isOwnStory && (
             <Pressable

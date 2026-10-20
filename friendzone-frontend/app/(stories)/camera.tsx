@@ -4,7 +4,18 @@ import {
   TouchableOpacity,
   Button,
   Image,
+  Alert,
+  ActivityIndicator,
+  View,
+  Text,
+  TextInput,
+  PanResponder,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
+import { Video, ResizeMode } from "expo-av";
+import StoryService from "@/services/StoryService";
+import { getApiError } from "@/constants/Functions";
 import { useTheme } from "@/context/ThemeContext";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,6 +26,8 @@ import * as MediaLibrary from "expo-media-library";
 import TextStoryEditor from "@/components/TextStoryEditor";
 import { useAuth } from "@/context/AuthContext";
 import { ThemedView } from "@/components/ThemedView";
+import InlineError from "@/components/InlineError";
+import StoryTextOverlay from "@/components/StoryTextOverlay";
 import { ThemedText } from "@/components/ThemedText";
 
 export default function CameraScreen() {
@@ -28,6 +41,50 @@ export default function CameraScreen() {
 
   const [lastGalleryImage, setLastGalleryImage] = useState<string | null>(null);
   const [showTextEditor, setShowTextEditor] = useState(false);
+  const [captured, setCaptured] = useState<{ uri: string; type: "image" | "video"; duration?: number } | null>(null);
+  const [posting, setPosting] = useState(false);
+  const [postError, setPostError] = useState("");
+  const [overlayText, setOverlayText] = useState("");
+  const [editingOverlay, setEditingOverlay] = useState(false);
+  const [textX, setTextX] = useState(0.5);
+  const [textY, setTextY] = useState(0.5);
+  const [previewHeight, setPreviewHeight] = useState(1);
+  const [previewWidth, setPreviewWidth] = useState(1);
+  const dragStart = useRef({ x: 0.5, y: 0.5 });
+  const textPos = useRef({ x: 0.5, y: 0.5 });
+  textPos.current = { x: textX, y: textY };
+  const previewSize = useRef({ width: 1, height: 1 });
+  previewSize.current = { width: previewWidth, height: previewHeight };
+  const overlaySize = useRef({ width: 0, height: 0 });
+
+  const dragResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        dragStart.current = textPos.current;
+      },
+      onPanResponderMove: (_e, g) => {
+        const { width, height } = previewSize.current;
+        const halfW = overlaySize.current.width / 2 / width;
+        const halfH = overlaySize.current.height / 2 / height;
+        const nextX = dragStart.current.x + g.dx / width;
+        const nextY = dragStart.current.y + g.dy / height;
+        setTextX(Math.min(Math.max(nextX, halfW), 1 - halfW));
+        setTextY(Math.min(Math.max(nextY, halfH), 1 - halfH));
+      },
+      onPanResponderRelease: (_e, g) => {
+        if (Math.abs(g.dx) < 6 && Math.abs(g.dy) < 6) setEditingOverlay(true);
+      },
+    })
+  ).current;
+
+  const closePreview = () => {
+    setCaptured(null);
+    setOverlayText("");
+    setEditingOverlay(false);
+    setTextX(0.5);
+    setTextY(0.5);
+  };
 
   const userProfilePic = user?.profileImage || null;
 
@@ -118,36 +175,69 @@ export default function CameraScreen() {
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      alert("Sorry, we need camera roll permissions to make this work!");
+      Alert.alert("Permission needed", "Allow photo access to pick something for your story.");
       return;
     }
 
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [9, 16],
-      quality: 1,
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images", "videos"],
+      allowsEditing: false,
+      videoMaxDuration: 30,
+      quality: 0.9,
     });
 
-    if (!result.canceled) {
-      setLastGalleryImage(result.assets[0].uri);
-    } else {
-      console.log("Image picker cancelled.");
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setCaptured({
+        uri: asset.uri,
+        type: asset.type === "video" ? "video" : "image",
+        duration: asset.duration ?? undefined,
+      });
     }
   };
 
   const takePicture = async () => {
     if (cameraRef.current) {
-      const photo = await cameraRef.current.takePictureAsync();
-      setLastGalleryImage(photo.uri);
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.85 });
+      setCaptured({ uri: photo.uri, type: "image" });
     } else {
       console.log("Camera ref not available to take picture.");
     }
   };
 
-  const handleTextStoryUpload = (text: string, privacy: 'public' | 'friends') => {
-    console.log(`Text story to upload (${privacy}):`, text);
-    router.back();
+  const handleTextStoryUpload = async (
+    text: string,
+    audience: "circle" | "close",
+    style: { gradient: string[]; textColor: string }
+  ) => {
+    try {
+      setPosting(true);
+      setPostError("");
+      await StoryService.postText(text, audience, style);
+      router.back();
+    } catch (error) {
+      setPostError(getApiError(error).message);
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  const shareCaptured = async (audience: "circle" | "close") => {
+    if (!captured) return;
+    try {
+      setPosting(true);
+      setPostError("");
+      await StoryService.postMedia(captured.uri, captured.type, audience, captured.duration, {
+        text: overlayText,
+        textX,
+        textY,
+      });
+      router.back();
+    } catch (error) {
+      setPostError(getApiError(error).message);
+    } finally {
+      setPosting(false);
+    }
   };
 
   const handleGoToCamera = () => {
@@ -157,6 +247,104 @@ export default function CameraScreen() {
   const handleCloseScreen = () => {
     router.back();
   };
+
+  if (captured) {
+    return (
+      <ThemedSafeArea style={styles.container}>
+        <InlineError message={postError} style={styles.postError} />
+        <View
+          style={{ flex: 1, backgroundColor: "black" }}
+          onLayout={(e) => {
+            setPreviewHeight(e.nativeEvent.layout.height || 1);
+            setPreviewWidth(e.nativeEvent.layout.width || 1);
+          }}
+        >
+          {captured.type === "image" ? (
+            <Image source={{ uri: captured.uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          ) : (
+            <Video
+              source={{ uri: captured.uri }}
+              style={StyleSheet.absoluteFill}
+              resizeMode={ResizeMode.COVER}
+              shouldPlay
+              isLooping
+            />
+          )}
+          <TouchableOpacity onPress={closePreview} style={styles.previewClose} disabled={posting}>
+            <Ionicons name="close" size={28} color="white" />
+          </TouchableOpacity>
+          {!editingOverlay && (
+            <TouchableOpacity onPress={() => setEditingOverlay(true)} style={styles.previewText} disabled={posting}>
+              <Text style={styles.previewAa}>Aa</Text>
+            </TouchableOpacity>
+          )}
+
+          {!editingOverlay && !!overlayText && (
+            <StoryTextOverlay
+              text={overlayText}
+              x={textX}
+              y={textY}
+              containerWidth={previewWidth}
+              containerHeight={previewHeight}
+              handlers={dragResponder.panHandlers}
+              onMeasure={(width, height) => {
+                overlaySize.current = { width, height };
+              }}
+            />
+          )}
+
+          {editingOverlay && (
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : undefined}
+              style={styles.editOverlay}
+            >
+              <TextInput
+                value={overlayText}
+                onChangeText={setOverlayText}
+                placeholder="Add text"
+                placeholderTextColor="rgba(255,255,255,0.6)"
+                maxLength={120}
+                multiline
+                autoFocus
+                style={styles.overlayInput}
+              />
+              <TouchableOpacity onPress={() => setEditingOverlay(false)} style={styles.editDone}>
+                <Text style={styles.editDoneText}>Done</Text>
+              </TouchableOpacity>
+            </KeyboardAvoidingView>
+          )}
+
+          <View style={styles.previewActions}>
+            {posting ? (
+              <ActivityIndicator color="#fff" size="large" />
+            ) : (
+              <>
+                <TouchableOpacity
+                  onPress={() => shareCaptured("circle")}
+                  style={[styles.shareButton, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+                >
+                  {userProfilePic ? (
+                    <Image source={{ uri: userProfilePic }} style={[styles.sharePic, { borderColor: colors.textSecondary }]} />
+                  ) : (
+                    <Ionicons name="person-circle-outline" size={30} style={{ color: colors.textSecondary }} />
+                  )}
+                  <Text style={[styles.shareText, { color: colors.textSecondary }]}>Your circle</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => shareCaptured("close")}
+                  style={[styles.shareButton, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+                >
+                  <Ionicons name="people-outline" size={24} style={{ color: colors.textSecondary }} />
+                  <Text style={[styles.shareText, { color: colors.textSecondary }]}>Close friends</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </ThemedSafeArea>
+    );
+  }
 
   return (
     <ThemedSafeArea style={styles.container}>
@@ -213,6 +401,7 @@ export default function CameraScreen() {
         </ThemedView>
       )}
 
+      <InlineError message={showTextEditor ? postError : ""} style={styles.postError} />
       {showTextEditor && (
         <TextStoryEditor
           onGoToCamera={handleGoToCamera}
@@ -226,6 +415,59 @@ export default function CameraScreen() {
 }
 
 const styles = StyleSheet.create({
+  postError: {
+    position: "absolute",
+    top: 70,
+    left: 16,
+    right: 16,
+    zIndex: 20,
+  },
+  previewClose: { position: "absolute", top: 12, left: 16, padding: 6 },
+  previewText: { position: "absolute", top: 12, right: 16, paddingHorizontal: 10, paddingVertical: 4 },
+  previewAa: { color: "#fff", fontSize: 26, fontWeight: "800" },
+  overlayHolder: { position: "absolute", left: 24, right: 24, alignItems: "center" },
+  overlayText: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "800",
+    textAlign: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  editOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 28,
+  },
+  overlayInput: { color: "#fff", fontSize: 28, fontWeight: "800", textAlign: "center", minWidth: 200 },
+  editDone: { position: "absolute", top: 14, right: 18, paddingHorizontal: 12, paddingVertical: 6 },
+  editDoneText: { color: "#fff", fontSize: 17, fontWeight: "800" },
+  previewActions: {
+    position: "absolute",
+    bottom: 32,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingHorizontal: 20,
+  },
+  shareButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 25,
+    paddingVertical: 6,
+    paddingHorizontal: 20,
+    minWidth: 150,
+    borderWidth: 1,
+  },
+  sharePic: { width: 28, height: 28, borderRadius: 14, marginRight: 8, borderWidth: 1 },
+  shareText: { fontSize: 14, fontWeight: "bold", marginLeft: 5 },
   container: {
     flex: 1,
     backgroundColor: "black",

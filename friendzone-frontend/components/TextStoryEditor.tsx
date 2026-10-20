@@ -21,9 +21,22 @@ import { ThemedView } from "./ThemedView";
 interface TextStoryEditorProps {
   onGoToCamera: () => void;
   onCloseScreen: () => void;
-  onUploadStory: (text: string, privacy: "public" | "friends") => void;
+  onUploadStory: (
+    text: string,
+    audience: "circle" | "close",
+    style: { gradient: string[]; textColor: string }
+  ) => void;
   userProfilePic: string | null;
 }
+
+const toHex = (color: string): string => {
+  const c = color.trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(c)) return c;
+  if (/^#[0-9a-fA-F]{3}$/.test(c)) return "#" + c.slice(1).split("").map((x) => x + x).join("");
+  const rgb = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (rgb) return "#" + [rgb[1], rgb[2], rgb[3]].map((n) => Number(n).toString(16).padStart(2, "0")).join("");
+  return "#1F1F1F";
+};
 
 export default function TextStoryEditor({
   onGoToCamera,
@@ -84,16 +97,17 @@ export default function TextStoryEditor({
   const cycleBackgroundGradient = useCallback(() => {
     setGradientIndex((prevIndex) => {
       const newIndex = (prevIndex + 1) % allThemes.length;
-      // const selectedThemeName = allThemeNames[newIndex];
-      // console.log(`Current Gradient Theme: ${selectedThemeName}`, allThemes[newIndex].gradient);
       return newIndex;
     });
   }, [allThemes, allThemeNames]);
 
-  const handleUpload = (privacy: "public" | "friends") => {
+  const handleUpload = (audience: "circle" | "close") => {
     if (text.trim().length > 0) {
       Keyboard.dismiss();
-      onUploadStory(text.trim(), privacy);
+      onUploadStory(text.trim(), audience, {
+        gradient: (activeThemeColors.gradient as readonly string[]).slice(0, 3).map(toHex),
+        textColor: toHex(activeThemeColors.text),
+      });
     }
   };
 
@@ -101,7 +115,6 @@ export default function TextStoryEditor({
     Keyboard.dismiss();
   };
 
-//   const currentFontStyle = { fontFamily: "System", fontSize: 36, fontWeight: "normal" };
 
   return (
     <Animated.View
@@ -179,7 +192,7 @@ export default function TextStoryEditor({
         </KeyboardAvoidingView>
         <ThemedView style={styles.footer}>
           <TouchableOpacity
-            onPress={() => handleUpload("public")}
+            onPress={() => handleUpload("circle")}
             style={[
               styles.footerButton,
               { backgroundColor: activeThemeColors.backgroundSecondary, borderColor: activeThemeColors.border },
@@ -208,12 +221,12 @@ export default function TextStoryEditor({
                 { color: activeThemeColors.textSecondary }
               ]}
             >
-              Your Story
+              Your circle
             </ThemedText>
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => handleUpload("friends")}
+            onPress={() => handleUpload("close")}
             style={[
               styles.footerButton,
               { backgroundColor: activeThemeColors.backgroundSecondary, borderColor: activeThemeColors.border },
@@ -232,7 +245,7 @@ export default function TextStoryEditor({
                 { color: activeThemeColors.textSecondary }
               ]}
             >
-              Friends Only
+              Close friends
             </ThemedText>
           </TouchableOpacity>
         </ThemedView>
