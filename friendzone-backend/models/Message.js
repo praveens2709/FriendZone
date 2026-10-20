@@ -11,6 +11,11 @@ const messageSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
+  type: {
+    type: String,
+    enum: ['user', 'system'],
+    default: 'user',
+  },
   text: {
     type: String,
     trim: true,
@@ -37,6 +42,14 @@ const messageSchema = new mongoose.Schema({
   replyTo: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Message',
+    default: null,
+  },
+  reactions: [{
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    emoji: { type: String, required: true, maxlength: 16 },
+  }],
+  editedAt: {
+    type: Date,
     default: null,
   },
   readBy: [{

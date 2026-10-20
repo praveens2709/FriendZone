@@ -34,6 +34,10 @@ const chatSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  groupAvatarPublicId: {
+    type: String,
+    default: null,
+  },
   groupAdmin: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -58,12 +62,10 @@ const chatSchema = new mongoose.Schema({
     ref: 'User',
     default: null,
   },
-  // New field to track if users are "locked in" (both have sent messages)
   isLockedIn: {
     type: Boolean,
     default: false,
   },
-  // Track which participants have sent at least one message
   participantsWhoSentMessages: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

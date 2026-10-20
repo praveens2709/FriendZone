@@ -3,8 +3,14 @@ import Message from "../models/Message.js";
 import User from "../models/User.js";
 import Knock from "../models/Knock.js";
 import { uploadImageToCloudinary } from "../services/cloudinaryService.js";
+import { getBlockedIds, isBlockedBetween } from "../services/privacyService.js";
+import { isObjectId, toIdList, cleanString } from "../utils/validate.js";
+import { getActiveVibes } from "../services/identityService.js";
 
-const formatLastMessageContentForPreview = (message) => {
+const MAX_MESSAGE_LENGTH = 4000;
+const MAX_GROUP_MEMBERS = 50;
+
+export const formatLastMessageContentForPreview = (message) => {
   if (!message) {
     return { content: "No messages yet", type: "text" };
   }
@@ -35,25 +41,58 @@ const formatLastMessageContentForPreview = (message) => {
 };
 
 export const createGroupChat = async (req, res, io, userSocketMap) => {
-  const { participants, name } = req.body;
   const userId = req.user.id;
+  const groupName = cleanString(req.body?.name, 60);
+  const participants = toIdList(req.body?.participants, MAX_GROUP_MEMBERS);
 
-  if (!participants || participants.length < 2) {
+  if (!participants || participants.filter((id) => id !== userId).length < 2) {
     return res.status(400).json({
       message: "A group chat must have at least 3 members, including yourself.",
     });
   }
-  if (!name || name.trim() === "") {
+  if (!groupName) {
     return res.status(400).json({ message: "Group name is required." });
   }
 
   const allParticipants = [...new Set([...participants, userId])];
 
   try {
+    const blocked = await getBlockedIds(userId);
+    if (allParticipants.some((id) => blocked.has(id))) {
+      return res.status(400).json({ message: "One or more users cannot be added." });
+    }
+
+    const members = await User.find({ _id: { $in: allParticipants }, isVerified: true })
+      .select("_id isPrivate")
+      .lean();
+    if (members.length !== allParticipants.length) {
+      return res.status(400).json({ message: "One or more users were not found." });
+    }
+
+    const privateMemberIds = members
+      .filter((m) => m.isPrivate && m._id.toString() !== userId)
+      .map((m) => m._id.toString());
+
+    if (privateMemberIds.length) {
+      const lockedIn = await Knock.find({
+        knocker: userId,
+        knocked: { $in: privateMemberIds },
+        status: "lockedIn",
+      })
+        .select("knocked")
+        .lean();
+      const lockedInIds = new Set(lockedIn.map((k) => k.knocked.toString()));
+      if (privateMemberIds.some((id) => !lockedInIds.has(id))) {
+        return res.status(403).json({
+          message: "You can only add private accounts you are locked in with.",
+        });
+      }
+    }
+
     const newChat = new Chat({
       participants: allParticipants,
       type: "group",
-      name,
+      name: groupName,
       groupAdmin: userId,
       unreadCounts: allParticipants.map((id) => ({ user: id, count: 0 })),
       lastMessageAt: new Date(),
@@ -63,8 +102,8 @@ export const createGroupChat = async (req, res, io, userSocketMap) => {
     await newChat.save();
 
     const populatedChat = await Chat.findById(newChat._id)
-      .populate("participants", "firstName lastName profileImage email")
-      .populate("groupAdmin", "firstName lastName profileImage email")
+      .populate("participants", "firstName lastName profileImage")
+      .populate("groupAdmin", "firstName lastName profileImage")
       .lean();
 
     console.log("New group chat created:", populatedChat._id);
@@ -122,7 +161,7 @@ export const getUserChats = async (req, res) => {
     })
       .populate({
         path: "participants",
-        select: "firstName lastName profileImage email isPrivate",
+        select: "firstName lastName profileImage isPrivate",
       })
       .populate({
         path: "lastMessage",
@@ -272,18 +311,19 @@ export const getUserChats = async (req, res) => {
 export const getChatMessages = async (req, res) => {
   const { id: chatId } = req.params;
   const userId = req.user.id;
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 20;
+  const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
   const skip = (page - 1) * limit;
+
+  if (!isObjectId(chatId)) {
+    return res.status(404).json({ message: "Chat not found or unauthorized" });
+  }
 
   try {
     const chat = await Chat.findById(chatId)
       .populate("participants", "firstName lastName profileImage isPrivate")
       .populate("groupAdmin", "firstName lastName");
     if (!chat || !chat.participants.some((p) => p._id.toString() === userId)) {
-      console.log(
-        `Chat not found or unauthorized for user ${userId} in chat ${chatId}`
-      );
       return res
         .status(404)
         .json({ message: "Chat not found or unauthorized" });
@@ -302,10 +342,12 @@ export const getChatMessages = async (req, res) => {
           select: "firstName lastName",
         },
       })
-      .sort({ createdAt: 1 })
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
+
+    messages.reverse();
 
     const totalMessages = await Message.countDocuments({
       chat: chatId,
@@ -322,7 +364,7 @@ export const getChatMessages = async (req, res) => {
       ? otherParticipant._id.toString()
       : null;
 
-    const formattedMessages = messages.map((msg) => {
+    const formattedMessages = messages.filter((msg) => msg.sender).map((msg) => {
       const isMyMessage = msg.sender._id.toString() === userId;
       let readStatus = false;
 
@@ -341,11 +383,14 @@ export const getChatMessages = async (req, res) => {
       return {
         id: msg._id.toString(),
         sender: msg.sender._id.toString(),
+        type: msg.type || "user",
         text: msg.text,
         attachments: msg.attachments,
         timestamp: msg.createdAt?.toISOString() || new Date().toISOString(),
         read: readStatus,
         isTemp: false,
+        reactions: (msg.reactions || []).map((r) => ({ user: r.user.toString(), emoji: r.emoji })),
+        editedAt: msg.editedAt ? msg.editedAt.toISOString() : null,
         replyTo: msg.replyTo
           ? {
               id: msg.replyTo._id.toString(),
@@ -386,7 +431,17 @@ export const getChatMessages = async (req, res) => {
       }
     }
 
+    let otherVibe = null;
+    if (isLockedIn && otherParticipant) {
+      const vibes = await getActiveVibes([otherParticipant._id.toString()]);
+      otherVibe = vibes.get(otherParticipant._id.toString()) || null;
+    }
+
     res.json({
+      otherVibe,
+      chatType: chat.type,
+      chatName: chat.type === "group" ? chat.name : null,
+      chatAvatar: chat.type === "group" ? chat.groupAvatar || null : null,
       messages: formattedMessages,
       currentPage: page,
       totalPages: Math.ceil(totalMessages / limit),
@@ -412,10 +467,17 @@ export const createChat = async (req, res, io, userSocketMap) => {
     });
   }
 
+  if (!isObjectId(recipientId)) {
+    return res.status(400).json({ message: "Invalid recipient" });
+  }
+
   try {
     if (userId === recipientId) {
-      console.log("Attempted to create chat with self:", userId);
       return res.status(400).json({ message: "Cannot create chat with self" });
+    }
+
+    if (await isBlockedBetween(userId, recipientId)) {
+      return res.status(404).json({ message: "Recipient user not found" });
     }
 
     let chat = await Chat.findOne({
@@ -424,7 +486,7 @@ export const createChat = async (req, res, io, userSocketMap) => {
     })
       .populate({
         path: "participants",
-        select: "firstName lastName profileImage email isPrivate",
+        select: "firstName lastName profileImage isPrivate",
       })
       .populate({
         path: "lastMessage",
@@ -640,7 +702,7 @@ export const createChat = async (req, res, io, userSocketMap) => {
     const newChatPopulated = await Chat.findById(chat._id)
       .populate(
         "participants",
-        "firstName lastName profileImage email isPrivate"
+        "firstName lastName profileImage isPrivate"
       )
       .lean();
 
@@ -736,11 +798,15 @@ export const saveMessage = async ({
   userSocketMap,
 }) => {
   try {
-    console.log(
-      `[saveMessage] Starting for chat ${chatId}, sender ${senderId}, text: "${text}", attachments: ${
-        attachments ? attachments.length : 0
-      }, replyTo: ${replyToId}`
-    );
+    if (typeof text === "string" && text.length > MAX_MESSAGE_LENGTH) {
+      text = text.slice(0, MAX_MESSAGE_LENGTH);
+    }
+    if (replyToId) {
+      const replied = isObjectId(String(replyToId))
+        ? await Message.exists({ _id: replyToId, chat: chatId })
+        : null;
+      if (!replied) replyToId = null;
+    }
     const chat = await Chat.findById(chatId).populate(
       "participants",
       "firstName lastName profileImage isPrivate"
@@ -770,6 +836,26 @@ export const saveMessage = async ({
     const otherParticipant = chat.participants.find(
       (p) => p._id.toString() !== senderId.toString()
     );
+
+    if (
+      chat.type === "private" &&
+      otherParticipant &&
+      (await isBlockedBetween(senderId, otherParticipant._id))
+    ) {
+      if (
+        io &&
+        clientTempId &&
+        userSocketMap &&
+        userSocketMap.get(senderId.toString())
+      ) {
+        io.to(userSocketMap.get(senderId.toString())).emit("messageFailed", {
+          clientTempId,
+          error: "You cannot message this user",
+        });
+      }
+      return { error: "You cannot message this user" };
+    }
+
     const messageCount = await Message.countDocuments({ chat: chatId });
     if (chat.type === "private" && otherParticipant?.isPrivate) {
       const knockStatus = await Knock.findOne({
@@ -786,7 +872,7 @@ export const saveMessage = async ({
         chat.firstMessageByKnockerId = null;
       } else if (
         chat.isRestricted &&
-        chat.firstMessageByKnockerId.toString() === senderId.toString()
+        chat.firstMessageByKnockerId?.toString() === senderId.toString()
       ) {
         if (
           io &&
@@ -865,6 +951,7 @@ export const saveMessage = async ({
       id: populatedMessage._id.toString(),
       chat: populatedMessage.chat.toString(),
       sender: populatedMessage.sender._id.toString(),
+      type: populatedMessage.type || "user",
       text: populatedMessage.text,
       attachments: populatedMessage.attachments,
       timestamp:
@@ -874,6 +961,8 @@ export const saveMessage = async ({
       firstMessageByKnockerId: chat.firstMessageByKnockerId?.toString() || null,
       isLockedIn: chat.isLockedIn || false,
       clientTempId: clientTempId,
+      reactions: [],
+      editedAt: null,
       replyTo: populatedMessage.replyTo
         ? {
             id: populatedMessage.replyTo._id.toString(),
@@ -996,34 +1085,40 @@ export const sendMessageWithAttachment = async (
     const senderId = req.user.id;
     const files = req.files;
 
-    if (!chatId || !senderId || !files || files.length === 0) {
+    if (!isObjectId(chatId) || !files || files.length === 0) {
       return res
         .status(400)
-        .json({ message: "Chat ID, sender ID, and files are required." });
+        .json({ message: "Chat ID and files are required." });
+    }
+
+    const membership = await Chat.exists({ _id: chatId, participants: senderId });
+    if (!membership) {
+      return res.status(404).json({ message: "Chat not found or unauthorized" });
     }
 
     const attachments = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const durationMillis = req.body[`file_duration_${i}`];
+      const durationMillis = parseInt(req.body[`file_duration_${i}`], 10);
 
       try {
-        const result = await uploadImageToCloudinary(file.buffer, "posts");
+        const result = await uploadImageToCloudinary(file.buffer, "chat_media");
 
         attachments.push({
           type: file.mimetype.split("/")[0],
           url: result.url,
-          fileName: file.originalname,
+          fileName: cleanString(file.originalname, 200),
           size: file.size,
-          duration: durationMillis ? parseInt(durationMillis, 10) : undefined,
+          duration: Number.isFinite(durationMillis) ? durationMillis : undefined,
         });
       } catch (err) {
-        console.error(
-          `Cloudinary upload failed for file ${file.originalname}:`,
-          err
-        );
+        console.error("Cloudinary upload failed:", err.message);
       }
+    }
+
+    if (attachments.length === 0) {
+      return res.status(502).json({ message: "Failed to upload attachments." });
     }
 
     const messageData = {
@@ -1608,6 +1703,111 @@ export const deleteMessage = async (req, res, io, userSocketMap) => {
     res.status(200).json({ message: "Message deleted successfully" });
   } catch (error) {
     console.error("Error deleting message:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getUnreadChatCount = async (req, res) => {
+  try {
+    const chats = await Chat.find({
+      participants: req.user.id,
+      deletedBy: { $ne: req.user.id },
+      unreadCounts: { $elemMatch: { user: req.user._id, count: { $gt: 0 } } },
+    })
+      .select("_id")
+      .lean();
+    res.json({ count: chats.length, chatIds: chats.map((c) => c._id.toString()) });
+  } catch (error) {
+    console.error("Error counting unread chats:", error.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const EDIT_WINDOW_MS = 15 * 60 * 1000;
+const ALLOWED_REACTIONS = ["❤️", "😂", "😮", "😢", "👍", "🔥"];
+
+const loadMessageForMember = async (messageId, userId) => {
+  if (!isObjectId(messageId)) return null;
+  const message = await Message.findById(messageId);
+  if (!message || message.type === "system" || message.deletedBy.some((id) => id.toString() === userId)) return null;
+  const chat = await Chat.findById(message.chat);
+  if (!chat || !chat.participants.some((p) => p.toString() === userId)) return null;
+  return { message, chat };
+};
+
+export const editMessage = async (req, res, io, userSocketMap) => {
+  const userId = req.user.id;
+  const text = typeof req.body?.text === "string" ? req.body.text.trim().slice(0, MAX_MESSAGE_LENGTH) : "";
+  if (!text) return res.status(400).json({ message: "Message can't be empty" });
+  try {
+    const found = await loadMessageForMember(req.body?.messageId, userId);
+    if (!found) return res.status(404).json({ message: "Message not found" });
+    const { message, chat } = found;
+    if (message.sender.toString() !== userId) {
+      return res.status(403).json({ message: "You can only edit your own messages" });
+    }
+    if (Date.now() - new Date(message.createdAt).getTime() > EDIT_WINDOW_MS) {
+      return res.status(400).json({ message: "Messages can only be edited within 15 minutes" });
+    }
+    if (message.text === text) return res.json({ messageId: message._id.toString(), text, editedAt: message.editedAt });
+    message.text = text;
+    message.editedAt = new Date();
+    await message.save();
+    const payload = {
+      chatId: chat._id.toString(),
+      messageId: message._id.toString(),
+      text,
+      editedAt: message.editedAt.toISOString(),
+    };
+    io.to(chat._id.toString()).emit("messageEdited", payload);
+    if (chat.lastMessage?.toString() === message._id.toString()) {
+      for (const participant of chat.participants) {
+        const socketId = userSocketMap.get(participant.toString());
+        if (socketId) {
+          io.to(socketId).emit("chatPreviewUpdate", {
+            id: chat._id.toString(),
+            lastMessage: {
+              senderId: userId,
+              content: text,
+              type: "text",
+              read: false,
+            },
+          });
+        }
+      }
+    }
+    res.json(payload);
+  } catch (error) {
+    console.error("Error editing message:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const reactToMessage = async (req, res, io) => {
+  const userId = req.user.id;
+  const emoji = req.body?.emoji;
+  if (typeof emoji !== "string" || !ALLOWED_REACTIONS.includes(emoji)) {
+    return res.status(400).json({ message: "Unsupported reaction" });
+  }
+  try {
+    const found = await loadMessageForMember(req.body?.messageId, userId);
+    if (!found) return res.status(404).json({ message: "Message not found" });
+    const { message, chat } = found;
+    const existing = message.reactions.find((r) => r.user.toString() === userId);
+    message.reactions = message.reactions.filter((r) => r.user.toString() !== userId);
+    if (!existing || existing.emoji !== emoji) {
+      message.reactions.push({ user: userId, emoji });
+    }
+    await message.save();
+    const payload = {
+      chatId: chat._id.toString(),
+      messageId: message._id.toString(),
+      reactions: message.reactions.map((r) => ({ user: r.user.toString(), emoji: r.emoji })),
+    };
+    io.to(chat._id.toString()).emit("messageReacted", payload);
+    res.json(payload);
+  } catch (error) {
+    console.error("Error reacting to message:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
