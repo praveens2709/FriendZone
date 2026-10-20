@@ -1,8 +1,9 @@
-import React, { useEffect } from "react";
-import { StyleSheet, TextInput, Alert, ScrollView } from "react-native";
+import React, { useEffect, useState } from "react";
+import { StyleSheet, TextInput, ScrollView } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import Button from "@/components/Button";
+import InlineError from "@/components/InlineError";
 import { useForm, Controller, SubmitHandler } from "react-hook-form";
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
@@ -52,15 +53,16 @@ export default function ProfileDetailsScreen() {
     }
   }, [user, setValue]);
 
+  const [submitError, setSubmitError] = useState("");
   const onSubmit: SubmitHandler<ProfileDetailsForm> = async (data) => {
     try {
+      setSubmitError("");
       loadingDialog.show();
-      console.log("Profile details submitted:", data);
       await updateProfile(data);
-      console.log("success", "Profile details saved successfully!");
+      
       router.push("/home");
     } catch (err: any) {
-      console.log("error", err.message || "Failed to save profile details.");
+      setSubmitError(err.message || "Couldn't save your profile. Try again.");
     } finally {
       loadingDialog.hide();
     }
@@ -183,7 +185,13 @@ export default function ProfileDetailsScreen() {
                   if (!value) return "Date of Birth is required";
                   const dobDate =
                     value instanceof Date ? value : new Date(value);
-                  const age = new Date().getFullYear() - dobDate.getFullYear();
+                  const today = new Date();
+                  let age = today.getFullYear() - dobDate.getFullYear();
+                  const beforeBirthday =
+                    today.getMonth() < dobDate.getMonth() ||
+                    (today.getMonth() === dobDate.getMonth() &&
+                      today.getDate() < dobDate.getDate());
+                  if (beforeBirthday) age -= 1;
                   return age >= 18 || "You must be at least 18 years old.";
                 },
               }}
@@ -204,6 +212,7 @@ export default function ProfileDetailsScreen() {
               )}
             />
           </ThemedView>
+          <InlineError message={submitError} style={{ marginBottom: 8 }} />
           <Button
             title="Save Profile"
             onPress={handleSubmit(onSubmit)}

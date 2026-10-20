@@ -9,11 +9,11 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { SocketProvider } from "@/context/SocketContext";
 import { StyleSheet, ActivityIndicator } from "react-native";
 import React from "react";
-import Toast from "react-native-toast-message";
-import CustomToast from "@/components/CustomToast";
 import { ThemedView } from "@/components/ThemedView";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { SavedPostsProvider } from "@/context/SavedPostsContext";
+import TermsGate from "@/components/TermsGate";
+import IncomingCallModal from "@/components/IncomingCallModal";
 
 function RootLayoutContent() {
   const { colors } = useTheme();
@@ -39,13 +39,8 @@ function RootLayoutContent() {
         translucent={true}
         backgroundColor="transparent"
       />
-      <Toast
-        config={{
-          success: (props) => <CustomToast {...props} />,
-          error: (props) => <CustomToast {...props} />,
-          info: (props) => <CustomToast {...props} />,
-        }}
-      />
+      <TermsGate />
+      <IncomingCallModal />
     </>
   );
 }

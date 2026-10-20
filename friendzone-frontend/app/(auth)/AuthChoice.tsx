@@ -1,65 +1,46 @@
 import React from "react";
-import { StyleSheet, Platform } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useRouter } from "expo-router";
-import { ThemedView } from "@/components/ThemedView";
 import AuthScreenWrapper from "@/components/AuthScreenWrapper";
-import Divider from "@/components/Divider";
 import Button from "@/components/Button";
 import AppLogo from "@/components/AppLogo";
+import { useTheme } from "@/context/ThemeContext";
 
 export default function AuthChoiceScreen() {
   const router = useRouter();
-
-  const handleGoogleSignIn = () => alert("Google Sign-In pressed");
-  const handleAppleSignIn = () => alert("Apple Sign-In pressed");
+  const { colors } = useTheme();
 
   return (
     <AuthScreenWrapper>
-      <ThemedView style={styles.container}>
-        <ThemedView style={styles.logoHeader}>
-          <AppLogo
-            showText
-            text="Welcome to FriendZone"
-            textStyle={{ fontSize: 30, fontWeight: 'bold' }}
-          />
-        </ThemedView>
-        <ThemedView style={styles.buttonGroup}>
-          <Button
-            title="Login with Email"
-            onPress={() => router.push("/(auth)/login")}
-          />
-          <Divider text="or" />
-          <Button
-            title="Sign Up with Email"
-            onPress={() => router.push("/(auth)/signup")}
-          />
-        </ThemedView>
+      <View style={styles.container}>
+        <View style={styles.logoHeader}>
+          <AppLogo size={96} />
+          <Text style={[styles.title, { color: colors.text }]}>Welcome to FriendZone</Text>
+          <Text style={[styles.subtitle, { color: colors.textDim }]}>
+            Log in or create an account to find your circle.
+          </Text>
+        </View>
 
-        <Divider text="or continue with" />
-
-        <ThemedView style={styles.buttonGroup}>
-          <Button title="Continue with Google" onPress={() => router.push("/(auth)/verify-otp")} />
-          {Platform.OS === "ios" && (
-            <Button title="Continue with Apple" onPress={handleAppleSignIn} />
-          )}
-        </ThemedView>
-      </ThemedView>
+        <View>
+          <View style={styles.card}>
+            <Button title="Create an account" onPress={() => router.push("/(auth)/signup")} />
+            <Button title="I already have an account" variant="outline" onPress={() => router.push("/(auth)/login")} />
+          </View>
+          <TouchableOpacity onPress={() => router.push("/(auth)/forget-password")} style={styles.forgot}>
+            <Text style={[styles.forgotText, { color: colors.textDim }]}>Forgot your password?</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </AuthScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    width: '95%',
-    margin: 'auto',
-    justifyContent: "center",
-  },
-  logoHeader: {
-    marginBottom: 40,
-    alignItems: "center",
-  },
-  buttonGroup: {
-    marginVertical: 14,
-  },
+  container: { flex: 1, width: "100%", justifyContent: "center", gap: 28 },
+  logoHeader: { alignItems: "center", gap: 6 },
+  title: { fontSize: 28, fontWeight: "900", textAlign: "center", marginTop: 8 },
+  subtitle: { fontSize: 15, lineHeight: 22, textAlign: "center", maxWidth: 280 },
+  card: { gap: 6 },
+  forgot: { alignItems: "center", paddingVertical: 16 },
+  forgotText: { fontSize: 14, fontWeight: "600" },
 });

@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet, TextInput, TouchableOpacity } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useForm, Controller } from "react-hook-form";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -9,7 +9,7 @@ import Button from "@/components/Button";
 import { useTheme } from "@/context/ThemeContext";
 import { useLoadingDialog } from "@/context/LoadingContext";
 import AuthServices from "@/services/AuthService";
-import { HandleApiError } from "@/constants/Functions";
+import { getApiError } from "@/constants/Functions";
 import AuthFormLayout from "@/components/AuthFormLayout";
 
 type TFormData = {
@@ -20,20 +20,22 @@ export default function ForgetPasswordScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const loadingDialog = useLoadingDialog();
-  const { control, handleSubmit, formState: { errors } } = useForm<TFormData>();
+  const params = useLocalSearchParams<{ email?: string }>();
+  const { control, handleSubmit, setError, clearErrors, formState: { errors } } = useForm<TFormData>({
+    defaultValues: { email: params.email ? String(params.email) : "" },
+  });
 
   const onSubmit = async (formData: TFormData) => {
     const email = formData.email.trim();
     try {
       loadingDialog.show();
-      const res = await AuthServices.forgetPassword({ email });
-      console.log("success", res.message);
+      await AuthServices.forgetPassword({ email });
       router.push({
         pathname: "/(auth)/verify-otp",
         params: { email, purpose: "forgot-password" },
       });
     } catch (err) {
-      HandleApiError(err);
+      setError("email", { type: "server", message: getApiError(err).message });
     } finally {
       loadingDialog.hide();
     }
@@ -61,11 +63,15 @@ export default function ForgetPasswordScreen() {
                       styles.input,
                       { 
                         color: colors.text, 
-                        borderColor: errors.email ? colors.error : colors.border 
+                        backgroundColor: colors.backgroundSecondary,
+                      borderColor: errors.email ? colors.error : colors.border 
                       },
                     ]}
                     value={value}
-                    onChangeText={onChange}
+                    onChangeText={(text) => {
+                      onChange(text);
+                      if (errors.email) clearErrors("email");
+                    }}
                   />
                 </ThemedView>
                 {errors.email && (
@@ -121,10 +127,10 @@ const styles = StyleSheet.create({
   input: {
     width: "100%",
     padding: 15,
-    borderWidth: 1,
-    borderRadius: 12,
+    borderWidth: 1.5,
+    borderRadius: 16,
     fontSize: 16,
-    height: 50,
+    height: 56,
   },
   backtologin: {
     alignSelf: "center",

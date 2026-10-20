@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getAuthSession, storeAuthSession } from "../utils/auth-storage";
 import { _post, _put } from "../configs/api-methods.config";
 import {
   IForgotPasswordResponse,
@@ -26,6 +26,7 @@ class AuthServices {
   static async signUp(data: {
     email: string;
     password: string;
+    acceptedTerms?: boolean;
   }): Promise<IRegisterResponse> {
     try {
       return await _post("auth/signup", data);
@@ -101,11 +102,9 @@ class AuthServices {
   }
 
   static async refreshAccessToken(): Promise<string> {
-    const storedSession = await AsyncStorage.getItem("AuthSession");
-    console.log("[RefreshAccessToken] Stored session:", storedSession);
+    const storedSession = await getAuthSession();
 
     if (!storedSession) {
-      console.error("[RefreshAccessToken] No session found in AsyncStorage.");
       throw new Error("No auth session found");
     }
 
@@ -117,17 +116,34 @@ class AuthServices {
       undefined
     );
 
-    const newAccessToken = response.accessToken;
     const updatedSession: AuthSession = {
       ...session,
-      accessToken: newAccessToken,
+      accessToken: response.accessToken,
     };
 
-    console.log("[RefreshAccessToken] Updated session:", updatedSession);
+    await storeAuthSession(updatedSession);
 
-    await AsyncStorage.setItem("AuthSession", JSON.stringify(updatedSession));
+    return response.accessToken;
+  }
 
-    return newAccessToken;
+  static async acceptTerms(): Promise<void> {
+    await _post("auth/accept-terms", {});
+  }
+
+  static async requestEmailChange(data: { newEmail: string; password: string }) {
+    return await _post<{ message: string }>("auth/email-change/request", data);
+  }
+
+  static async confirmEmailChange(otp: string) {
+    return await _post<{ message: string; email: string }>("auth/email-change/confirm", { otp });
+  }
+
+  static async logout(): Promise<void> {
+    try {
+      await _post("auth/logout", {});
+    } catch {
+      return;
+    }
   }
 }
 

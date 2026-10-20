@@ -11,7 +11,6 @@ import Button from "@/components/Button";
 import { useTheme } from "@/context/ThemeContext";
 import { useLoadingDialog } from "@/context/LoadingContext";
 import AuthServices from "@/services/AuthService";
-import { HandleApiError } from "@/constants/Functions";
 import { Ionicons } from "@expo/vector-icons";
 
 type TRouteProp = RouteProp<
@@ -47,25 +46,15 @@ export default function ResetPasswordScreen() {
 
     try {
       loadingDialog.show();
-      console.log("reset-password payload", {
+      await AuthServices.resetPassword({
         email,
         otp,
         newPassword: password,
       });
-      const res = await AuthServices.resetPassword({
-        email,
-        otp,
-        newPassword: password,
-      });
-      console.log("success", res.message);
-      router.replace("/(auth)/login");
+      router.replace({ pathname: "/(auth)/login", params: { email } });
     } catch (err) {
         const serverMessage = (err as any)?.response?.data?.message || "An unknown error occurred.";
-        if (serverMessage) {
-            setError("password", { type: "server", message: serverMessage });
-        } else {
-            HandleApiError(err);
-        }
+        setError("password", { type: "server", message: serverMessage });
     } finally {
       loadingDialog.hide();
     }
@@ -103,7 +92,8 @@ export default function ResetPasswordScreen() {
                       styles.input,
                       { 
                         color: colors.text, 
-                        borderColor: errors.password ? colors.error : colors.border 
+                        backgroundColor: colors.backgroundSecondary,
+                      borderColor: errors.password ? colors.error : colors.border 
                       },
                     ]}
                     value={value}
@@ -149,7 +139,8 @@ export default function ResetPasswordScreen() {
                       styles.input,
                       { 
                         color: colors.text, 
-                        borderColor: errors.confirmPassword ? colors.error : colors.border 
+                        backgroundColor: colors.backgroundSecondary,
+                      borderColor: errors.confirmPassword ? colors.error : colors.border 
                       },
                     ]}
                     value={value}
@@ -219,10 +210,10 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     padding: 15,
-    borderWidth: 1,
-    borderRadius: 12,
+    borderWidth: 1.5,
+    borderRadius: 16,
     fontSize: 16,
-    height: 50,
+    height: 56,
     paddingRight: 50,
   },
   eyeIcon: {

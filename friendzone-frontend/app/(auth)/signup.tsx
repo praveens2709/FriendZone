@@ -1,3 +1,4 @@
+import { getApiError } from "@/constants/Functions";
 import React, { useState } from "react";
 import {
   StyleSheet,
@@ -8,6 +9,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import AppLogo from "@/components/AppLogo";
 import Button from "@/components/Button";
+import EmailSuggestion from "@/components/EmailSuggestion";
 import { useForm, Controller } from "react-hook-form";
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
@@ -39,9 +41,11 @@ export default function SignupScreen({
   const loadingDialog = useLoadingDialog();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [agreed, setAgreed] = useState(false);
+  const [agreeError, setAgreeError] = useState(false);
 
 
-  const { control, handleSubmit, watch, formState: { errors }, setError } = useForm<TFormData>({
+  const { control, handleSubmit, watch, formState: { errors }, setError, clearErrors } = useForm<TFormData>({
     defaultValues: {
       email: "",
       password: "",
@@ -52,13 +56,16 @@ export default function SignupScreen({
   const passwordValue = watch("password");
 
   const onSubmit = async (formData: TFormData) => {
+    if (!agreed) {
+      setAgreeError(true);
+      return;
+    }
     const email = formData.email.trim();
     const password = formData.password.trim();
     try {
       loadingDialog.show();
       await signUp(email, password);
       if (isModal) {
-        console.log("success", "Account created! Please verify your email.");
         onCloseModal?.();
       } else {
         router.push({
@@ -67,18 +74,13 @@ export default function SignupScreen({
         });
       }
     } catch (err: any) {
-      if (err.message) {
-        if (err.message.includes("Password must contain at least one uppercase letter")) {
-          setError("password", { type: "manual", message: "Password must include a capital letter." });
-        } else if (err.message.includes("Password must contain at least one special character")) {
-          setError("password", { type: "manual", message: "Password must include a special character (!$@%)." });
-        } else if (err.message.includes("Password must contain at least one number")) {
-          setError("password", { type: "manual", message: "Password must include a number." });
-        } else {
-          setError("password", { type: "manual", message: err.message });
-        }
+      const { message, code } = getApiError(err);
+      if (code === "ACCOUNT_EXISTS" || code === "INVALID_EMAIL") {
+        setError("email", { type: "server", message });
+      } else if (code === "WEAK_PASSWORD") {
+        setError("password", { type: "server", message });
       } else {
-        console.log("Signup Failed", err.message || "Please try again.");
+        setError("email", { type: "server", message });
       }
     } finally {
       loadingDialog.hide();
@@ -115,6 +117,7 @@ export default function SignupScreen({
                     styles.input,
                     { 
                       color: colors.text, 
+                      backgroundColor: colors.backgroundSecondary,
                       borderColor: errors.email ? colors.error : colors.border 
                     },
                   ]}
@@ -127,6 +130,7 @@ export default function SignupScreen({
                   {errors.email.message}
                 </ThemedText>
               )}
+              <EmailSuggestion email={value} onApply={(suggested) => { onChange(suggested); clearErrors("email"); }} />
             </>
           )}
         />
@@ -137,12 +141,12 @@ export default function SignupScreen({
           rules={{
             required: "Password is required.",
             minLength: {
-              value: 6,
-              message: "Password must be at least 6 characters.",
+              value: 8,
+              message: "Password must be at least 8 characters.",
             },
             pattern: {
-              value: /^(?=.*[A-Z])(?=.*[!$@%])(?=.*[0-9]).{6,}$/,
-              message: "Password must include a capital letter, number, and special character.",
+              value: /^(?=.*[A-Z])(?=.*[^A-Za-z0-9])(?=.*[0-9]).{8,}$/,
+              message: "Password must include a capital letter, a number and a special character.",
             },
           }}
           render={({ field: { onChange, value } }) => (
@@ -157,6 +161,7 @@ export default function SignupScreen({
                     styles.input,
                     { 
                       color: colors.text, 
+                      backgroundColor: colors.backgroundSecondary,
                       borderColor: errors.password ? colors.error : colors.border 
                     },
                   ]}
@@ -203,6 +208,7 @@ export default function SignupScreen({
                     styles.input,
                     { 
                       color: colors.text, 
+                      backgroundColor: colors.backgroundSecondary,
                       borderColor: errors.confirmPassword ? colors.error : colors.border 
                     },
                   ]}
@@ -228,6 +234,38 @@ export default function SignupScreen({
             </>
           )}
         />
+
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={styles.agreeRow}
+          onPress={() => {
+            setAgreed(!agreed);
+            setAgreeError(false);
+          }}
+        >
+          <Ionicons
+            name={agreed ? "checkbox" : "square-outline"}
+            size={24}
+            color={agreeError ? colors.error : colors.primary}
+          />
+          <ThemedText style={[styles.agreeText, agreeError && { color: colors.error }]}>
+            I'm 18 or older and I agree to the{" "}
+            <ThemedText
+              style={styles.agreeLink}
+              onPress={() => router.push("/legal/terms")}
+            >
+              Terms
+            </ThemedText>{" "}
+            and{" "}
+            <ThemedText
+              style={styles.agreeLink}
+              onPress={() => router.push("/legal/privacy")}
+            >
+              Privacy Policy
+            </ThemedText>
+            .
+          </ThemedText>
+        </TouchableOpacity>
 
         <Button
           title="Sign Up"
@@ -256,6 +294,9 @@ export default function SignupScreen({
 }
 
 const styles = StyleSheet.create({
+  agreeRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, marginTop: 4 },
+  agreeText: { flex: 1, fontSize: 13, lineHeight: 19 },
+  agreeLink: { fontSize: 13, lineHeight: 19, fontWeight: "800", textDecorationLine: "underline" },
   container: {
     flex: 1,
     justifyContent: "center",
@@ -281,10 +322,10 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     padding: 15,
-    borderWidth: 1,
-    borderRadius: 12,
+    borderWidth: 1.5,
+    borderRadius: 16,
     fontSize: 16,
-    height: 50,
+    height: 56,
     paddingRight: 50,
   },
   eyeIcon: {

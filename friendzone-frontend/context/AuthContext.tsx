@@ -15,8 +15,8 @@ import { removeFilterSettings } from "@/utils/filter-storage";
 import { AuthSession } from "@/types/auth-session.type";
 import AuthServices from "@/services/AuthService";
 import { useThemeStore, ThemeType } from "@/store/themeStore";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { User } from "@/types/user.type";
+import { getApiError } from "@/constants/Functions";
 import ProfileServices from "@/services/ProfileService";
 
 interface AuthContextType {
@@ -55,9 +55,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const availableThemes = useThemeStore((state) => state.availableThemes);
 
   const signOut = useCallback(async () => {
+    await AuthServices.logout();
     await removeAuthSession();
     await removeFilterSettings();
-    await AsyncStorage.removeItem("userToken");
     setSession(null);
     setAccessToken(null);
     setIsAuthenticated(false);
@@ -66,7 +66,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const loadUserProfile = useCallback(
     async (tokenOverride?: string | null) => {
-      const token = tokenOverride || (await AsyncStorage.getItem("userToken"));
+      let token = tokenOverride;
+      if (!token) {
+        const stored = await getAuthSession();
+        token = stored ? (JSON.parse(stored) as AuthSession).accessToken : null;
+      }
       try {
         if (token) {
           const userProfile = await ProfileServices.getProfile(token);
@@ -127,7 +131,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = async (sessionData: AuthSession) => {
     await storeAuthSession(sessionData);
-    await AsyncStorage.setItem("userToken", sessionData.accessToken);
     setSession(sessionData);
     setAccessToken(sessionData.accessToken || null);
     setIsAuthenticated(true);
@@ -141,7 +144,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signUp = async (email: string, password: string) => {
-    await AuthServices.signUp({ email, password });
+    await AuthServices.signUp({ email, password, acceptedTerms: true });
   };
 
   const updateUserTheme = async (theme: ThemeType) => {
@@ -149,13 +152,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw new Error("No active session to update theme.");
     }
 
+    const previousTheme = useThemeStore.getState().theme;
+    setThemeFromStore(theme);
+
     try {
       await AuthServices.updateTheme(session.accessToken, theme);
       const updatedSession = { ...session, theme };
       setSession(updatedSession);
       await storeAuthSession(updatedSession);
-      setThemeFromStore(theme);
     } catch (error) {
+      setThemeFromStore(previousTheme);
       throw error;
     }
   };
@@ -182,22 +188,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (profileData.gender) {
         formData.append("gender", profileData.gender);
       }
-      const dob =
-        profileData.dob instanceof Date
-          ? profileData.dob
-          : new Date(profileData.dob);
-      const formattedDob = `${dob.getFullYear()}-${(dob.getMonth() + 1)
-        .toString()
-        .padStart(2, "0")}-${dob.getDate().toString().padStart(2, "0")}`;
-      formData.append("dob", formattedDob);
+      if (profileData.dob) {
+        const dob =
+          profileData.dob instanceof Date
+            ? profileData.dob
+            : new Date(profileData.dob);
+        if (!Number.isNaN(dob.getTime())) {
+          const formattedDob = `${dob.getFullYear()}-${(dob.getMonth() + 1)
+            .toString()
+            .padStart(2, "0")}-${dob.getDate().toString().padStart(2, "0")}`;
+          formData.append("dob", formattedDob);
+        }
+      }
 
-      if (profileData.profileImage) {
+      if (profileData.profileImage && !/^https?:\/\//i.test(profileData.profileImage)) {
         const uriParts = profileData.profileImage.split(".");
-        const fileType = uriParts[uriParts.length - 1];
-        const fileName = `profile.${fileType}`;
+        const rawType = (uriParts[uriParts.length - 1] || "jpeg").toLowerCase().split("?")[0];
+        const fileType = rawType === "jpg" ? "jpeg" : rawType;
         formData.append("profileImage", {
           uri: profileData.profileImage,
-          name: fileName,
+          name: `profile.${rawType}`,
           type: `image/${fileType}`,
         } as any);
       }
@@ -208,8 +218,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       );
       setUser(response.user);
     } catch (error) {
-      console.error("Failed to update profile:", error);
-      throw new Error("Failed to update profile");
+      throw new Error(getApiError(error).message);
     }
   };
 

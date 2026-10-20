@@ -1,17 +1,18 @@
 import React, { useState } from "react";
 import { StyleSheet, TouchableOpacity, TextInput } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useForm, Controller } from "react-hook-form";
 import { Ionicons } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import AppLogo from "@/components/AppLogo";
 import Button from "@/components/Button";
+import EmailSuggestion from "@/components/EmailSuggestion";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useLoadingDialog } from "@/context/LoadingContext";
 import AuthServices from "@/services/AuthService";
-import { HandleApiError } from "@/constants/Functions";
+import { getApiError } from "@/constants/Functions";
 import AuthFormLayout from "@/components/AuthFormLayout";
 
 interface LoginScreenProps {
@@ -33,29 +34,62 @@ export default function LoginScreen({
   const { colors } = useTheme();
   const router = useRouter();
   const auth = useAuth();
-  const { control, handleSubmit, formState: { errors } } = useForm<TFormData>();
+  const params = useLocalSearchParams<{ email?: string }>();
+  const { control, handleSubmit, setError, clearErrors, getValues, formState: { errors } } = useForm<TFormData>({
+    defaultValues: { email: params.email ? String(params.email) : "", password: "" },
+  });
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
   const loadingDialog = useLoadingDialog();
   const [showPassword, setShowPassword] = useState(false);
 
   const onSubmit = async (formData: TFormData) => {
+    const credentials = { email: formData.email.trim(), password: formData.password };
+    setNeedsVerification(false);
     try {
       loadingDialog.show();
-      const response = await AuthServices.signIn(formData);
+      const response = await AuthServices.signIn(credentials);
       if (response) {
         await auth.signIn({
           accessToken: response.tokens.accessToken,
           refreshToken: response.tokens.refreshToken,
           theme: response.theme,
         });
-        if (response.message) console.log("success", response.message);
         onCloseModal?.();
         router.replace("/home");
       }
     } catch (error) {
-      HandleApiError(error);
+      const { message, code } = getApiError(error);
+      if (code === "INVALID_CREDENTIALS" || code === "WRONG_PASSWORD") {
+        setError("password", { type: "server", message });
+      } else if (code === "NOT_VERIFIED") {
+        setError("email", { type: "server", message });
+        setNeedsVerification(true);
+        setLoginEmail(credentials.email);
+        setLoginPassword(credentials.password);
+      } else if (code === "ACCOUNT_NOT_FOUND" || code === "INVALID_EMAIL") {
+        setError("email", { type: "server", message });
+      } else {
+        setError("password", { type: "server", message });
+      }
     } finally {
       loadingDialog.hide();
     }
+  };
+
+  const goToVerification = async () => {
+    try {
+      loadingDialog.show();
+      await AuthServices.resendOtp(loginEmail);
+    } catch {
+    } finally {
+      loadingDialog.hide();
+    }
+    router.push({
+      pathname: "/(auth)/verify-otp",
+      params: { email: loginEmail, password: loginPassword, purpose: "signup" },
+    });
   };
 
   const loginContent = (
@@ -79,17 +113,29 @@ export default function LoginScreen({
                     styles.input,
                     { 
                       color: colors.text, 
+                      backgroundColor: colors.backgroundSecondary,
                       borderColor: errors.email ? colors.error : colors.border 
                     },
                   ]}
                   value={value}
-                  onChangeText={onChange}
+                  onChangeText={(text) => {
+                    onChange(text);
+                    if (errors.email) clearErrors("email");
+                  }}
                 />
               </ThemedView>
               {errors.email && (
                 <ThemedText style={[styles.errorText, { color: colors.error }]}>
                   {errors.email.message}
                 </ThemedText>
+              )}
+              <EmailSuggestion email={value} onApply={(suggested) => { onChange(suggested); clearErrors("email"); }} />
+              {needsVerification && (
+                <TouchableOpacity onPress={goToVerification}>
+                  <ThemedText style={{ fontWeight: "600", textDecorationLine: "underline" }}>
+                    Verify my email
+                  </ThemedText>
+                </TouchableOpacity>
               )}
             </>
           )}
@@ -110,11 +156,15 @@ export default function LoginScreen({
                     styles.input,
                     { 
                       color: colors.text, 
+                      backgroundColor: colors.backgroundSecondary,
                       borderColor: errors.password ? colors.error : colors.border 
                     },
                   ]}
                   value={value}
-                  onChangeText={onChange}
+                  onChangeText={(text) => {
+                    onChange(text);
+                    if (errors.password) clearErrors("password");
+                  }}
                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
@@ -134,7 +184,12 @@ export default function LoginScreen({
               )}
               <TouchableOpacity
                 style={styles.forgotPassword}
-                onPress={() => router.push("/(auth)/forget-password")}
+                onPress={() =>
+                  router.push({
+                    pathname: "/(auth)/forget-password",
+                    params: { email: getValues("email")?.trim() || "" },
+                  })
+                }
               >
                 <ThemedText
                   style={{
@@ -205,10 +260,10 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     padding: 15,
-    borderWidth: 1,
-    borderRadius: 12,
+    borderWidth: 1.5,
+    borderRadius: 16,
     fontSize: 16,
-    height: 50,
+    height: 56,
     paddingRight: 50,
   },
   eyeIcon: {
