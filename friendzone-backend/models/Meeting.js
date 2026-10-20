@@ -33,6 +33,30 @@ const meetingSchema = new mongoose.Schema({
         trim: true,
         maxlength: 500,
     },
+    kind: {
+        type: String,
+        enum: ['video', 'in_person'],
+        default: 'video',
+    },
+    audioOnly: {
+        type: Boolean,
+        default: false,
+    },
+    instant: {
+        type: Boolean,
+        default: false,
+    },
+    chat: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Chat',
+        default: null,
+    },
+    location: {
+        type: String,
+        trim: true,
+        maxlength: 200,
+        default: '',
+    },
     host: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -50,7 +74,6 @@ const meetingSchema = new mongoose.Schema({
     },
     endTime: {
         type: Date,
-        // Optional - if not provided, defaults to startTime + 2 hours
     },
     actualStartTime: {
         type: Date,
@@ -69,7 +92,7 @@ const meetingSchema = new mongoose.Schema({
         type: Number,
         default: 15,
         min: 2,
-        max: 100, // 100ms supports up to 100 participants
+        max: 100,
     },
     settings: {
         isRecordingEnabled: {
@@ -95,19 +118,15 @@ const meetingSchema = new mongoose.Schema({
     },
 }, { timestamps: true });
 
-// Generate unique roomId before saving
 meetingSchema.pre('save', function (next) {
     if (this.isNew && !this.roomId) {
-        // Generate a unique room ID: combination of timestamp + random string
         this.roomId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     }
     next();
 });
 
-// Indexes for efficient queries
 meetingSchema.index({ host: 1, status: 1 });
 meetingSchema.index({ 'participants.user': 1, status: 1 });
 meetingSchema.index({ startTime: 1 });
-// Note: roomId index is already created by unique: true on the field
 
 export default mongoose.model('Meeting', meetingSchema);

@@ -2,28 +2,123 @@ import Meeting from '../models/Meeting.js';
 import mongoose from 'mongoose';
 import Knock from '../models/Knock.js';
 import User from '../models/User.js';
+import Notification from '../models/Notification.js';
 import { createNotification } from './notificationController.js';
-import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
+import { toIdList, escapeRegex, cleanString } from '../utils/validate.js';
+import { getBlockedIds } from '../services/privacyService.js';
 import { StreamClient } from '@stream-io/node-sdk';
 
-const streamClient = new StreamClient(process.env.STREAM_API_KEY, process.env.STREAM_SECRET_KEY);
-// 100ms logic removed
+let streamClient = null;
 
+const getStreamClient = () => {
+    if (!streamClient) {
+        if (!process.env.STREAM_API_KEY || !process.env.STREAM_SECRET_KEY) {
+            throw new Error('Stream credentials are not configured');
+        }
+        streamClient = new StreamClient(process.env.STREAM_API_KEY, process.env.STREAM_SECRET_KEY);
+    }
+    return streamClient;
+};
 
-// Create a new meeting
+const POPULATE_FIELDS = [
+    { path: 'host', select: 'firstName lastName profileImage' },
+    { path: 'participants.user', select: 'firstName lastName profileImage' },
+];
+
+const emitMeetingUpdate = async (io, meeting) => {
+    if (!io) return;
+    try {
+        const populated = await Meeting.findById(meeting._id).populate(POPULATE_FIELDS).lean();
+        if (!populated || !populated.host) return;
+        const clean = { ...populated, participants: populated.participants.filter((p) => p.user) };
+        const recipients = [
+            populated.host._id.toString(),
+            ...clean.participants.map((p) => p.user._id.toString()),
+        ];
+        recipients.forEach((id) => io.to(`notifications-${id}`).emit('meetingUpdated', clean));
+    } catch (error) {
+        console.error('Error emitting meeting update:', error.message);
+    }
+};
+
+export const removeMeetingNotifications = async (meeting, io) => {
+    const meetingId = meeting._id.toString();
+    const recipients = await Notification.distinct('recipient', {
+        $or: [{ relatedEntityId: meeting._id }, { 'metadata.meetingId': meetingId }]
+    });
+    await Notification.deleteMany({
+        $or: [{ relatedEntityId: meeting._id }, { 'metadata.meetingId': meetingId }]
+    });
+    if (io) {
+        recipients.forEach((id) => {
+            io.to(`notifications-${id}`).emit('meetingNotificationsRemoved', { meetingId });
+        });
+    }
+};
+
+export const expireStaleMeetings = async () => {
+    const now = new Date();
+    await Meeting.updateMany(
+        { status: 'upcoming', endTime: { $lt: now } },
+        { $set: { status: 'completed', actualEndTime: now } }
+    );
+    await Meeting.updateMany(
+        { status: 'live', endTime: { $lt: new Date(now.getTime() - 3 * 60 * 60 * 1000) } },
+        { $set: { status: 'completed', actualEndTime: now } }
+    );
+};
+
+const SETTING_KEYS = ['isRecordingEnabled', 'waitingRoomEnabled', 'muteOnEntry', 'allowScreenShare'];
+
+const sanitizeSettings = (settings) => {
+    const clean = {};
+    if (settings && typeof settings === 'object') {
+        for (const key of SETTING_KEYS) {
+            if (typeof settings[key] === 'boolean') clean[key] = settings[key];
+        }
+    }
+    return clean;
+};
+
+const filterInvitableUsers = async (hostId, ids) => {
+    const candidates = ids.filter((id) => id !== hostId);
+    if (!candidates.length) return [];
+    const blocked = await getBlockedIds(hostId);
+    const users = await User.find({
+        _id: { $in: candidates.filter((id) => !blocked.has(id)) },
+        isVerified: true,
+    })
+        .select('_id')
+        .lean();
+    return users.map((u) => u._id.toString());
+};
+
 export const createMeeting = async (req, res, io) => {
     try {
-        const { title, description, startTime, endTime, participants, maxParticipants, settings } = req.body;
+        const { startTime, endTime, maxParticipants, settings } = req.body;
+        const title = cleanString(req.body.title, 100);
+        const description = cleanString(req.body.description, 500);
+        const kind = req.body.kind === 'in_person' ? 'in_person' : 'video';
+        const location = cleanString(req.body.location, 200);
         const hostId = req.user._id;
+
+        if (kind === 'in_person' && !location) {
+            return res.status(400).json({ message: 'A place is required for in-person plans' });
+        }
 
         if (!title || !startTime) {
             return res.status(400).json({ message: 'Title and start time are required' });
         }
 
         const start = new Date(startTime);
-        // Default end time to 2 hours after start if not provided
+        if (Number.isNaN(start.getTime())) {
+            return res.status(400).json({ message: 'Invalid start time' });
+        }
         const end = endTime ? new Date(endTime) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
+        if (Number.isNaN(end.getTime())) {
+            return res.status(400).json({ message: 'Invalid end time' });
+        }
 
         if (endTime && start >= end) {
             return res.status(400).json({ message: 'End time must be after start time' });
@@ -33,39 +128,42 @@ export const createMeeting = async (req, res, io) => {
             return res.status(400).json({ message: 'Start time cannot be in the past' });
         }
 
-        // Generate internal room ID (UUID)
+        const requested = req.body.participants === undefined ? [] : toIdList(req.body.participants, 100);
+        if (!requested) {
+            return res.status(400).json({ message: 'Invalid participants' });
+        }
+
+        const participants = await filterInvitableUsers(hostId.toString(), requested);
+
         const roomId = uuidv4();
 
-
-        // Build participants array from user IDs
-        const participantsList = participants?.map(userId => ({
+        const participantsList = participants.map(userId => ({
             user: userId,
             status: 'pending',
-        })) || [];
+        }));
 
         const meeting = new Meeting({
             title,
             description,
+            kind,
+            location,
             host: hostId,
             participants: participantsList,
-            roomId: roomId, // Use internal UUID
+            roomId: roomId,
             startTime: start,
             endTime: end,
-            maxParticipants: maxParticipants || 100, // 100ms supports more participants
-            settings: settings || {},
+            maxParticipants: Math.min(Math.max(parseInt(maxParticipants, 10) || 100, 2), 100),
+            settings: sanitizeSettings(settings),
         });
 
         await meeting.save();
 
-        // Populate host and participants for response
         await meeting.populate([
             { path: 'host', select: 'firstName lastName profileImage' },
             { path: 'participants.user', select: 'firstName lastName profileImage' }
         ]);
 
-        // Send notifications to all participants
-        if (participants && participants.length > 0 && io) {
-            const hostName = `${meeting.host.firstName} ${meeting.host.lastName || ''}`.trim();
+        if (participants.length > 0 && io) {
             const formattedTime = start.toLocaleString('en-US', {
                 month: 'short',
                 day: 'numeric',
@@ -96,7 +194,6 @@ export const createMeeting = async (req, res, io) => {
             }
         }
 
-        // Emit real-time event to host and participants
         if (io) {
             const recipientIds = [...participants, hostId.toString()];
             recipientIds.forEach(id => {
@@ -111,11 +208,13 @@ export const createMeeting = async (req, res, io) => {
     }
 };
 
-// Get all meetings for the logged-in user (as host or participant)
 export const getUserMeetings = async (req, res) => {
     try {
         const userId = req.user._id;
-        const { status, page = 1, limit = 20 } = req.query;
+        await expireStaleMeetings();
+        const { status } = req.query;
+        const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
 
         const query = {
             $or: [
@@ -124,8 +223,22 @@ export const getUserMeetings = async (req, res) => {
             ]
         };
 
-        if (status) {
+        if (status === 'past') {
+            query.status = { $in: ['completed', 'cancelled'] };
+        } else if (typeof status === 'string' && ['upcoming', 'live', 'completed', 'cancelled'].includes(status)) {
             query.status = status;
+        }
+
+        const from = req.query.from ? new Date(req.query.from) : null;
+        const to = req.query.to ? new Date(req.query.to) : null;
+        if (from && !Number.isNaN(from.getTime())) query.startTime = { ...query.startTime, $gte: from };
+        if (to && !Number.isNaN(to.getTime())) query.startTime = { ...query.startTime, $lte: to };
+
+        const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 50) : '';
+        if (q) query.title = { $regex: escapeRegex(q), $options: 'i' };
+
+        if (req.query.includeInstant !== 'true') {
+            query.instant = { $ne: true };
         }
 
         const skip = (page - 1) * limit;
@@ -133,14 +246,19 @@ export const getUserMeetings = async (req, res) => {
         const meetings = await Meeting.find(query)
             .populate('host', 'firstName lastName profileImage')
             .populate('participants.user', 'firstName lastName profileImage')
-            .sort({ startTime: 1 })
+            .sort({ startTime: ['completed', 'cancelled', 'past'].includes(String(status)) ? -1 : 1 })
             .skip(skip)
-            .limit(Number(limit));
+            .limit(Number(limit))
+            .lean();
 
         const total = await Meeting.countDocuments(query);
 
+        const cleanMeetings = meetings
+            .filter((m) => m.host)
+            .map((m) => ({ ...m, participants: m.participants.filter((p) => p.user) }));
+
         res.json({
-            meetings,
+            meetings: cleanMeetings,
             pagination: {
                 page: Number(page),
                 limit: Number(limit),
@@ -154,7 +272,6 @@ export const getUserMeetings = async (req, res) => {
     }
 };
 
-// Get a single meeting by ID
 export const getMeetingById = async (req, res) => {
     try {
         const { meetingId } = req.params;
@@ -168,11 +285,12 @@ export const getMeetingById = async (req, res) => {
             .populate('host', 'firstName lastName profileImage')
             .populate('participants.user', 'firstName lastName profileImage');
 
-        if (!meeting) {
+        if (!meeting || !meeting.host) {
             return res.status(404).json({ message: 'Meeting not found' });
         }
 
-        // Check if user has access to this meeting
+        meeting.participants = meeting.participants.filter((p) => p.user);
+
         const isHost = meeting.host._id.toString() === userId.toString();
         const isParticipant = meeting.participants.some(
             p => p.user._id.toString() === userId.toString()
@@ -191,7 +309,6 @@ export const getMeetingById = async (req, res) => {
 
 
 
-// Generate Stream Token for joining a meeting
 export const generateMeetingToken = async (req, res) => {
     try {
         const { meetingId } = req.params;
@@ -204,7 +321,10 @@ export const generateMeetingToken = async (req, res) => {
             return res.status(404).json({ message: 'Meeting not found' });
         }
 
-        // Check if user has access
+        if (meeting.kind === 'in_person') {
+            return res.status(400).json({ message: 'This plan is in person' });
+        }
+
         const isHost = meeting.host.toString() === userId.toString();
         const isParticipant = meeting.participants.some(
             p => p.user.toString() === userId.toString()
@@ -217,16 +337,12 @@ export const generateMeetingToken = async (req, res) => {
         if (meeting.status === 'cancelled') {
             return res.status(400).json({ message: 'This meeting has been cancelled' });
         }
-        // Allow token generation for completed meetings so they can be played back
 
 
-        // Generate Stream User Token
-        // Expiration: 24 hours
-        const exp = Math.round(new Date().getTime() / 1000) + 24 * 60 * 60;
-        const token = streamClient.createToken(userId.toString(), exp);
+        const exp = Math.round(new Date().getTime() / 1000) + 6 * 60 * 60;
+        const token = getStreamClient().createToken(userId.toString(), exp);
 
-        // Optionally upsert user in Stream (not strictly required if client handles it, but good practice)
-        await streamClient.upsertUsers([{
+        await getStreamClient().upsertUsers([{
             id: userId.toString(),
             role: isHost ? 'admin' : 'user',
             name: userName,
@@ -236,7 +352,7 @@ export const generateMeetingToken = async (req, res) => {
         res.json({
             roomId: meeting.roomId,
             token: token,
-            apiKey: process.env.STREAM_API_KEY, // Send API Key to frontend
+            apiKey: process.env.STREAM_API_KEY,
             userId: userId.toString(),
             userName,
             isHost,
@@ -248,7 +364,6 @@ export const generateMeetingToken = async (req, res) => {
 };
 
 
-// Update meeting status (start/end meeting)
 export const updateMeetingStatus = async (req, res) => {
     try {
         const { meetingId } = req.params;
@@ -261,7 +376,10 @@ export const updateMeetingStatus = async (req, res) => {
             return res.status(404).json({ message: 'Meeting not found' });
         }
 
-        // Only host can update status
+        if (meeting.kind === 'in_person' && status === 'live') {
+            return res.status(400).json({ message: 'In-person plans have nothing to start.' });
+        }
+
         if (meeting.host.toString() !== userId.toString()) {
             return res.status(403).json({ message: 'Only the host can update meeting status' });
         }
@@ -273,7 +391,7 @@ export const updateMeetingStatus = async (req, res) => {
             cancelled: [],
         };
 
-        if (!validTransitions[meeting.status].includes(status)) {
+        if (!validTransitions[meeting.status]?.includes(status)) {
             return res.status(400).json({
                 message: `Cannot transition from ${meeting.status} to ${status}`
             });
@@ -288,6 +406,10 @@ export const updateMeetingStatus = async (req, res) => {
         }
 
         await meeting.save();
+        if (status === 'cancelled') {
+            await removeMeetingNotifications(meeting, req.app.get('socketio'));
+        }
+        await emitMeetingUpdate(req.app.get('socketio'), meeting);
         await meeting.populate([
             { path: 'host', select: 'firstName lastName profileImage' },
             { path: 'participants.user', select: 'firstName lastName profileImage' }
@@ -300,11 +422,10 @@ export const updateMeetingStatus = async (req, res) => {
     }
 };
 
-// Respond to meeting invitation (accept/decline)
 export const respondToInvitation = async (req, res, io) => {
     try {
         const { meetingId } = req.params;
-        const { response } = req.body; // 'accepted' or 'declined'
+        const { response } = req.body;
         const userId = req.user._id;
 
         if (!['accepted', 'declined'].includes(response)) {
@@ -329,11 +450,28 @@ export const respondToInvitation = async (req, res, io) => {
         meeting.participants[participantIndex].status = response;
         await meeting.save();
 
-        // Get responding user info
+        try {
+            await Notification.updateMany(
+                {
+                    recipient: userId,
+                    $or: [
+                        { relatedEntityId: meeting._id },
+                        { 'metadata.meetingId': meeting._id.toString() }
+                    ]
+                },
+                {
+                    $set: {
+                        'metadata.status': response
+                    }
+                }
+            );
+        } catch (notifUpdateErr) {
+            console.error('Error updating invitee notification status:', notifUpdateErr);
+        }
+
         const respondingUser = await User.findById(userId).select('firstName lastName profileImage');
         const userName = respondingUser ? `${respondingUser.firstName} ${respondingUser.lastName || ''}`.trim() : 'Someone';
 
-        // Notify host about the response
         if (io && meeting.host._id.toString() !== userId.toString()) {
             await createNotification({
                 recipientId: meeting.host._id,
@@ -349,7 +487,6 @@ export const respondToInvitation = async (req, res, io) => {
                 io
             });
 
-            // Emit real-time event to host
             io.to(`notifications-${meeting.host._id}`).emit('meetingInviteResponse', {
                 meetingId: meeting._id.toString(),
                 participantId: userId.toString(),
@@ -358,6 +495,15 @@ export const respondToInvitation = async (req, res, io) => {
             });
         }
 
+        if (io) {
+            io.to(`notifications-${userId}`).emit('meetingInviteStatusUpdated', {
+                meetingId: meeting._id.toString(),
+                status: response
+            });
+        }
+
+        await emitMeetingUpdate(io, meeting);
+
         res.json({ message: `Invitation ${response}` });
     } catch (error) {
         console.error('Error responding to invitation:', error);
@@ -365,16 +511,17 @@ export const respondToInvitation = async (req, res, io) => {
     }
 };
 
-// Add participants to an existing meeting
 export const addParticipants = async (req, res, io) => {
     try {
         const { meetingId } = req.params;
-        const { participants } = req.body; // Array of user IDs
+        const requestedIds = toIdList(req.body.participants, 100);
         const userId = req.user._id;
 
-        if (!participants || !Array.isArray(participants) || participants.length === 0) {
+        if (!requestedIds || requestedIds.length === 0) {
             return res.status(400).json({ message: 'Participants array is required' });
         }
+
+        const participants = await filterInvitableUsers(userId.toString(), requestedIds);
 
         const meeting = await Meeting.findById(meetingId)
             .populate('host', 'firstName lastName profileImage');
@@ -383,17 +530,14 @@ export const addParticipants = async (req, res, io) => {
             return res.status(404).json({ message: 'Meeting not found' });
         }
 
-        // Only host can add participants
         if (meeting.host._id.toString() !== userId.toString()) {
             return res.status(403).json({ message: 'Only the host can add participants' });
         }
 
-        // Can only add to upcoming or live meetings
         if (!['upcoming', 'live'].includes(meeting.status)) {
             return res.status(400).json({ message: 'Cannot add participants to a completed or cancelled meeting' });
         }
 
-        // Filter out already invited participants
         const existingParticipantIds = meeting.participants.map(p => p.user.toString());
         const newParticipants = participants.filter(id =>
             !existingParticipantIds.includes(id.toString()) && id.toString() !== userId.toString()
@@ -403,15 +547,13 @@ export const addParticipants = async (req, res, io) => {
             return res.status(400).json({ message: 'All users are already invited' });
         }
 
-        // Check max participants limit
-        const totalParticipants = meeting.participants.length + newParticipants.length + 1; // +1 for host
+        const totalParticipants = meeting.participants.length + newParticipants.length + 1;
         if (totalParticipants > meeting.maxParticipants) {
             return res.status(400).json({
                 message: `Cannot exceed ${meeting.maxParticipants} participants`
             });
         }
 
-        // Add new participants
         const newParticipantsList = newParticipants.map(uid => ({
             user: uid,
             status: 'pending',
@@ -419,7 +561,6 @@ export const addParticipants = async (req, res, io) => {
         meeting.participants.push(...newParticipantsList);
         await meeting.save();
 
-        // Send notifications to new participants
         if (io) {
             const hostName = `${meeting.host.firstName} ${meeting.host.lastName || ''}`.trim();
             const formattedTime = new Date(meeting.startTime).toLocaleString('en-US', {
@@ -452,7 +593,6 @@ export const addParticipants = async (req, res, io) => {
             }
         }
 
-        // Populate and return updated meeting
         await meeting.populate('participants.user', 'firstName lastName profileImage');
 
         res.json({
@@ -475,7 +615,6 @@ export const addParticipants = async (req, res, io) => {
     }
 };
 
-// Delete/Cancel a meeting
 export const deleteMeeting = async (req, res, io) => {
     try {
         const { meetingId } = req.params;
@@ -487,13 +626,10 @@ export const deleteMeeting = async (req, res, io) => {
             return res.status(404).json({ message: 'Meeting not found' });
         }
 
-        // Only host can delete
         if (meeting.host.toString() !== userId.toString()) {
             return res.status(403).json({ message: 'Only the host can delete this meeting' });
         }
 
-        // If meeting is live, end it first
-        // If meeting is live, end it first
         if (meeting.status === 'live') {
             meeting.status = 'completed';
             meeting.actualEndTime = new Date();
@@ -501,11 +637,11 @@ export const deleteMeeting = async (req, res, io) => {
         } else if (meeting.status === 'upcoming') {
             meeting.status = 'cancelled';
             await meeting.save();
+            await removeMeetingNotifications(meeting, io);
         } else if (['completed', 'cancelled'].includes(meeting.status)) {
-            // Hard delete for cleanup
             await Meeting.deleteOne({ _id: meeting._id });
+            await removeMeetingNotifications(meeting, io);
 
-            // Emit delete event immediately since it's gone
             if (io) {
                 const recipientIds = [
                     meeting.host.toString(),
@@ -519,43 +655,11 @@ export const deleteMeeting = async (req, res, io) => {
             return res.json({ message: 'Meeting deleted permanently' });
         }
 
-        // Legacy room cleanup removed
-
-
-        // Emit real-time delete event
-        if (io) {
-            const recipientIds = [
-                meeting.host.toString(),
-                ...meeting.participants.map(p => p.user.toString())
-            ];
-            recipientIds.forEach(id => {
-                io.to(`notifications-${id}`).emit('meetingDeleted', { meetingId });
-            });
-        }
+        await emitMeetingUpdate(io, meeting);
 
         if (meeting.status === 'cancelled') {
-            // Emit status update (cancelled)
-            if (io) {
-                const recipientIds = [
-                    meeting.host.toString(),
-                    ...meeting.participants.map(p => p.user.toString())
-                ];
-                recipientIds.forEach(id => {
-                    io.to(`notifications-${id}`).emit('meetingUpdated', meeting);
-                });
-            }
             res.json({ message: 'Meeting cancelled successfully' });
         } else {
-            // Just status update to completed
-            if (io) {
-                const recipientIds = [
-                    meeting.host.toString(),
-                    ...meeting.participants.map(p => p.user.toString())
-                ];
-                recipientIds.forEach(id => {
-                    io.to(`notifications-${id}`).emit('meetingUpdated', meeting);
-                });
-            }
             res.json(meeting);
         }
     } catch (error) {
@@ -564,7 +668,6 @@ export const deleteMeeting = async (req, res, io) => {
     }
 };
 
-// Record participant join time
 export const recordParticipantJoin = async (req, res) => {
     try {
         const { meetingId } = req.params;
@@ -597,7 +700,6 @@ export const recordParticipantJoin = async (req, res) => {
     }
 };
 
-// Search users for meeting invites with knock-based priority
 export const searchUsersForInvite = async (req, res) => {
     try {
         const { q } = req.query;
@@ -607,18 +709,17 @@ export const searchUsersForInvite = async (req, res) => {
             return res.json([]);
         }
 
-        const searchQuery = q.trim();
+        const searchQuery = escapeRegex(String(q).trim().slice(0, 50));
+        const blockedIds = await getBlockedIds(userId);
 
-        // Get all knocks involving current user
         const [knocksAsKnocker, knocksAsKnocked] = await Promise.all([
             Knock.find({ knocker: userId }).lean(),
             Knock.find({ knocked: userId }).lean()
         ]);
 
-        // Categorize user IDs by relationship
         const lockedInUserIds = new Set();
-        const knockedUserIds = new Set(); // users I knocked
-        const knockerUserIds = new Set(); // users who knocked me
+        const knockedUserIds = new Set();
+        const knockerUserIds = new Set();
 
         knocksAsKnocker.forEach(k => {
             if (k.status === 'lockedIn') {
@@ -636,9 +737,9 @@ export const searchUsersForInvite = async (req, res) => {
             }
         });
 
-        // Search users matching query
         const users = await User.find({
-            _id: { $ne: userId },
+            _id: { $ne: userId, $nin: [...blockedIds] },
+            isVerified: true,
             $or: [
                 { firstName: { $regex: searchQuery, $options: 'i' } },
                 { lastName: { $regex: searchQuery, $options: 'i' } },
@@ -648,10 +749,9 @@ export const searchUsersForInvite = async (req, res) => {
             .limit(30)
             .lean();
 
-        // Sort users by relationship priority
         const sortedUsers = users.map(user => {
             const id = user._id.toString();
-            let priority = 3; // default: no relationship
+            let priority = 3;
             let relationship = 'none';
 
             if (lockedInUserIds.has(id)) {
@@ -682,7 +782,6 @@ export const searchUsersForInvite = async (req, res) => {
     }
 };
 
-// Delete a specific recording via Stream SDK
 export const deleteSpecificRecording = async (req, res) => {
     try {
         const { meetingId } = req.params;
@@ -699,15 +798,11 @@ export const deleteSpecificRecording = async (req, res) => {
             return res.status(404).json({ message: 'Meeting not found' });
         }
 
-        // Only host can delete recordings
         if (meeting.host.toString() !== userId.toString()) {
             return res.status(403).json({ message: 'Only the host can delete recordings' });
         }
 
-        // Call Stream SDK to delete the recording
-        // We use meeting._id as the call ID (consistent with frontend usage)
-        // Access 'video' namespace for unified SDK
-        const call = streamClient.video.call('default', meeting._id.toString());
+        const call = getStreamClient().video.call('default', meeting._id.toString());
 
         await call.deleteRecording({
             session: sessionId,
