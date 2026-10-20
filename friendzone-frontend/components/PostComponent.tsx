@@ -178,11 +178,16 @@ const PostComponent = ({
       setPostLikesCount(likesCount);
       if (userId === user?._id) setIsLiked(liked);
     };
+    const handlePostRemoved = ({ postId }: { postId: string }) => {
+      if (postId === post._id) setRemoved(true);
+    };
     socket.on("newComment", handleNewComment);
     socket.on("postLikeUpdated", handleLikeUpdated);
+    socket.on("postRemoved", handlePostRemoved);
     return () => {
       socket.off("newComment", handleNewComment);
       socket.off("postLikeUpdated", handleLikeUpdated);
+      socket.off("postRemoved", handlePostRemoved);
     };
   }, [socket, post._id, user?._id]);
   const [commentCount, setCommentCount] = useState(safeComments.length);

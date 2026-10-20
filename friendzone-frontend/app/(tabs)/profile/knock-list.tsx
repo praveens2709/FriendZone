@@ -23,12 +23,14 @@ import {
 } from "@/utils/knock-utils";
 import { KnockListType } from "@/types/knock.type";
 import UserProfileCard from "@/components/UserProfileCard";
+import { useSocket } from "@/context/SocketContext";
 
 export default function KnockListScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const params = useLocalSearchParams();
   const { user, accessToken } = useAuth();
+  const { socket } = useSocket();
   const listType = params.listType as KnockListType;
   const initialData = params.data
     ? (JSON.parse(params.data as string) as KnockRequest[])
@@ -40,7 +42,7 @@ export default function KnockListScreen() {
 
   const refreshData = useCallback(async () => {
     if (!user || !accessToken) return;
-    setLoading(true);
+    if (listData.length === 0) setLoading(true);
     try {
       const myReceivedKnocks = await KnockService.getKnockers(accessToken);
       const mySentKnocks = await KnockService.getKnocked(accessToken);
@@ -66,6 +68,15 @@ export default function KnockListScreen() {
       (listType === "Knocking" && item.status === "pending")
     );
   };
+
+  useEffect(() => {
+    if (!socket) return;
+    const onChange = () => refreshData();
+    socket.on("knockStatusChanged", onChange);
+    return () => {
+      socket.off("knockStatusChanged", onChange);
+    };
+  }, [socket, refreshData]);
 
   const handleActionButtonPress = async (item: KnockRequest) => {
     if (!accessToken || isButtonDisabled(item)) {

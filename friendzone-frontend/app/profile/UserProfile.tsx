@@ -15,6 +15,7 @@ import { ThemedText } from "@/components/ThemedText";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
+import { useSocket } from "@/context/SocketContext";
 import KnockService, { UserAvatar } from "@/services/knockService";
 import ProfileServices from "@/services/ProfileService";
 import ChatService from "@/services/ChatService";
@@ -84,6 +85,7 @@ function UserProfileContent() {
   const { colors } = useTheme();
   const router = useRouter();
   const { accessToken, user } = useAuth();
+  const { socket } = useSocket();
   const { userId } = useLocalSearchParams();
 
   const [userProfile, setUserProfile] = useState<User | null>(null);
@@ -233,6 +235,27 @@ function UserProfileContent() {
     fetchUserProfile();
     fetchUserPosts();
   }, [fetchUserProfile, fetchUserPosts]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const onKnockChange = () => fetchUserProfile();
+    const onProfileUpdated = (data: { userId: string }) => {
+      if (data.userId === userId) fetchUserProfile();
+    };
+    const onPostChange = () => fetchUserPosts();
+    socket.on("knockStatusChanged", onKnockChange);
+    socket.on("userProfileUpdated", onProfileUpdated);
+    socket.on("postRemoved", onPostChange);
+    socket.on("postRestored", onPostChange);
+    socket.on("newPost", onPostChange);
+    return () => {
+      socket.off("knockStatusChanged", onKnockChange);
+      socket.off("userProfileUpdated", onProfileUpdated);
+      socket.off("postRemoved", onPostChange);
+      socket.off("postRestored", onPostChange);
+      socket.off("newPost", onPostChange);
+    };
+  }, [socket, userId, fetchUserProfile, fetchUserPosts]);
 
   const handlePressPost = useCallback(
     (item: PostItem) => {

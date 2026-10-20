@@ -350,6 +350,29 @@ export default function NotificationsScreen() {
       );
     };
 
+    const handlePostNotificationsRemoved = ({
+      postId,
+      senderId,
+      type,
+    }: {
+      postId: string;
+      senderId: string | null;
+      type: string | null;
+    }) => {
+      setNotifications((prev) =>
+        prev.filter(
+          (n) =>
+            !(
+              n.relatedEntityType === "Post" &&
+              n.relatedEntityId === postId &&
+              (!senderId || n.user?.id === senderId) &&
+              (!type || n.type === type)
+            )
+        )
+      );
+    };
+
+    socket.on("postNotificationsRemoved", handlePostNotificationsRemoved);
     socket.on("meetingNotificationsRemoved", handleMeetingNotificationsRemoved);
     socket.on("newNotification", handleNewNotification);
     socket.on("newKnockRequest", handleNewKnockRequest);
@@ -362,6 +385,7 @@ export default function NotificationsScreen() {
 
     return () => {
       console.log("[NotificationsScreen] Cleaning up socket listeners.");
+      socket.off("postNotificationsRemoved", handlePostNotificationsRemoved);
       socket.off("meetingNotificationsRemoved", handleMeetingNotificationsRemoved);
       socket.off("newNotification", handleNewNotification);
       socket.off("newKnockRequest", handleNewKnockRequest);

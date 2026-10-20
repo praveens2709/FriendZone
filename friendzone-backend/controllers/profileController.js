@@ -1,6 +1,6 @@
 import User from '../models/User.js';
 import { uploadImageToCloudinary, deleteImageFromCloudinary } from '../services/cloudinaryService.js';
-import { canViewUser, isBlockedBetween, publicUserFields } from '../services/privacyService.js';
+import { canViewUser, isBlockedBetween, publicUserFields, getAudienceIds, emitToUsers } from '../services/privacyService.js';
 import { calculateAge, cleanString, isObjectId, toIdList } from '../utils/validate.js';
 import Knock from '../models/Knock.js';
 import { getActiveVibes, getCircleSet } from '../services/identityService.js';
@@ -90,6 +90,14 @@ export const updateProfile = async (req, res) => {
     if (previousPublicId) {
       deleteImageFromCloudinary(previousPublicId);
     }
+
+    const audience = await getAudienceIds(userId);
+    emitToUsers(req.app.get('socketio'), audience, 'userProfileUpdated', {
+      userId: userId.toString(),
+      firstName: updatedUser.firstName,
+      lastName: updatedUser.lastName || '',
+      profileImage: updatedUser.profileImage || null,
+    });
 
     res.json({
       success: true,

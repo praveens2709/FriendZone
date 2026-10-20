@@ -2,15 +2,29 @@ import Notification from '../models/Notification.js';
 import Knock from '../models/Knock.js';
 import User from '../models/User.js';
 import Meeting from '../models/Meeting.js';
+import Post from '../models/Post.js';
 
 const emitUnreadNotificationCount = async (io, userId) => {
     try {
         await purgeDeadMeetingNotifications(userId);
+        await purgeDeadPostNotifications(userId);
         const unreadCount = await Notification.countDocuments({ recipient: userId, isRead: false });
         io.to(`notifications-${userId}`).emit('unreadNotificationCountUpdate', { count: unreadCount });
     } catch (error) {
         console.error("Error emitting unread notification count:", error);
     }
+};
+
+const purgeDeadPostNotifications = async (userId) => {
+    const candidates = await Notification.find({ recipient: userId, relatedEntityType: 'Post' })
+        .select('relatedEntityId')
+        .lean();
+    if (candidates.length === 0) return;
+    const ids = [...new Set(candidates.map((n) => n.relatedEntityId?.toString()).filter(Boolean))];
+    const alive = await Post.find({ _id: { $in: ids }, deletedAt: null }).select('_id').lean();
+    const aliveSet = new Set(alive.map((p) => p._id.toString()));
+    const dead = candidates.filter((n) => !aliveSet.has(n.relatedEntityId?.toString())).map((n) => n._id);
+    if (dead.length) await Notification.deleteMany({ _id: { $in: dead } });
 };
 
 const purgeDeadMeetingNotifications = async (userId) => {
@@ -33,6 +47,24 @@ const purgeDeadMeetingNotifications = async (userId) => {
     }
 };
 
+export const removePostNotifications = async ({ postId, recipientId, senderId, type }, io) => {
+    const filter = { relatedEntityType: 'Post', relatedEntityId: postId };
+    if (recipientId) filter.recipient = recipientId;
+    if (senderId) filter.sender = senderId;
+    if (type) filter.type = type;
+    const recipients = recipientId ? [recipientId] : await Notification.distinct('recipient', filter);
+    await Notification.deleteMany(filter);
+    if (!io) return;
+    for (const id of recipients) {
+        io.to(`notifications-${id}`).emit('postNotificationsRemoved', {
+            postId: postId.toString(),
+            senderId: senderId ? senderId.toString() : null,
+            type: type || null,
+        });
+        emitUnreadNotificationCount(io, id);
+    }
+};
+
 export const getUserNotifications = async (req, res) => {
     const userId = req.user.id;
     const page = parseInt(req.query.page) || 1;
@@ -41,6 +73,7 @@ export const getUserNotifications = async (req, res) => {
 
     try {
         await purgeDeadMeetingNotifications(userId);
+        await purgeDeadPostNotifications(userId);
         const totalNotificationsCount = await Notification.countDocuments({ recipient: userId });
 
         const rawNotifications = await Notification.find({ recipient: userId })

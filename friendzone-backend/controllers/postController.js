@@ -1,4 +1,6 @@
 import Post from '../models/Post.js';
+import Notification from '../models/Notification.js';
+import { createNotification, removePostNotifications } from './notificationController.js';
 import User from '../models/User.js';
 import Knock from '../models/Knock.js';
 import Chat from '../models/Chat.js';
@@ -287,6 +289,20 @@ export const addComment = async (req, res) => {
     const audience = await getAudienceIds(post.user);
     emitToUsers(io, audience, 'newComment', { postId, comment: populatedComment });
 
+    if (post.user.toString() !== userId.toString()) {
+      const excerpt = text.length > 60 ? `${text.slice(0, 57)}...` : text;
+      await createNotification({
+        recipientId: post.user,
+        senderId: userId,
+        type: 'post_comment',
+        content: `commented on your post: "${excerpt}"`,
+        relatedEntityId: post._id,
+        relatedEntityType: 'Post',
+        metadata: { postId: postId.toString() },
+        io,
+      });
+    }
+
     res.status(201).json({ message: 'Comment added successfully', comment: populatedComment });
   } catch (error) {
     console.error('Error adding comment:', error.message);
@@ -309,8 +325,28 @@ export const toggleLike = async (req, res) => {
       { new: true }
     );
 
+    const io = req.app.get('socketio');
+    const ownerId = post.user.toString();
+    if (ownerId !== userId.toString()) {
+      const likeFilter = { recipient: post.user, sender: userId, type: 'post_like', relatedEntityId: post._id };
+      if (hasLiked) {
+        await removePostNotifications({ postId: post._id, recipientId: post.user, senderId: userId, type: 'post_like' }, io);
+      } else if (!(await Notification.exists(likeFilter))) {
+        await createNotification({
+          recipientId: post.user,
+          senderId: userId,
+          type: 'post_like',
+          content: 'liked your post.',
+          relatedEntityId: post._id,
+          relatedEntityType: 'Post',
+          metadata: { postId: postId.toString() },
+          io,
+        });
+      }
+    }
+
     const audience = await getAudienceIds(post.user);
-    emitToUsers(req.app.get('socketio'), audience, 'postLikeUpdated', {
+    emitToUsers(io, audience, 'postLikeUpdated', {
       postId,
       userId: userId.toString(),
       liked: !hasLiked,
@@ -476,6 +512,8 @@ const setArchived = (archived) => async (req, res) => {
       { new: true }
     );
     if (!post) return res.status(404).json({ message: 'Post not found.' });
+    const audience = await getAudienceIds(post.user);
+    emitToUsers(req.app.get('socketio'), audience, archived ? 'postRemoved' : 'postRestored', { postId });
     res.json({ success: true, archived: post.archived });
   } catch (error) {
     console.error('Error archiving post:', error.message);
@@ -497,6 +535,9 @@ export const deletePost = async (req, res) => {
       { new: true }
     );
     if (!post) return res.status(404).json({ message: 'Post not found.' });
+    await removePostNotifications({ postId: post._id }, req.app.get('socketio'));
+    const audience = await getAudienceIds(post.user);
+    emitToUsers(req.app.get('socketio'), audience, 'postRemoved', { postId });
     res.json({ success: true });
   } catch (error) {
     console.error('Error deleting post:', error.message);
@@ -539,6 +580,8 @@ export const restorePost = async (req, res) => {
       { new: true }
     );
     if (!post) return res.status(404).json({ message: 'Post not found.' });
+    const audience = await getAudienceIds(post.user);
+    emitToUsers(req.app.get('socketio'), audience, 'postRestored', { postId });
     res.json({ success: true });
   } catch (error) {
     console.error('Error restoring post:', error.message);

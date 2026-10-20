@@ -269,6 +269,26 @@ export default function ChatsScreen() {
         setIsSelectionMode(false);
       };
 
+      const handleProfileUpdated = (data: {
+        userId: string;
+        firstName: string;
+        lastName: string;
+        profileImage: string | null;
+      }) => {
+        setChats((prevChats) =>
+          prevChats.map((chat) =>
+            chat.type === "private" && chat.otherParticipantId === data.userId
+              ? {
+                  ...chat,
+                  name: `${data.firstName} ${data.lastName}`.trim(),
+                  avatar: data.profileImage,
+                }
+              : chat
+          )
+        );
+      };
+
+      socket.on("userProfileUpdated", handleProfileUpdated);
       socket.on("newChat", handleNewChatOrConfirmation);
       socket.on("chatCreatedConfirmation", handleNewChatOrConfirmation);
       socket.on("chatPreviewUpdate", handleChatPreviewUpdate);
@@ -279,6 +299,7 @@ export default function ChatsScreen() {
       socket.on("chatsDeletedConfirmation", handleChatsDeletedConfirmation);
 
       return () => {
+        socket.off("userProfileUpdated", handleProfileUpdated);
         socket.off("newChat", handleNewChatOrConfirmation);
         socket.off("chatCreatedConfirmation", handleNewChatOrConfirmation);
         socket.off("chatPreviewUpdate", handleChatPreviewUpdate);

@@ -206,7 +206,35 @@ export default function HomeScreen() {
     };
 
     const handleNewPost = (newPost: Post) => {
-      setPosts((prevPosts) => [newPost, ...prevPosts]);
+      setPosts((prevPosts) =>
+        prevPosts.some((p) => p._id === newPost._id) ? prevPosts : [newPost, ...prevPosts]
+      );
+    };
+    const handlePostRemoved = ({ postId }: { postId: string }) => {
+      setPosts((prevPosts) => prevPosts.filter((p) => p._id !== postId));
+    };
+    const handlePostRestored = () => fetchPosts(true);
+    const handleProfileUpdated = (data: {
+      userId: string;
+      firstName: string;
+      lastName: string;
+      profileImage: string | null;
+    }) => {
+      setPosts((prevPosts) =>
+        prevPosts.map((p) =>
+          p.user?._id === data.userId
+            ? {
+                ...p,
+                user: {
+                  ...p.user,
+                  firstName: data.firstName,
+                  lastName: data.lastName,
+                  profileImage: data.profileImage || "",
+                },
+              }
+            : p
+        )
+      );
     };
 
     socket.on("chatPreviewUpdate", handleChatPreviewUpdate);
@@ -215,6 +243,9 @@ export default function HomeScreen() {
       handleUnreadNotificationCountUpdate
     );
     socket.on("newPost", handleNewPost);
+    socket.on("postRemoved", handlePostRemoved);
+    socket.on("postRestored", handlePostRestored);
+    socket.on("userProfileUpdated", handleProfileUpdated);
     const handleKnockChange = () => fetchPosts(true);
     socket.on("knockStatusChanged", handleKnockChange);
 
@@ -225,6 +256,9 @@ export default function HomeScreen() {
         handleUnreadNotificationCountUpdate
       );
       socket.off("newPost", handleNewPost);
+      socket.off("postRemoved", handlePostRemoved);
+      socket.off("postRestored", handlePostRestored);
+      socket.off("userProfileUpdated", handleProfileUpdated);
       socket.off("knockStatusChanged", handleKnockChange);
     };
   }, [socket, user, fetchPosts]);
