@@ -1,3 +1,4 @@
+import httpClient from "../configs/axios.config";
 import { _get, _post, _patch, _delete } from "../configs/api-methods.config";
 import {
     Meeting,
@@ -7,9 +8,6 @@ import {
 } from "@/types/meeting.type";
 
 class MeetingService {
-    /**
-     * Create a new meeting
-     */
     static async createMeeting(data: CreateMeetingInput, token: string): Promise<Meeting> {
         try {
             const response = await _post<Meeting>("meetings", data, token);
@@ -20,12 +18,22 @@ class MeetingService {
         }
     }
 
-    /**
-     * Get all meetings for the current user
-     */
+    static async startCall(chatId: string, audioOnly: boolean): Promise<{ meetingId: string; audioOnly: boolean }> {
+        const response = await httpClient.post("calls", { chatId, audioOnly });
+        return response.data;
+    }
+
+    static async cancelCall(meetingId: string): Promise<void> {
+        await httpClient.post(`calls/${meetingId}/cancel`, {});
+    }
+
+    static async declineCall(meetingId: string): Promise<void> {
+        await httpClient.post(`calls/${meetingId}/decline`, {});
+    }
+
     static async getMeetings(
         token: string,
-        params?: { status?: string; page?: number; limit?: number }
+        params?: { status?: string; page?: number; limit?: number; includeInstant?: boolean }
     ): Promise<GetMeetingsResponse> {
         try {
             const response = await _get<GetMeetingsResponse>("meetings", token, params);
@@ -36,9 +44,6 @@ class MeetingService {
         }
     }
 
-    /**
-     * Get a single meeting by ID
-     */
     static async getMeetingById(meetingId: string, token: string): Promise<Meeting> {
         try {
             const response = await _get<Meeting>(`meetings/${meetingId}`, token);
@@ -49,9 +54,6 @@ class MeetingService {
         }
     }
 
-    /**
-     * Get token/credentials for joining a meeting
-     */
     static async getMeetingToken(meetingId: string, token: string): Promise<MeetingTokenResponse> {
         try {
             const response = await _post<MeetingTokenResponse>(
@@ -66,9 +68,6 @@ class MeetingService {
         }
     }
 
-    /**
-     * Update meeting status (start/end meeting)
-     */
     static async updateMeetingStatus(
         meetingId: string,
         status: "live" | "completed",
@@ -87,9 +86,6 @@ class MeetingService {
         }
     }
 
-    /**
-     * Respond to meeting invitation
-     */
     static async respondToInvitation(
         meetingId: string,
         response: "accepted" | "declined",
@@ -108,9 +104,6 @@ class MeetingService {
         }
     }
 
-    /**
-     * Delete/Cancel a meeting
-     */
     static async deleteMeeting(meetingId: string, token: string): Promise<{ message: string }> {
         try {
             const response = await _delete<{ message: string }>(
@@ -125,9 +118,6 @@ class MeetingService {
         }
     }
 
-    /**
-     * Record participant join
-     */
     static async recordJoin(meetingId: string, token: string): Promise<{ message: string }> {
         try {
             const response = await _post<{ message: string }>(
@@ -142,9 +132,6 @@ class MeetingService {
         }
     }
 
-    /**
-     * Add participants to an existing meeting
-     */
     static async addParticipants(
         meetingId: string,
         participants: string[],
@@ -163,9 +150,6 @@ class MeetingService {
         }
     }
 
-    /**
-     * Delete a specific recording
-     */
     static async deleteRecording(
         meetingId: string,
         recordingName: string,

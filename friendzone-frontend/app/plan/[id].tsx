@@ -1,3 +1,4 @@
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect } from "react";
 import {
     StyleSheet,
@@ -7,7 +8,6 @@ import {
     Alert,
     ActivityIndicator,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import CommonHeader from "@/components/CommonHeader";
@@ -17,8 +17,10 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Button from "@/components/Button";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
+import { useSocket } from "@/context/SocketContext";
 import MeetingService from "@/services/MeetingService";
 import { Meeting } from "@/types/meeting.type";
 import { format } from "date-fns";
@@ -27,14 +29,14 @@ import UserProfileCard from "@/components/UserProfileCard";
 
 export default function MeetingDetailsScreen() {
     const { colors } = useTheme();
+    const insets = useSafeAreaInsets();
     const { accessToken, user } = useAuth();
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
     const [meeting, setMeeting] = useState<Meeting | null>(null);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
-
-    // Add Participants Modal State
+    const [rsvpSubmitting, setRsvpSubmitting] = useState<"accepted" | "declined" | null>(null);
     const [showInviteModal, setShowInviteModal] = useState(false);
     const [invitedUserIds, setInvitedUserIds] = useState<Set<string>>(new Set());
     const [invitingIds, setInvitingIds] = useState<Set<string>>(new Set());
@@ -56,17 +58,65 @@ export default function MeetingDetailsScreen() {
         }
     };
 
+    const { socket } = useSocket();
+
+    useEffect(() => {
+        if (!socket) return;
+        const onUpdate = (updated: Meeting) => {
+            if (updated._id === id) setMeeting(updated);
+        };
+        const onDeleted = ({ meetingId }: { meetingId: string }) => {
+            if (meetingId === id) router.back();
+        };
+        socket.on("meetingUpdated", onUpdate);
+        socket.on("meetingDeleted", onDeleted);
+        return () => {
+            socket.off("meetingUpdated", onUpdate);
+            socket.off("meetingDeleted", onDeleted);
+        };
+    }, [socket, id]);
+
+    const handleRsvp = async (response: "accepted" | "declined") => {
+        if (!meeting || !accessToken) return;
+        setRsvpSubmitting(response);
+        setActionLoading(true);
+
+        const currentUserId = user?._id?.toString();
+        setMeeting(prev => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                participants: prev.participants.map(p => {
+                    const pUserId = (p.user?._id || p.user)?.toString();
+                    if (pUserId === currentUserId) {
+                        return { ...p, status: response };
+                    }
+                    return p;
+                })
+            };
+        });
+
+        try {
+            await MeetingService.respondToInvitation(meeting._id, response, accessToken);
+            await fetchMeeting();
+        } catch (error) {
+            console.error("Error responding to plan:", error);
+            await fetchMeeting();
+        } finally {
+            setActionLoading(false);
+            setRsvpSubmitting(null);
+        }
+    };
+
     const handleJoinMeeting = async () => {
         if (!meeting) return;
 
         setActionLoading(true);
         try {
-            // If meeting is upcoming and user is host, start the meeting
             if (meeting.status === "upcoming" && meeting.host._id === user?._id) {
                 await MeetingService.updateMeetingStatus(meeting._id, "live", accessToken!);
             }
 
-            // Navigate to meeting room
             router.push(`/live-meeting/${meeting._id}?isHost=${meeting.host._id === user?._id}`);
         } catch (error) {
             console.error("Error joining meeting:", error);
@@ -110,10 +160,9 @@ export default function MeetingDetailsScreen() {
             await MeetingService.addParticipants(meeting._id, [user._id], accessToken);
             setInvitedUserIds(prev => new Set(prev).add(user._id));
 
-            // Refresh meeting details silently
             fetchMeeting();
         } catch (error: any) {
-            Alert.alert("Error", error?.response?.data?.message || "Failed to invite user");
+            console.error("Failed to invite user:", error);
         } finally {
             setInvitingIds(prev => {
                 const newSet = new Set(prev);
@@ -126,38 +175,45 @@ export default function MeetingDetailsScreen() {
 
     if (loading) {
         return (
-            <LinearGradient colors={colors.gradient} style={styles.container}>
+            <ScreenBackground style={styles.container}>
                 <ThemedSafeArea style={styles.safeArea}>
                     <CommonHeader title="Meeting Details" leftContent={<BackButton color={colors.text} />} />
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color={colors.primary} />
                     </View>
                 </ThemedSafeArea>
-            </LinearGradient>
+            </ScreenBackground>
         );
     }
 
     if (!meeting) {
         return (
-            <LinearGradient colors={colors.gradient} style={styles.container}>
+            <ScreenBackground style={styles.container}>
                 <ThemedSafeArea style={styles.safeArea}>
                     <CommonHeader title="Meeting Details" leftContent={<BackButton color={colors.text} />} />
                     <View style={styles.loadingContainer}>
                         <ThemedText style={{ color: colors.textDim }}>Meeting not found</ThemedText>
                     </View>
                 </ThemedSafeArea>
-            </LinearGradient>
+            </ScreenBackground>
         );
     }
 
-    const isHost = meeting.host._id === user?._id;
+    const currentUserId = user?._id?.toString();
+    const hostId = (meeting.host?._id || meeting.host)?.toString();
+    const isHost = hostId === currentUserId;
+    const isInPerson = meeting.kind === "in_person";
+    const myParticipant = meeting.participants.find(
+        (p) => (p.user?._id || p.user)?.toString() === currentUserId
+    );
+    const isPendingRsvp = !isHost && myParticipant && myParticipant.status === "pending";
     const startDate = new Date(meeting.startTime);
 
     return (
-        <LinearGradient colors={colors.gradient} style={styles.container}>
-            <ThemedSafeArea style={styles.safeArea}>
+        <ScreenBackground style={styles.container}>
+            <ThemedSafeArea style={styles.safeArea} edges={["top", "left", "right"]}>
                 <CommonHeader
-                    title="Meeting Details"
+                    title={isInPerson ? "Plan" : "Meeting Details"}
                     leftContent={<BackButton color={colors.text} />}
                     rightContent1={
                         <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -171,7 +227,6 @@ export default function MeetingDetailsScreen() {
                 />
 
                 <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
-                    {/* Status Badge */}
                     <View style={styles.statusRow}>
                         <View style={[
                             styles.statusBadge,
@@ -180,26 +235,37 @@ export default function MeetingDetailsScreen() {
                                     meeting.status === "upcoming" ? colors.primary : colors.border
                             }
                         ]}>
-                            <MaterialCommunityIcons name="video" size={14} color="white" />
+                            <MaterialCommunityIcons name={isInPerson ? "map-marker" : "video"} size={14} color="white" />
                             <ThemedText style={styles.statusText}>
                                 {meeting.status.toUpperCase()}
                             </ThemedText>
                         </View>
                     </View>
 
-                    {/* Title */}
                     <ThemedText style={[styles.title, { color: colors.text }]}>
                         {meeting.title}
                     </ThemedText>
 
-                    {/* Description */}
                     {meeting.description && (
                         <ThemedText style={[styles.description, { color: colors.textDim }]}>
                             {meeting.description}
                         </ThemedText>
                     )}
 
-                    {/* Time Info */}
+                    {isInPerson && !!meeting.location && (
+                        <ThemedView style={[styles.infoCard, { backgroundColor: colors.buttonBackgroundSecondary }]}>
+                            <View style={styles.infoRow}>
+                                <Ionicons name="location-outline" size={20} color={colors.primary} />
+                                <View style={styles.infoTextContainer}>
+                                    <ThemedText style={[styles.infoLabel, { color: colors.textDim }]}>Where</ThemedText>
+                                    <ThemedText style={[styles.infoValue, { color: colors.text }]}>
+                                        {meeting.location}
+                                    </ThemedText>
+                                </View>
+                            </View>
+                        </ThemedView>
+                    )}
+
                     <ThemedView style={[styles.infoCard, { backgroundColor: colors.buttonBackgroundSecondary }]}>
                         <View style={styles.infoRow}>
                             <Ionicons name="calendar-outline" size={20} color={colors.primary} />
@@ -226,7 +292,6 @@ export default function MeetingDetailsScreen() {
                         )}
                     </ThemedView>
 
-                    {/* Host */}
                     <ThemedView style={[styles.infoCard, { backgroundColor: colors.buttonBackgroundSecondary }]}>
                         <ThemedText style={[styles.sectionTitle, { color: colors.textDim }]}>HOST</ThemedText>
                         <View style={styles.hostRow}>
@@ -242,7 +307,6 @@ export default function MeetingDetailsScreen() {
                         </View>
                     </ThemedView>
 
-                    {/* Participants */}
                     {meeting.participants.length > 0 && (
                         <ThemedView style={[styles.infoCard, { backgroundColor: colors.buttonBackgroundSecondary }]}>
                             <ThemedText style={[styles.sectionTitle, { color: colors.textDim }]}>
@@ -268,26 +332,59 @@ export default function MeetingDetailsScreen() {
                     )}
                 </ScrollView>
 
-                {/* Action Buttons */}
                 {meeting.status !== "completed" && meeting.status !== "cancelled" && (
-                    <View style={styles.footer}>
+                    <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8, borderTopColor: colors.border }]}>
                         {isHost && meeting.status === "upcoming" && (
-                            <TouchableOpacity
-                                style={[styles.cancelButton, { borderColor: "#EF4444" }]}
+                            <Button
+                                title="Cancel Meeting"
+                                variant="outline"
                                 onPress={handleCancelMeeting}
                                 disabled={actionLoading}
-                            >
-                                <ThemedText style={{ color: "#EF4444", fontWeight: "600" }}>
-                                    Cancel Meeting
-                                </ThemedText>
-                            </TouchableOpacity>
+                                style={{ borderColor: "#EF4444" }}
+                                textStyle={{ color: "#EF4444" }}
+                            />
                         )}
-                        <Button
-                            title={actionLoading ? "Loading..." : (meeting.status === "live" ? "Join Now" : "Start Meeting")}
-                            onPress={handleJoinMeeting}
-                            disabled={actionLoading || (!isHost && meeting.status === "upcoming")}
-                        />
-                        {!isHost && meeting.status === "upcoming" && (
+                        {isPendingRsvp && meeting.status === "upcoming" && (
+                            <View style={{ flexDirection: "row", gap: 10 }}>
+                                <Button
+                                    title={rsvpSubmitting === "accepted" ? "Accepting..." : "I'm in"}
+                                    onPress={() => handleRsvp("accepted")}
+                                    disabled={actionLoading}
+                                    style={{ flex: 1 }}
+                                />
+                                <Button
+                                    title={rsvpSubmitting === "declined" ? "Declining..." : "Can't make it"}
+                                    variant="outline"
+                                    onPress={() => handleRsvp("declined")}
+                                    disabled={actionLoading}
+                                    style={{ flex: 1 }}
+                                />
+                            </View>
+                        )}
+                        {!isHost && myParticipant && myParticipant.status === "accepted" && (
+                            <View style={[styles.rsvpConfirmedBadge, { backgroundColor: "#10B98115", borderColor: "#10B98140" }]}>
+                                <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                                <ThemedText style={{ color: "#10B981", fontWeight: "600", fontSize: 14 }}>
+                                    You're in for this {isInPerson ? "plan" : "meeting"}
+                                </ThemedText>
+                            </View>
+                        )}
+                        {!isHost && myParticipant && myParticipant.status === "declined" && (
+                            <View style={[styles.rsvpConfirmedBadge, { backgroundColor: "#EF444415", borderColor: "#EF444440" }]}>
+                                <Ionicons name="close-circle" size={18} color="#EF4444" />
+                                <ThemedText style={{ color: "#EF4444", fontWeight: "600", fontSize: 14 }}>
+                                    You can't make it to this {isInPerson ? "plan" : "meeting"}
+                                </ThemedText>
+                            </View>
+                        )}
+                        {!isInPerson && (
+                            <Button
+                                title={actionLoading ? "Loading..." : (meeting.status === "live" ? "Join Now" : "Start Meeting")}
+                                onPress={handleJoinMeeting}
+                                disabled={actionLoading || (!isHost && meeting.status === "upcoming")}
+                            />
+                        )}
+                        {!isInPerson && !isHost && meeting.status === "upcoming" && (
                             <ThemedText style={[styles.waitingText, { color: colors.textDim }]}>
                                 Waiting for host to start the meeting
                             </ThemedText>
@@ -304,10 +401,10 @@ export default function MeetingDetailsScreen() {
                     invitedIds={invitedUserIds}
                     invitingIds={invitingIds}
                     onInviteUser={handleInviteSingleUser}
-                    existingParticipantIds={new Set(meeting.participants.map(p => p.user._id))}
+                    existingParticipantIds={new Set(meeting.participants.map(p => (p.user?._id || p.user)?.toString()))}
                 />
             </ThemedSafeArea>
-        </LinearGradient >
+        </ScreenBackground>
     );
 }
 
@@ -315,7 +412,7 @@ const styles = StyleSheet.create({
     container: { flex: 1 },
     safeArea: { flex: 1, backgroundColor: "transparent" },
     content: { flex: 1 },
-    scrollContent: { padding: 20, paddingBottom: 120 },
+    scrollContent: { padding: 20, paddingBottom: 20 },
     loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
     statusRow: { marginBottom: 16 },
     statusBadge: {
@@ -345,14 +442,7 @@ const styles = StyleSheet.create({
     participantInfo: { flex: 1 },
     participantName: { fontSize: 14, fontWeight: "500" },
     participantStatus: { fontSize: 12, textTransform: "capitalize" },
-    footer: { padding: 20, paddingBottom: 100, gap: 12 },
-    cancelButton: {
-        height: 50,
-        borderRadius: 25,
-        borderWidth: 1,
-        justifyContent: "center",
-        alignItems: "center"
-    },
+    footer: { paddingHorizontal: 20, paddingTop: 12, gap: 12, borderTopWidth: StyleSheet.hairlineWidth },
     waitingText: { fontSize: 12, textAlign: "center" },
     statusButton: {
         paddingVertical: 2,
@@ -367,6 +457,16 @@ const styles = StyleSheet.create({
     statusButtonText: {
         fontSize: 13,
         fontWeight: 'bold',
+    },
+    rsvpConfirmedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        gap: 8,
     },
     emptyText: { textAlign: 'center', marginTop: 30, fontSize: 16 },
 });

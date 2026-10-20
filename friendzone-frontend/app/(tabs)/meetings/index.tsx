@@ -1,6 +1,10 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { readableTextOn } from "@/utils/theme-utils";
+import { useTabBarSpace } from "@/hooks/useTabBarSpace";
+import ScreenBackground from "@/components/ui/ScreenBackground";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
     StyleSheet,
+    Pressable,
     TouchableOpacity,
     FlatList,
     TextInput,
@@ -11,14 +15,14 @@ import {
     RefreshControl,
     Alert,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import CommonHeader from "@/components/CommonHeader";
 import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
+import { format } from "date-fns";
 import MeetingCard from "@/components/meetings/MeetingCard";
 import { Calendar, DateData } from "react-native-calendars";
 import { useAuth } from "@/context/AuthContext";
@@ -30,82 +34,132 @@ const { width } = Dimensions.get("window");
 
 type TabType = "live" | "upcoming" | "completed";
 
+const PAGE_SIZE = 15;
+
 export default function MeetingsScreen() {
     const { colors } = useTheme();
-    const { accessToken } = useAuth();
+    const { space: tabSpace } = useTabBarSpace();
+    const { accessToken, user } = useAuth();
+    const { socket } = useSocket();
     const router = useRouter();
+
     const [activeTab, setActiveTab] = useState<TabType>("upcoming");
     const [searchQuery, setSearchQuery] = useState("");
+    const [debouncedQuery, setDebouncedQuery] = useState("");
     const [showCalendar, setShowCalendar] = useState(false);
     const [selectedDate, setSelectedDate] = useState("");
     const [meetings, setMeetings] = useState<Meeting[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-
-    const fetchMeetings = useCallback(async () => {
-        if (!accessToken) return;
-
-        try {
-            const response = await MeetingService.getMeetings(accessToken);
-            setMeetings(response.meetings);
-        } catch (error) {
-            console.error("Error fetching meetings:", error);
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    }, [accessToken]);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [hasMore, setHasMore] = useState(true);
+    const pageRef = useRef(1);
+    const busyRef = useRef(false);
+    const requestIdRef = useRef(0);
 
     useEffect(() => {
-        fetchMeetings();
-    }, [fetchMeetings]);
+        const timer = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 350);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
 
-    const { socket } = useSocket();
-    const { user } = useAuth();
+    const buildParams = useCallback(
+        (page: number) => {
+            const params: Record<string, any> = {
+                status: activeTab === "completed" ? "past" : activeTab,
+                page,
+                limit: PAGE_SIZE,
+            };
+            if (debouncedQuery) params.q = debouncedQuery;
+            if (selectedDate) {
+                const start = new Date(`${selectedDate}T00:00:00`);
+                const end = new Date(`${selectedDate}T23:59:59.999`);
+                params.from = start.toISOString();
+                params.to = end.toISOString();
+            }
+            return params;
+        },
+        [activeTab, debouncedQuery, selectedDate]
+    );
+
+    const fetchFirstPage = useCallback(
+        async (silent = false) => {
+            if (!accessToken) return;
+            const requestId = ++requestIdRef.current;
+            try {
+                if (!silent) setLoading(true);
+                const response = await MeetingService.getMeetings(accessToken, buildParams(1));
+                if (requestId !== requestIdRef.current) return;
+                pageRef.current = 1;
+                setMeetings(response.meetings);
+                setHasMore(response.pagination.page < response.pagination.pages);
+            } catch (error) {
+                console.error("Error fetching meetings:", error);
+            } finally {
+                if (requestId === requestIdRef.current) {
+                    setLoading(false);
+                    setRefreshing(false);
+                }
+            }
+        },
+        [accessToken, buildParams]
+    );
+
+    const fetchNextPage = useCallback(async () => {
+        if (!accessToken || !hasMore || busyRef.current || loading) return;
+        busyRef.current = true;
+        setLoadingMore(true);
+        try {
+            const next = pageRef.current + 1;
+            const response = await MeetingService.getMeetings(accessToken, buildParams(next));
+            pageRef.current = next;
+            setMeetings((current) => {
+                const seen = new Set(current.map((m) => m._id));
+                return [...current, ...response.meetings.filter((m) => !seen.has(m._id))];
+            });
+            setHasMore(response.pagination.page < response.pagination.pages);
+        } catch (error) {
+            console.error("Error loading more meetings:", error);
+        } finally {
+            busyRef.current = false;
+            setLoadingMore(false);
+        }
+    }, [accessToken, hasMore, loading, buildParams]);
+
+    useEffect(() => {
+        fetchFirstPage();
+    }, [fetchFirstPage]);
+
+    useFocusEffect(
+        useCallback(() => {
+            fetchFirstPage(true);
+        }, [fetchFirstPage])
+    );
 
     useEffect(() => {
         if (!socket) return;
-
-        const handleMeetingCreated = (newMeeting: Meeting) => {
-            // Only add if relevant to current user (should be, since filtered by notification room)
-            setMeetings(prev => {
-                // Prevent duplicates
-                if (prev.find(m => m._id === newMeeting._id)) return prev;
-                return [...prev, newMeeting].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-            });
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        const refresh = () => {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(() => fetchFirstPage(true), 350);
         };
-
-        const handleMeetingUpdated = (updatedMeeting: Meeting) => {
-            setMeetings(prev => prev.map(m => m._id === updatedMeeting._id ? updatedMeeting : m));
-        };
-
-        const handleMeetingDeleted = ({ meetingId }: { meetingId: string }) => {
-            setMeetings(prev => prev.filter(m => m._id !== meetingId));
-        };
-
-        socket.on('meetingCreated', handleMeetingCreated);
-        socket.on('meetingUpdated', handleMeetingUpdated);
-        socket.on('meetingDeleted', handleMeetingDeleted);
-
+        const events = ["meetingCreated", "meetingUpdated", "meetingDeleted"];
+        events.forEach((event) => socket.on(event, refresh));
         return () => {
-            socket.off('meetingCreated', handleMeetingCreated);
-            socket.off('meetingUpdated', handleMeetingUpdated);
-            socket.off('meetingDeleted', handleMeetingDeleted);
+            if (timer) clearTimeout(timer);
+            events.forEach((event) => socket.off(event, refresh));
         };
-    }, [socket]);
+    }, [socket, fetchFirstPage]);
 
     const onRefresh = useCallback(() => {
         setRefreshing(true);
-        fetchMeetings();
-    }, [fetchMeetings]);
+        fetchFirstPage(true);
+    }, [fetchFirstPage]);
 
     const handleJoin = async (meeting: Meeting) => {
-        if (meeting.status === "live") {
-            // Navigate to meeting room
-            router.push(`/live-meeting/${meeting._id}`);
-        } else if (meeting.status === "upcoming") {
-            // Navigate to meeting details
-            router.push(`/meetings/${meeting._id}`);
+        if (meeting.status === "live" && meeting.kind !== "in_person") {
+            router.push(`/live-meeting/${meeting._id}?isHost=${meeting.host._id === user?._id}`);
+        } else {
+            router.push(`/plan/${meeting._id}`);
         }
     };
 
@@ -114,60 +168,49 @@ export default function MeetingsScreen() {
     };
 
     const handleDayPress = (day: DateData) => {
-        setSelectedDate(day.dateString);
+        setSelectedDate(day.dateString === selectedDate ? "" : day.dateString);
         setShowCalendar(false);
-        // TODO: Filter meetings by selected date
     };
 
     const handleDelete = async (meetingId: string, status: string) => {
         Alert.alert(
-            "Delete Meeting",
-            status === 'upcoming'
-                ? "This meeting will be cancelled and participants will be notified. Continue?"
-                : "This meeting will be permanently deleted from your history. Continue?",
+            status === "upcoming" ? "Cancel this plan?" : "Delete this plan?",
+            status === "upcoming"
+                ? "Everyone invited will see that it's cancelled."
+                : "This removes it from your history for everyone.",
             [
-                { text: "Cancel", style: "cancel" },
+                { text: "Keep it", style: "cancel" },
                 {
-                    text: "Delete",
+                    text: status === "upcoming" ? "Cancel plan" : "Delete",
                     style: "destructive",
                     onPress: async () => {
                         try {
-                            setLoading(true);
                             await MeetingService.deleteMeeting(meetingId, accessToken!);
+                            fetchFirstPage(true);
                         } catch (error) {
-                            console.error("Error deleting meeting:", error);
-                        } finally {
-                            setLoading(false);
+
                         }
-                    }
-                }
+                    },
+                },
             ]
         );
     };
 
-    // Filter meetings by status and search query
-    const filteredMeetings = meetings.filter((meeting) => {
-        let matchesStatus = false;
-        if (activeTab === 'completed') {
-            matchesStatus = meeting.status === 'completed' || meeting.status === 'cancelled';
-        } else {
-            matchesStatus = meeting.status === activeTab;
-        }
+    const filteredMeetings = meetings;
 
-        const matchesSearch = meeting.title.toLowerCase().includes(searchQuery.toLowerCase());
-        return matchesStatus && matchesSearch;
-    });
-
-    // Get dates with meetings for calendar marking
     const getMarkedDates = () => {
-        const marked: { [key: string]: { marked: boolean; dotColor: string } } = {};
+        const marked: { [key: string]: any } = {};
         meetings.forEach((meeting) => {
-            const date = new Date(meeting.startTime).toISOString().split("T")[0];
-            marked[date] = {
+            const d = new Date(meeting.startTime);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+            marked[key] = {
                 marked: true,
                 dotColor: meeting.status === "live" ? "red" : meeting.status === "upcoming" ? "orange" : "gray",
             };
         });
+        if (selectedDate) {
+            marked[selectedDate] = { ...(marked[selectedDate] || {}), selected: true, selectedColor: colors.primary };
+        }
         return marked;
     };
 
@@ -195,10 +238,10 @@ export default function MeetingsScreen() {
     );
 
     return (
-        <LinearGradient colors={colors.gradient} style={styles.container}>
-            <ThemedSafeArea style={styles.safeArea}>
+        <ScreenBackground style={styles.container}>
+            <ThemedSafeArea style={styles.safeArea} edges={["top", "left", "right"]}>
                 <CommonHeader
-                    title="Meetings"
+                    title="Plans"
                     rightContent1={
                         <TouchableOpacity onPress={() => router.push("/recordings")}>
                             <Ionicons name="recording-outline" size={26} color={colors.text} />
@@ -226,7 +269,7 @@ export default function MeetingsScreen() {
                         >
                             <Feather name="search" size={20} color={colors.textDim} style={styles.searchIcon} />
                             <TextInput
-                                placeholder="Search meetings..."
+                                placeholder="Search plans..."
                                 placeholderTextColor={colors.textDim}
                                 style={[styles.searchInput, { color: colors.text }]}
                                 value={searchQuery}
@@ -235,10 +278,23 @@ export default function MeetingsScreen() {
                         </ThemedView>
                     </ThemedView>
 
+                    {!!selectedDate && (
+                        <TouchableOpacity
+                            onPress={() => setSelectedDate("")}
+                            style={[styles.dateChip, { backgroundColor: colors.primary + "1F", borderColor: colors.primary }]}
+                        >
+                            <Ionicons name="calendar" size={14} color={colors.text} />
+                            <ThemedText style={{ color: colors.text, fontWeight: "700", fontSize: 13 }}>
+                                {format(new Date(`${selectedDate}T00:00:00`), "EEE, MMM d")}
+                            </ThemedText>
+                            <Ionicons name="close" size={14} color={colors.text} />
+                        </TouchableOpacity>
+                    )}
+
                     <View style={styles.tabsContainer}>
                         {renderTab("live", "Live")}
                         {renderTab("upcoming", "Upcoming")}
-                        {renderTab("completed", "Completed")}
+                        {renderTab("completed", "Past")}
                     </View>
 
                     {loading ? (
@@ -253,12 +309,17 @@ export default function MeetingsScreen() {
                                 <MeetingCard
                                     meeting={item}
                                     onJoin={() => handleJoin(item)}
-                                    onPress={() => router.push(`/meetings/${item._id}`)}
+                                    onPress={() => router.push(`/plan/${item._id}`)}
                                     onDelete={item.host._id === user?._id ? () => handleDelete(item._id, item.status) : undefined}
                                 />
                             )}
-                            contentContainerStyle={styles.listContent}
+                            contentContainerStyle={[styles.listContent, { paddingBottom: tabSpace }]}
                             showsVerticalScrollIndicator={false}
+                            onEndReached={fetchNextPage}
+                            onEndReachedThreshold={0.5}
+                            ListFooterComponent={
+                                loadingMore ? <ActivityIndicator style={{ marginVertical: 16 }} color={colors.primary} /> : null
+                            }
                             refreshControl={
                                 <RefreshControl
                                     refreshing={refreshing}
@@ -268,9 +329,15 @@ export default function MeetingsScreen() {
                             }
                             ListEmptyComponent={() => (
                                 <View style={styles.emptyState}>
-                                    <Ionicons name="videocam-outline" size={48} color={colors.textDim} />
+                                    <Ionicons name="calendar-outline" size={48} color={colors.textDim} />
                                     <ThemedText style={[styles.emptyText, { color: colors.textDim }]}>
-                                        No {activeTab} meetings
+                                        {debouncedQuery || selectedDate
+                                            ? "No plans match. Try a different search or date."
+                                            : activeTab === "completed"
+                                                ? "No past plans yet."
+                                                : activeTab === "live"
+                                                    ? "Nothing live right now."
+                                                    : "No upcoming plans. Tap + to get something on the calendar."}
                                     </ThemedText>
                                 </View>
                             )}
@@ -279,14 +346,20 @@ export default function MeetingsScreen() {
                 </View>
 
                 <TouchableOpacity
-                    style={[styles.fab, { backgroundColor: colors.primary }]}
+                    style={[styles.fab, { backgroundColor: colors.primary, bottom: tabSpace - 2 }]}
                     onPress={handleCreate}
                 >
-                    <Ionicons name="add" size={30} color={colors.buttonText} />
+                    <Ionicons name="add" size={30} color={readableTextOn(colors.primary, colors.buttonText)} />
                 </TouchableOpacity>
 
-                <Modal visible={showCalendar} transparent animationType="slide">
+                <Modal
+                    visible={showCalendar}
+                    transparent
+                    animationType="slide"
+                    onRequestClose={() => setShowCalendar(false)}
+                >
                     <View style={styles.modalOverlay}>
+                        <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowCalendar(false)} />
                         <ThemedView style={[styles.calendarModal, { backgroundColor: colors.background }]}>
                             <View style={styles.modalHeader}>
                                 <ThemedText type="subtitle" style={{ color: colors.text }}>
@@ -316,7 +389,7 @@ export default function MeetingsScreen() {
                     </View>
                 </Modal>
             </ThemedSafeArea>
-        </LinearGradient>
+        </ScreenBackground>
     );
 }
 
@@ -377,6 +450,18 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         borderRadius: 20,
     },
+    dateChip: {
+        flexDirection: "row",
+        alignItems: "center",
+        alignSelf: "flex-start",
+        gap: 8,
+        borderWidth: 1,
+        borderRadius: 16,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        marginHorizontal: 15,
+        marginBottom: 8,
+    },
     tabText: {
         fontSize: 16,
     },
@@ -407,18 +492,12 @@ const styles = StyleSheet.create({
     },
     fab: {
         position: "absolute",
-        bottom: 110,
         right: 20,
-        width: 60,
-        height: 60,
-        borderRadius: 30,
+        width: 58,
+        height: 58,
+        borderRadius: 29,
         justifyContent: "center",
         alignItems: "center",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 5,
     },
     modalOverlay: {
         flex: 1,

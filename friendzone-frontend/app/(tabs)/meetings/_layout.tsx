@@ -7,7 +7,7 @@ export default function MeetingsLayout() {
     return (
         <Stack
             screenOptions={{
-                headerShown: false, // We'll use custom headers or screen headers
+                headerShown: false,
                 contentStyle: { backgroundColor: colors.background },
             }}
         >

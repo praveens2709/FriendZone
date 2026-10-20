@@ -1,3 +1,4 @@
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect } from "react";
 import {
     StyleSheet,
@@ -7,7 +8,6 @@ import {
     ActivityIndicator,
     Alert,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import CommonHeader from "@/components/CommonHeader";
@@ -42,14 +42,11 @@ export default function MeetingRecordingsScreen() {
             setLoading(true);
 
             try {
-                // Get Meeting Title
                 const meetingData = await MeetingService.getMeetingById(meetingId, accessToken);
                 setMeetingTitle(meetingData.title);
 
-                // Get Token & Init Stream to fetch recordings
                 const tokenData = await MeetingService.getMeetingToken(meetingId, accessToken);
 
-                // Initialize client
                 streamClient = new StreamVideoClient({
                     apiKey: tokenData.apiKey,
                     user: { id: user._id },
@@ -60,12 +57,9 @@ export default function MeetingRecordingsScreen() {
 
                 try {
                     const { recordings } = await call.queryRecordings();
-                    // Sort by end_time desc
                     recordings.sort((a, b) => new Date(b.end_time).getTime() - new Date(a.end_time).getTime());
                     setRecordings(recordings);
                 } catch (err: any) {
-                    // Check for specific "Call not found" error (code 16 or 404)
-                    // If call doesn't exist, it simply means no recordings yet.
                     if (err?.code === 16 || err?.status === 404 || err?.message?.includes("Can't find call")) {
                         console.log("Call not found on Stream, treating as no recordings.");
                         setRecordings([]);
@@ -76,7 +70,6 @@ export default function MeetingRecordingsScreen() {
 
             } catch (error) {
                 console.error("Error fetching recordings:", error);
-                Alert.alert("Error", "Failed to load recordings");
             } finally {
                 setLoading(false);
             }
@@ -98,7 +91,7 @@ export default function MeetingRecordingsScreen() {
     };
 
     return (
-        <LinearGradient colors={colors.gradient} style={styles.container}>
+        <ScreenBackground style={styles.container}>
             <ThemedSafeArea style={styles.safeArea}>
                 <CommonHeader
                     title="Recordings"
@@ -120,11 +113,6 @@ export default function MeetingRecordingsScreen() {
                             </View>
                         ) : (
                             recordings.map((rec, index) => {
-                                // Logic for naming: "Title 1", "Title 2" etc.
-                                // Since we sorted desc, listing them in order.
-                                // To keep logical order "Part 1, Part 2", we might want to reverse index naming visually
-                                // or just use the index from map if we sort asc.
-                                // Let's use "Recording X" based on chronological order (index if sorted asc, len-index if descending)
                                 const name = `${meetingTitle} - Part ${recordings.length - index}`;
 
                                 return (
@@ -160,7 +148,7 @@ export default function MeetingRecordingsScreen() {
                 />
 
             </ThemedSafeArea>
-        </LinearGradient>
+        </ScreenBackground>
     );
 }
 

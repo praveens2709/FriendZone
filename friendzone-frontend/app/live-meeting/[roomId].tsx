@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
     View,
     ActivityIndicator,
@@ -7,6 +7,7 @@ import {
     Alert,
     TouchableOpacity,
     Text,
+    Platform,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -18,10 +19,14 @@ import {
     useCall,
     ParticipantView,
     ParticipantNetworkQualityIndicator,
+    useScreenShareButton,
+    callManager,
 } from "@stream-io/video-react-native-sdk";
+import { ScreenCapturePickerView } from "@stream-io/react-native-webrtc";
 import { useAuth } from "@/context/AuthContext";
 import MeetingService from "@/services/MeetingService";
 import { ThemedText } from "@/components/ThemedText";
+import Button from "@/components/Button";
 import { useTheme } from "@/context/ThemeContext";
 import { Ionicons, MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import InviteParticipantsModal from "@/components/InviteParticipantsModal";
@@ -39,6 +44,8 @@ const ParticipantsGrid = () => {
     });
 
     const count = participants.length;
+    const sharer = participants.find((p) => !!(p as any).screenShareStream && !p.isLocalParticipant);
+    const sharingLocally = participants.some((p) => p.isLocalParticipant && !!(p as any).screenShareStream);
 
     const getItemStyle = (index: number): StyleProp<ViewStyle> => {
         if (count === 1) return { width: '100%', height: '100%' };
@@ -51,8 +58,53 @@ const ParticipantsGrid = () => {
         return { width: '50%', height: 250 };
     };
 
+    if (sharer) {
+        const others = participants;
+        return (
+            <View style={styles.shareContainer}>
+                <View style={styles.shareMain}>
+                    <ParticipantView
+                        participant={sharer}
+                        trackType="screenShareTrack"
+                        style={styles.videoView}
+                        ParticipantLabel={() => null}
+                        ParticipantNetworkQualityIndicator={() => null}
+                    />
+                    <View style={styles.shareLabel}>
+                        <Text style={styles.nameText}>
+                            {`${sharer.name || sharer.userId} is sharing`}
+                        </Text>
+                    </View>
+                </View>
+                <View style={styles.shareStrip}>
+                    {others.map((p) => (
+                        <View key={p.sessionId} style={styles.shareThumb}>
+                            <ParticipantView
+                                participant={p}
+                                style={styles.videoView}
+                                ParticipantLabel={() => null}
+                                ParticipantNetworkQualityIndicator={() => null}
+                            />
+                        </View>
+                    ))}
+                </View>
+            </View>
+        );
+    }
+
     return (
         <View style={styles.gridContainer}>
+            {sharingLocally && (
+                <View style={styles.sharingBanner} pointerEvents="none">
+                    <MaterialIcons name="screen-share" size={16} color="white" />
+                    <Text style={styles.nameText}>You are sharing your screen</Text>
+                </View>
+            )}
+            {count <= 1 && (
+                <View style={styles.waiting} pointerEvents="none">
+                    <Text style={styles.waitingText}>Waiting for others to join...</Text>
+                </View>
+            )}
             {participants.map((p, index) => {
                 const published = p.publishedTracks || [];
                 const isAudioOn = published.includes(1 as any) || published.includes('audio' as any);
@@ -102,19 +154,27 @@ const ParticipantsGrid = () => {
     );
 };
 
-const BottomControls = ({ onLeave }: { onLeave: () => void }) => {
+const BottomControls = ({ onLeave, isHost, audioOnly }: { onLeave: () => void; isHost: boolean; audioOnly: boolean }) => {
     const call = useCall();
     const { useMicrophoneState, useCameraState } = useCallStateHooks();
     const { status: micStatus } = useMicrophoneState();
     const { status: camStatus } = useCameraState();
 
     const [isRecording, setIsRecording] = useState(false);
+    const [recordingBusy, setRecordingBusy] = useState(false);
+    const [speakerOn, setSpeakerOn] = useState(!audioOnly);
 
     useEffect(() => {
         if (!call) return;
         setIsRecording(call.state.recording);
-        const unsubscribe = call.on('call.recording_started', () => setIsRecording(true));
-        const unsubscribe2 = call.on('call.recording_stopped', () => setIsRecording(false));
+        const unsubscribe = call.on('call.recording_started', () => {
+            setIsRecording(true);
+            setRecordingBusy(false);
+        });
+        const unsubscribe2 = call.on('call.recording_stopped', () => {
+            setIsRecording(false);
+            setRecordingBusy(false);
+        });
         return () => {
             unsubscribe();
             unsubscribe2();
@@ -128,30 +188,40 @@ const BottomControls = ({ onLeave }: { onLeave: () => void }) => {
     const toggleCam = async () => { if (call) await call.camera.toggle(); };
     const flipCamera = async () => { if (call) await call.camera.flip(); };
 
-    // Sound placeholders
-    const playSound = async (type: 'start' | 'stop') => {
-        // Logic for sound playback (requires files)
+    const toggleRecording = async () => {
+        if (!call || recordingBusy) return;
+        setRecordingBusy(true);
+        try {
+            if (isRecording) await call.stopRecording();
+            else await call.startRecording();
+        } catch (e) {
+            setRecordingBusy(false);
+        }
     };
 
-    const toggleRecording = async () => {
-        if (!call) return;
-        try {
-            if (isRecording) {
-                await playSound('stop');
-                await call.stopRecording();
-            } else {
-                await playSound('start');
-                await call.startRecording();
-            }
-        } catch (e) {
-            console.error("Recording error", e);
-        }
+    const toggleSpeaker = () => {
+        const next = !speakerOn;
+        setSpeakerOn(next);
+        callManager.speaker.setForceSpeakerphoneOn(next);
     };
 
     return (
         <View style={styles.controlsBar}>
-            <TouchableOpacity style={[styles.roundButton, isRecording && { backgroundColor: "#FF3B30" }]} onPress={toggleRecording}>
-                <MaterialCommunityIcons name={isRecording ? "stop-circle-outline" : "record-circle-outline"} size={24} color={"white"} />
+            {isHost && (
+                <TouchableOpacity
+                    style={[styles.roundButton, (isRecording || recordingBusy) && { backgroundColor: "#FF3B30" }]}
+                    onPress={toggleRecording}
+                    disabled={recordingBusy}
+                >
+                    {recordingBusy ? (
+                        <ActivityIndicator size="small" color="white" />
+                    ) : (
+                        <MaterialCommunityIcons name={isRecording ? "stop-circle-outline" : "record-circle-outline"} size={24} color={"white"} />
+                    )}
+                </TouchableOpacity>
+            )}
+            <TouchableOpacity style={[styles.roundButton, speakerOn && { backgroundColor: "white" }]} onPress={toggleSpeaker}>
+                <Ionicons name={speakerOn ? "volume-high" : "volume-medium"} size={24} color={speakerOn ? "black" : "white"} />
             </TouchableOpacity>
             <TouchableOpacity style={[styles.roundButton, isMicMuted && { backgroundColor: "white" }]} onPress={toggleMic}>
                 <Ionicons name={isMicMuted ? "mic-off" : "mic"} size={24} color={isMicMuted ? "black" : "white"} />
@@ -159,9 +229,11 @@ const BottomControls = ({ onLeave }: { onLeave: () => void }) => {
             <TouchableOpacity style={[styles.roundButton, isCamOff && { backgroundColor: "white" }]} onPress={toggleCam}>
                 <Ionicons name={isCamOff ? "videocam-off" : "videocam"} size={24} color={isCamOff ? "black" : "white"} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.roundButton} onPress={flipCamera}>
-                <Ionicons name="camera-reverse-outline" size={24} color="white" />
-            </TouchableOpacity>
+            {!isCamOff && (
+                <TouchableOpacity style={styles.roundButton} onPress={flipCamera}>
+                    <Ionicons name="camera-reverse-outline" size={24} color="white" />
+                </TouchableOpacity>
+            )}
             <TouchableOpacity style={[styles.roundButton, { backgroundColor: "#FF3B30" }]} onPress={onLeave}>
                 <MaterialCommunityIcons name="phone-hangup" size={24} color="white" />
             </TouchableOpacity>
@@ -169,37 +241,87 @@ const BottomControls = ({ onLeave }: { onLeave: () => void }) => {
     );
 };
 
-// --- Top Right Controls ---
-const TopRightControls = ({ onAddParticipants }: { onAddParticipants: () => void }) => {
-    const call = useCall();
+const ScreenShareButton = () => {
+    const pickerRef = useRef<any>(null);
+    const { onPress, hasPublishedScreenShare } = useScreenShareButton(pickerRef);
 
-    const toggleScreenShare = () => { Alert.alert("Feature", "Screen share requires additional setup on mobile."); };
-    const endMeetingForAll = () => {
-        if (call) {
-            Alert.alert("End Meeting", "End meeting for everyone?", [
-                { text: "Cancel", style: "cancel" },
-                { text: "End", style: "destructive", onPress: async () => await call.endCall() }
-            ]);
+    if (!onPress) return null;
+
+    return (
+        <TouchableOpacity
+            style={[styles.verticalButton, hasPublishedScreenShare && { backgroundColor: 'rgba(255, 149, 0, 0.9)' }]}
+            onPress={onPress}
+        >
+            <MaterialIcons
+                name={hasPublishedScreenShare ? "stop-screen-share" : "screen-share"}
+                size={24}
+                color="white"
+            />
+            {Platform.OS === 'ios' && <ScreenCapturePickerView ref={pickerRef} />}
+        </TouchableOpacity>
+    );
+};
+
+const TopRightControls = ({
+    isHost,
+    onAddParticipants,
+    onEndForAll,
+}: {
+    isHost: boolean;
+    onAddParticipants: () => void;
+    onEndForAll: () => void;
+}) => {
+    const { useIsCallRecordingInProgress } = useCallStateHooks();
+    const recording = useIsCallRecordingInProgress();
+    const [seconds, setSeconds] = useState(0);
+
+    useEffect(() => {
+        if (!recording) {
+            setSeconds(0);
+            return;
         }
-    };
+        const timer = setInterval(() => setSeconds((value) => value + 1), 1000);
+        return () => clearInterval(timer);
+    }, [recording]);
+
+    const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
     return (
         <View style={styles.topRightContainer}>
-            <TouchableOpacity style={styles.verticalButton} onPress={onAddParticipants}>
-                <Ionicons name="person-add-outline" size={24} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.verticalButton} onPress={toggleScreenShare}>
-                <MaterialIcons name="screen-share" size={24} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.verticalButton, { backgroundColor: 'rgba(255, 59, 48, 0.8)' }]} onPress={endMeetingForAll}>
-                <MaterialCommunityIcons name="close-circle-outline" size={24} color="white" />
-            </TouchableOpacity>
+            {recording && (
+                <View style={styles.recBadge}>
+                    <View style={styles.recDot} />
+                    <Text style={styles.recText}>REC {clock}</Text>
+                </View>
+            )}
+            <ScreenShareButton />
+            {isHost && (
+                <TouchableOpacity style={styles.verticalButton} onPress={onAddParticipants}>
+                    <Ionicons name="person-add-outline" size={24} color="white" />
+                </TouchableOpacity>
+            )}
+            {isHost && (
+                <TouchableOpacity
+                    style={[styles.verticalButton, { backgroundColor: 'rgba(255, 59, 48, 0.8)' }]}
+                    onPress={onEndForAll}
+                >
+                    <MaterialCommunityIcons name="close-circle-outline" size={24} color="white" />
+                </TouchableOpacity>
+            )}
         </View>
-    )
-}
+    );
+};
 
 export default function LiveMeetingScreen() {
-    const { roomId } = useLocalSearchParams<{ roomId: string }>();
+    const { roomId, isHost: isHostParam, audio, instant } = useLocalSearchParams<{
+        roomId: string;
+        isHost?: string;
+        audio?: string;
+        instant?: string;
+    }>();
+    const isHost = isHostParam === "true";
+    const audioOnly = audio === "1";
+    const isInstant = instant === "1";
     const { accessToken, user } = useAuth();
     const router = useRouter();
     const { colors } = useTheme();
@@ -232,6 +354,27 @@ export default function LiveMeetingScreen() {
                 currentCall = currentClient.call("default", roomId);
 
                 await currentCall.join({ create: true });
+                try {
+                    await currentCall.microphone.enable();
+                    if (audioOnly) await currentCall.camera.disable();
+                    else await currentCall.camera.enable();
+                } catch (mediaError) {
+                    console.warn("Could not enable devices", mediaError);
+                }
+                MeetingService.recordJoin(roomId, accessToken).catch(() => undefined);
+                setTimeout(() => {
+                    try {
+                        callManager.speaker.setForceSpeakerphoneOn(!audioOnly);
+                    } catch (speakerError) {
+                        console.warn("Could not set audio route", speakerError);
+                    }
+                }, 700);
+
+                currentCall.on("call.ended", () => {
+                    if (!mounted) return;
+
+                    router.back();
+                });
 
                 if (mounted) {
                     setClient(currentClient);
@@ -243,8 +386,6 @@ export default function LiveMeetingScreen() {
                 if (mounted) {
                     setError(err?.message || "Failed to join meeting");
                     setLoading(false);
-                    Alert.alert("Error", "Failed to join meeting. Please try again.");
-                    router.back();
                 }
             }
         };
@@ -261,8 +402,42 @@ export default function LiveMeetingScreen() {
         };
     }, [roomId, accessToken, user]);
 
+    const handleEndForAll = () => {
+        if (!call) return;
+        Alert.alert("End call", "End the call for everyone?", [
+            { text: "Cancel", style: "cancel" },
+            {
+                text: "End",
+                style: "destructive",
+                onPress: async () => {
+                    try {
+                        await call.endCall();
+                        await MeetingService.updateMeetingStatus(roomId!, "completed", accessToken!);
+                    } catch (e) {
+                        console.error("End call failed", e);
+                    }
+                    await handleLeave();
+                },
+            },
+        ]);
+    };
+
+    useEffect(() => {
+        if (!call || !isInstant || !isHost) return;
+        const timer = setTimeout(async () => {
+            if (call.state.participantCount <= 1) {
+                await MeetingService.cancelCall(roomId!).catch(() => undefined);
+
+                await handleLeave();
+            }
+        }, 60000);
+        return () => clearTimeout(timer);
+    }, [call]);
+
     const handleLeave = async () => {
-        // Force cleanup on intentional leave
+        if (isInstant && isHost && call && call.state.participantCount <= 1) {
+            await MeetingService.cancelCall(roomId!).catch(() => undefined);
+        }
         if (call) await call.leave().catch(e => console.error(e));
         if (client) await client.disconnectUser().catch(e => console.error(e));
         router.back();
@@ -272,7 +447,7 @@ export default function LiveMeetingScreen() {
         if (!call) return;
         try {
             await MeetingService.addParticipants(roomId!, [userToInvite._id], accessToken!);
-            Alert.alert("Success", `Invited ${userToInvite.firstName}`);
+
         } catch (e) {
             Alert.alert("Error", "Failed to invite user");
         }
@@ -290,7 +465,8 @@ export default function LiveMeetingScreen() {
     if (error || !client || !call) {
         return (
             <View style={[styles.center, { backgroundColor: colors.background }]}>
-                <ThemedText style={{ color: "red" }}>{error || "Failed to initialize meeting"}</ThemedText>
+                <ThemedText style={{ color: "red", marginBottom: 20 }}>{error || "Failed to initialize meeting"}</ThemedText>
+                <Button title="Go back" onPress={() => router.back()} style={{ alignSelf: "stretch", marginHorizontal: 24 }} />
             </View>
         );
     }
@@ -300,14 +476,16 @@ export default function LiveMeetingScreen() {
             <StreamCall call={call}>
                 <View style={styles.container}>
 
-                    {/* Dynamic Grid Layout */}
                     <ParticipantsGrid />
 
-                    {/* Overlays */}
-                    <TopRightControls onAddParticipants={() => setShowInviteModal(true)} />
+                    <TopRightControls
+                        isHost={isHost}
+                        onAddParticipants={() => setShowInviteModal(true)}
+                        onEndForAll={handleEndForAll}
+                    />
 
                     <View style={styles.bottomContainer}>
-                        <BottomControls onLeave={handleLeave} />
+                        <BottomControls onLeave={handleLeave} isHost={isHost} audioOnly={audioOnly} />
                     </View>
 
                     <InviteParticipantsModal
@@ -334,7 +512,6 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
     },
-    // Dynamic Grid
     gridContainer: {
         flex: 1,
         flexDirection: 'row',
@@ -344,7 +521,7 @@ const styles = StyleSheet.create({
     gridItem: {
         position: 'relative',
         borderColor: '#000',
-        borderWidth: 1, // Slight separation
+        borderWidth: 1,
         backgroundColor: '#1c1c1e',
         overflow: 'hidden',
     },
@@ -380,13 +557,67 @@ const styles = StyleSheet.create({
         padding: 4,
         borderRadius: 4,
     },
+    shareContainer: { flex: 1, backgroundColor: 'black' },
+    shareMain: { flex: 1, backgroundColor: '#111', marginTop: 50 },
+    shareLabel: {
+        position: 'absolute',
+        top: 10,
+        left: 10,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+    },
+    shareStrip: { flexDirection: 'row', height: 130, paddingBottom: 90, gap: 6, paddingHorizontal: 6 },
+    shareThumb: { width: 90, height: 120, borderRadius: 10, overflow: 'hidden', backgroundColor: '#1c1c1e' },
+    waiting: {
+        position: 'absolute',
+        top: 110,
+        left: 0,
+        right: 0,
+        alignItems: 'center',
+        zIndex: 50,
+    },
+    waitingText: {
+        color: 'white',
+        backgroundColor: 'rgba(0,0,0,0.55)',
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 16,
+        fontSize: 14,
+        fontWeight: '600',
+        overflow: 'hidden',
+    },
+    recBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 14,
+    },
+    sharingBanner: {
+        position: 'absolute',
+        top: 90,
+        alignSelf: 'center',
+        zIndex: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(255, 149, 0, 0.9)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+    },
+    recDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF3B30' },
+    recText: { color: 'white', fontSize: 11, fontWeight: '800' },
     speakingBorder: {
         ...StyleSheet.absoluteFillObject,
         borderWidth: 3,
-        borderColor: '#34C759', // Green
+        borderColor: '#34C759',
     },
 
-    // Controls
     bottomContainer: {
         position: "absolute",
         bottom: 30,

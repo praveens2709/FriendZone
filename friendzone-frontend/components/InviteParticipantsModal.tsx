@@ -177,7 +177,6 @@ export default function InviteParticipantsModal({
     };
 
     const renderRightAction = (item: InviteeUser) => {
-        // Logic for Batch Mode
         if (mode === 'batch') {
             const isSelected = selectedIds.has(item._id);
             return (

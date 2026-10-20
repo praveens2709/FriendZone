@@ -1,3 +1,4 @@
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect } from "react";
 import {
     StyleSheet,
@@ -8,7 +9,6 @@ import {
     Alert,
     RefreshControl,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import CommonHeader from "@/components/CommonHeader";
@@ -24,9 +24,9 @@ import { StreamVideoClient, CallRecording } from "@stream-io/video-react-native-
 import CustomVideoPlayer from "@/components/CustomVideoPlayer";
 
 type FlatRecordingItem = {
-    id: string; // Composite ID
+    id: string;
     meetingId: string;
-    recordingName: string; // Stream Recording ID (name)
+    recordingName: string;
     sessionId: string;
     url: string;
     filename: string;
@@ -43,17 +43,14 @@ export default function RecordingsListScreen() {
     const { accessToken, user } = useAuth();
     const router = useRouter();
 
-    // Data State
     const [allRecordings, setAllRecordings] = useState<FlatRecordingItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
-    // Playback State
     const [playingRecording, setPlayingRecording] = useState<FlatRecordingItem | null>(null);
 
-    // Selection Mode State
     const [isSelectionMode, setIsSelectionMode] = useState(false);
-    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set()); // IDs of FlatRecordingItem
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
@@ -66,21 +63,15 @@ export default function RecordingsListScreen() {
         if (!accessToken || !user) return;
         setLoading(true);
         try {
-            // 1. Fetch Meetings
-            const response = await MeetingService.getMeetings(accessToken);
-            // Considered "ended" if completed or live (showing functionality even if live)
-            // Typically only completed meetings have recordings, but sometimes long live ones do.
+            const response = await MeetingService.getMeetings(accessToken, { includeInstant: true, limit: 100 });
             const candidateMeetings = response.meetings.filter((m: Meeting) => m.status === 'completed' || m.status === 'live');
 
             const flattened: FlatRecordingItem[] = [];
 
-            // 2. Fetch Recordings for each meeting (Parallel)
             await Promise.all(candidateMeetings.map(async (meeting: Meeting) => {
                 try {
-                    // Get Token
                     const tokenData = await MeetingService.getMeetingToken(meeting._id, accessToken);
 
-                    // Init Client
                     const client = new StreamVideoClient({
                         apiKey: tokenData.apiKey,
                         user: { id: user._id },
@@ -91,7 +82,6 @@ export default function RecordingsListScreen() {
                     const { recordings } = await call.queryRecordings();
 
                     if (recordings && recordings.length > 0) {
-                        // Sort by start_time to determine parts
                         const sorted = [...recordings].sort((a, b) =>
                             new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
                         );
@@ -100,20 +90,17 @@ export default function RecordingsListScreen() {
                             const partNum = index + 1;
                             const isMultiPart = sorted.length > 1;
 
-                            // Naming Convention: "Title" or "Title - Part X"
                             let displayTitle = meeting.title;
                             if (isMultiPart) {
                                 displayTitle = `${meeting.title} - Part ${partNum}`;
                             }
 
-                            // Debug logging to find the correct ID
-                            // console.log("Stream Recording Object:", JSON.stringify(rec, null, 2));
 
                             flattened.push({
-                                id: `${meeting._id}_${rec.filename}`, // Unique Composite ID
+                                id: `${meeting._id}_${rec.filename}`,
                                 meetingId: meeting._id,
-                                recordingName: rec.filename, // Using filename as identifier for now
-                                sessionId: (rec as any).session_id, // Capture session_id
+                                recordingName: rec.filename,
+                                sessionId: (rec as any).session_id,
                                 url: rec.url,
                                 filename: rec.filename,
                                 startTime: rec.start_time,
@@ -130,7 +117,6 @@ export default function RecordingsListScreen() {
                 }
             }));
 
-            // Sort all flattened recordings by date desc
             flattened.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
 
             setAllRecordings(flattened);
@@ -151,7 +137,6 @@ export default function RecordingsListScreen() {
         if (isSelectionMode) {
             toggleSelection(item.id);
         } else {
-            // Play Recording
             setPlayingRecording(item);
         }
     };
@@ -212,16 +197,13 @@ export default function RecordingsListScreen() {
 
                             await Promise.all(deletionPromises);
 
-                            // Refresh list
                             await fetchAllRecordings();
                             setIsSelectionMode(false);
                             setSelectedIds(new Set());
-                            // Console log instead of Alert
                             console.log("Recordings deleted successfully");
 
                         } catch (error) {
                             console.error("Error deleting recordings:", error);
-                            // Console error instead of Alert
                         } finally {
                             setIsDeleting(false);
                         }
@@ -232,7 +214,7 @@ export default function RecordingsListScreen() {
     };
 
     return (
-        <LinearGradient colors={colors.gradient} style={styles.container}>
+        <ScreenBackground style={styles.container}>
             <ThemedSafeArea style={styles.safeArea}>
                 <CommonHeader
                     title={isSelectionMode ? `${selectedIds.size} Selected` : "All Recordings"}
@@ -272,8 +254,8 @@ export default function RecordingsListScreen() {
                             <RefreshControl
                                 refreshing={refreshing}
                                 onRefresh={onRefresh}
-                                tintColor={colors.text} // Use text color for contrast on dark bg
-                                colors={[colors.primary]} // Android
+                                tintColor={colors.text}
+                                colors={[colors.primary]}
                             />
                         }
                         ListEmptyComponent={() => (
@@ -328,7 +310,6 @@ export default function RecordingsListScreen() {
                     />
                 )}
 
-                {/* Custom Video Player */}
                 <CustomVideoPlayer
                     visible={!!playingRecording}
                     videoUrl={playingRecording?.url || null}
@@ -337,7 +318,7 @@ export default function RecordingsListScreen() {
                 />
 
             </ThemedSafeArea>
-        </LinearGradient>
+        </ScreenBackground>
     );
 }
 
