@@ -3,6 +3,9 @@ import nodemailer from 'nodemailer';
 
 dotenv.config();
 
+const emailConfigured = Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS);
+const devMailFallback = !emailConfigured && process.env.NODE_ENV !== 'production';
+
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -11,31 +14,32 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-transporter.verify((error, success) => {
-  if (error) {
-    console.error('Email transport error:', error);
-  } else {
-    console.log('Gmail SMTP verified successfully');
-  }
-});
+if (emailConfigured) {
+  transporter.verify((error) => {
+    if (error) {
+      console.error('Email transport error:', error.message);
+    } else {
+      console.log('Email transport verified');
+    }
+  });
+} else if (devMailFallback) {
+  console.warn('EMAIL_USER/EMAIL_PASS not set: OTP codes will be printed to this console (development only).');
+}
 
-/**
- * Sends an OTP email using Gmail
- * @param {string} toEmail - Recipient's email address
- * @param {string} otp - OTP code to send
- */
 export const sendOTPEmail = async (toEmail, otp) => {
-  console.log(`[EmailService] Sending OTP email to: ${toEmail}`);
+  if (devMailFallback) {
+    console.log(`[dev] OTP for ${toEmail}: ${otp}`);
+    return;
+  }
   try {
     await transporter.sendMail({
       from: `"FriendZone" <${process.env.EMAIL_USER}>`,
       to: toEmail,
-      subject: 'Your OTP Code',
-      text: `Your OTP code is: ${otp}`,
+      subject: 'Your FriendZone verification code',
+      text: `Your FriendZone verification code is ${otp}. It expires in 3 minutes. If you did not request it, you can ignore this email.`,
     });
-    console.log(`[EmailService] ✅ Email successfully sent to ${toEmail}`);
   } catch (err) {
-    console.error('❌ Failed to send OTP email:', err);
+    console.error('Failed to send OTP email:', err.message);
     throw err;
   }
 };

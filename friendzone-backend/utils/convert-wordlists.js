@@ -12,7 +12,6 @@ const convertTxtToJson = (txtFile, jsonFile) => {
   console.log(`✅ Converted ${txtFile} → ${jsonFile} (${words.length} words)`);
 };
 
-// Adjust paths as needed
 const answersTxt = path.resolve("./data/answers.txt");
 const validTxt = path.resolve("./data/valid.txt");
 const answersJson = path.resolve("./data/answers.json");

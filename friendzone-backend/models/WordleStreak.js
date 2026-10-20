@@ -16,7 +16,7 @@ const wordleStreakSchema = new mongoose.Schema({
     default: 0
   },
   lastPlayedDate: {
-    type: String, // Format: YYYY-MM-DD
+    type: String,
     default: null
   },
   totalGamesPlayed: {

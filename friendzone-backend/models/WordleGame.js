@@ -8,7 +8,7 @@ const wordleGameSchema = new mongoose.Schema({
     index: true
   },
   date: {
-    type: String, // Format: YYYY-MM-DD
+    type: String,
     required: true,
     index: true
   },
@@ -21,6 +21,10 @@ const wordleGameSchema = new mongoose.Schema({
     type: String,
     uppercase: true
   }],
+  inProgress: {
+    type: Boolean,
+    default: false
+  },
   won: {
     type: Boolean,
     default: false
@@ -40,7 +44,6 @@ const wordleGameSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Compound index for unique game per user per day
 wordleGameSchema.index({ userId: 1, date: 1 }, { unique: true });
 
 const WordleGame = mongoose.model('WordleGame', wordleGameSchema);

@@ -9,17 +9,26 @@ const valid = JSON.parse(
   fs.readFileSync(new URL("../data/valid.json", import.meta.url))
 );
 
-export const ANSWER_WORDS = answers.map((w) => w.toUpperCase());
-export const VALID_FIVE_LETTER_WORDS = [
-  ...new Set([...ANSWER_WORDS, ...valid.map((w) => w.toUpperCase())]),
-];
+const MAX_GUESSES = 6;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const UTC_OFFSET_MINUTES = Number(process.env.WORDLE_UTC_OFFSET_MINUTES ?? 330);
 
-console.log(`Loaded ${VALID_FIVE_LETTER_WORDS.length} valid 5-letter words`);
-console.log(`Loaded ${ANSWER_WORDS.length} answer words`);
+export const ANSWER_WORDS = answers.map((w) => w.toUpperCase());
+const VALID_WORD_SET = new Set([
+  ...ANSWER_WORDS,
+  ...valid.map((w) => w.toUpperCase()),
+]);
+
+const dateStringFor = (daysAgo = 0) =>
+  new Date(Date.now() + UTC_OFFSET_MINUTES * 60 * 1000 - daysAgo * DAY_MS)
+    .toISOString()
+    .split("T")[0];
+
+export const getTodayDateString = () => dateStringFor(0);
+export const getYesterdayDateString = () => dateStringFor(1);
 
 export const getTodayWord = () => {
-  const today = new Date();
-  const dateString = today.toISOString().split("T")[0];
+  const dateString = getTodayDateString();
 
   let seed = 0;
   for (let i = 0; i < dateString.length; i++) {
@@ -27,23 +36,11 @@ export const getTodayWord = () => {
     seed = seed & seed;
   }
 
-  const pseudoRandom = Math.abs(seed) % ANSWER_WORDS.length;
-  return ANSWER_WORDS[pseudoRandom];
+  return ANSWER_WORDS[Math.abs(seed) % ANSWER_WORDS.length];
 };
 
-export const getTodayDateString = () => {
-  return new Date().toISOString().split("T")[0];
-};
-
-export const getYesterdayDateString = () => {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  return yesterday.toISOString().split("T")[0];
-};
-
-export const isValidWord = (word) => {
-  return VALID_FIVE_LETTER_WORDS.includes(word.toUpperCase());
-};
+export const isValidWord = (word) =>
+  typeof word === "string" && VALID_WORD_SET.has(word.toUpperCase());
 
 export const evaluateGuess = (word, guess) => {
   word = word.toUpperCase();
@@ -72,164 +69,229 @@ export const evaluateGuess = (word, guess) => {
   return result;
 };
 
-export const checkIfPlayedToday = async (userId) => {
-  try {
-    const todayDate = getTodayDateString();
-    const game = await WordleGame.findOne({ userId, date: todayDate });
-    return !!game;
-  } catch (error) {
-    console.error("Error in checkIfPlayedToday:", error);
-    throw error;
-  }
+const getStreakCount = async (userId) => {
+  const streak = await WordleStreak.findOne({ userId }).lean();
+  return streak?.currentStreak || 0;
 };
 
 export const getTodayGame = async (userId) => {
-  try {
-    const todayDate = getTodayDateString();
-    const game = await WordleGame.findOne({ userId, date: todayDate });
-    const streak = await WordleStreak.findOne({ userId });
+  const todayDate = getTodayDateString();
+  const game = await WordleGame.findOne({ userId, date: todayDate }).lean();
+  const streak = await getStreakCount(userId);
 
-    return {
-      hasPlayed: !!game,
-      game: game || null,
-      streak: streak?.currentStreak || 0,
-      word: game ? null : getTodayWord(),
-    };
-  } catch (error) {
-    console.error("Error in getTodayGame:", error);
-    throw error;
+  if (!game) {
+    return { hasPlayed: false, guesses: [], evaluations: [], won: false, streak, word: null };
   }
+
+  const finished = !game.inProgress;
+  return {
+    hasPlayed: finished,
+    guesses: game.guesses,
+    evaluations: game.guesses.map((g) => evaluateGuess(game.word, g)),
+    won: finished ? game.won : false,
+    streak,
+    word: finished ? game.word : null,
+  };
 };
 
-export const submitGameResult = async (userId, guesses, won) => {
-  try {
-    const todayDate = getTodayDateString();
-    const yesterdayDate = getYesterdayDateString();
-    const word = getTodayWord();
+const recordResult = async (userId, won, todayDate) => {
+  const yesterdayDate = getYesterdayDateString();
 
-    for (const guess of guesses) {
-      if (!isValidWord(guess)) throw new Error(`Invalid word: ${guess}`);
+  let streakRecord = await WordleStreak.findOne({ userId });
+  if (!streakRecord) {
+    streakRecord = new WordleStreak({ userId });
+  }
+
+  let streakEnded = false;
+  const lastPlayedDate = streakRecord.lastPlayedDate;
+
+  if (won) {
+    if (lastPlayedDate === yesterdayDate) {
+      streakRecord.currentStreak += 1;
+    } else if (!lastPlayedDate || lastPlayedDate < yesterdayDate) {
+      streakEnded = streakRecord.currentStreak > 0;
+      streakRecord.currentStreak = 1;
     }
-
-    const existingGame = await WordleGame.findOne({ userId, date: todayDate });
-    if (existingGame) throw new Error("You have already played today");
-
-    let streakRecord = await WordleStreak.findOne({ userId });
-    if (!streakRecord) {
-      streakRecord = new WordleStreak({
-        userId,
-        currentStreak: 0,
-        longestStreak: 0,
-        lastPlayedDate: null,
-        totalGamesPlayed: 0,
-        totalGamesWon: 0,
-        winPercentage: 0,
-      });
+    if (streakRecord.currentStreak > streakRecord.longestStreak) {
+      streakRecord.longestStreak = streakRecord.currentStreak;
     }
+    streakRecord.totalGamesWon += 1;
+  } else {
+    if (streakRecord.currentStreak > 0) streakEnded = true;
+    streakRecord.currentStreak = 0;
+  }
 
-    let streakEnded = false;
-    const lastPlayedDate = streakRecord.lastPlayedDate;
+  streakRecord.lastPlayedDate = todayDate;
+  streakRecord.totalGamesPlayed += 1;
+  streakRecord.winPercentage = Math.round(
+    (streakRecord.totalGamesWon / streakRecord.totalGamesPlayed) * 100
+  );
 
-    if (won) {
-      if (lastPlayedDate === yesterdayDate) {
-        streakRecord.currentStreak += 1;
-      } else if (!lastPlayedDate || lastPlayedDate < yesterdayDate) {
-        streakEnded = streakRecord.currentStreak > 0;
-        streakRecord.currentStreak = 1;
-      }
-      if (streakRecord.currentStreak > streakRecord.longestStreak) {
-        streakRecord.longestStreak = streakRecord.currentStreak;
-      }
-      streakRecord.totalGamesWon += 1;
-    } else {
-      if (streakRecord.currentStreak > 0) streakEnded = true;
-      streakRecord.currentStreak = 0;
+  await streakRecord.save();
+
+  return { streak: streakRecord.currentStreak, streakEnded };
+};
+
+export const submitGuess = async (userId, rawGuess) => {
+  if (typeof rawGuess !== "string" || !/^[A-Za-z]{5}$/.test(rawGuess)) {
+    return { isValid: false };
+  }
+
+  const guess = rawGuess.toUpperCase();
+  if (!isValidWord(guess)) {
+    return { isValid: false };
+  }
+
+  const todayDate = getTodayDateString();
+  const word = getTodayWord();
+
+  const existing = await WordleGame.findOne({ userId, date: todayDate }).lean();
+  if (existing && !existing.inProgress) {
+    throw new Error("You have already played today");
+  }
+
+  if (!existing) {
+    try {
+      await WordleGame.create({ userId, date: todayDate, word, inProgress: true });
+    } catch (error) {
+      if (error.code !== 11000) throw error;
     }
+  }
 
-    streakRecord.lastPlayedDate = todayDate;
-    streakRecord.totalGamesPlayed += 1;
-    streakRecord.winPercentage = Math.round(
-      (streakRecord.totalGamesWon / streakRecord.totalGamesPlayed) * 100
-    );
-
-    await streakRecord.save();
-
-    const game = new WordleGame({
+  const game = await WordleGame.findOneAndUpdate(
+    {
       userId,
       date: todayDate,
-      word,
-      guesses,
-      won,
-      attempts: guesses.length,
-      streak: streakRecord.currentStreak,
-      completedAt: new Date(),
-    });
-    await game.save();
+      inProgress: true,
+      [`guesses.${MAX_GUESSES - 1}`]: { $exists: false },
+    },
+    { $push: { guesses: guess } },
+    { new: true }
+  );
 
-    return {
-      success: true,
-      won,
-      streak: streakRecord.currentStreak,
-      streakEnded,
-      attempts: guesses.length,
-      word: won ? null : word,
-    };
-  } catch (error) {
-    console.error("Error in submitGameResult:", error);
-    throw error;
+  if (!game) {
+    throw new Error("You have already played today");
   }
+
+  const evaluation = evaluateGuess(game.word, guess);
+  const won = guess === game.word;
+  const finished = won || game.guesses.length >= MAX_GUESSES;
+
+  if (!finished) {
+    return {
+      isValid: true,
+      evaluation,
+      finished: false,
+      won: false,
+      attempts: game.guesses.length,
+      streak: await getStreakCount(userId),
+      streakEnded: false,
+      word: null,
+    };
+  }
+
+  const { streak, streakEnded } = await recordResult(userId, won, todayDate);
+
+  await WordleGame.updateOne(
+    { _id: game._id },
+    {
+      $set: {
+        inProgress: false,
+        won,
+        attempts: game.guesses.length,
+        streak,
+        completedAt: new Date(),
+      },
+    }
+  );
+
+  return {
+    isValid: true,
+    evaluation,
+    finished: true,
+    won,
+    attempts: game.guesses.length,
+    streak,
+    streakEnded,
+    word: game.word,
+  };
 };
 
 export const checkStreakStatus = async (userId) => {
-  try {
-    const yesterdayDate = getYesterdayDateString();
-    const streakRecord = await WordleStreak.findOne({ userId });
+  const yesterdayDate = getYesterdayDateString();
+  const streakRecord = await WordleStreak.findOne({ userId });
 
-    if (!streakRecord || !streakRecord.lastPlayedDate) {
-      return { hasStreak: false, streakEnded: false, currentStreak: 0 };
-    }
-
-    if (
-      streakRecord.lastPlayedDate < yesterdayDate &&
-      streakRecord.currentStreak > 0
-    ) {
-      streakRecord.currentStreak = 0;
-      await streakRecord.save();
-      return { hasStreak: false, streakEnded: true, currentStreak: 0 };
-    }
-
-    return {
-      hasStreak: streakRecord.currentStreak > 0,
-      streakEnded: false,
-      currentStreak: streakRecord.currentStreak,
-    };
-  } catch (error) {
-    console.error("Error in checkStreakStatus:", error);
-    throw error;
+  if (!streakRecord || !streakRecord.lastPlayedDate) {
+    return { hasStreak: false, streakEnded: false, currentStreak: 0 };
   }
+
+  if (
+    streakRecord.lastPlayedDate < yesterdayDate &&
+    streakRecord.currentStreak > 0
+  ) {
+    streakRecord.currentStreak = 0;
+    await streakRecord.save();
+    return { hasStreak: false, streakEnded: true, currentStreak: 0 };
+  }
+
+  return {
+    hasStreak: streakRecord.currentStreak > 0,
+    streakEnded: false,
+    currentStreak: streakRecord.currentStreak,
+  };
 };
 
 export const getUserStats = async (userId) => {
-  try {
-    const streakRecord = await WordleStreak.findOne({ userId });
-    if (!streakRecord)
-      return {
-        currentStreak: 0,
-        longestStreak: 0,
-        totalGamesPlayed: 0,
-        totalGamesWon: 0,
-        winPercentage: 0,
-      };
-
+  const streakRecord = await WordleStreak.findOne({ userId });
+  if (!streakRecord) {
     return {
-      currentStreak: streakRecord.currentStreak,
-      longestStreak: streakRecord.longestStreak,
-      totalGamesPlayed: streakRecord.totalGamesPlayed,
-      totalGamesWon: streakRecord.totalGamesWon,
-      winPercentage: streakRecord.winPercentage,
+      currentStreak: 0,
+      longestStreak: 0,
+      totalGamesPlayed: 0,
+      totalGamesWon: 0,
+      winPercentage: 0,
     };
-  } catch (error) {
-    console.error("Error in getUserStats:", error);
-    throw error;
   }
+
+  return {
+    currentStreak: streakRecord.currentStreak,
+    longestStreak: streakRecord.longestStreak,
+    totalGamesPlayed: streakRecord.totalGamesPlayed,
+    totalGamesWon: streakRecord.totalGamesWon,
+    winPercentage: streakRecord.winPercentage,
+  };
+};
+
+export const getCircleBoard = async (userId, circleIds) => {
+  const ids = [userId.toString(), ...circleIds];
+  const today = getTodayDateString();
+
+  const [streaks, games] = await Promise.all([
+    WordleStreak.find({ userId: { $in: ids } }).lean(),
+    WordleGame.find({ userId: { $in: ids }, date: today, inProgress: { $ne: true } }).lean(),
+  ]);
+
+  const streakByUser = new Map(streaks.map((s) => [s.userId.toString(), s]));
+  const gameByUser = new Map(games.map((g) => [g.userId.toString(), g]));
+
+  return ids
+    .map((id) => {
+      const streak = streakByUser.get(id);
+      const game = gameByUser.get(id);
+      return {
+        userId: id,
+        currentStreak: streak?.currentStreak || 0,
+        longestStreak: streak?.longestStreak || 0,
+        playedToday: !!game,
+        wonToday: game ? game.won : false,
+        attemptsToday: game ? game.attempts : null,
+      };
+    })
+    .filter((row) => row.currentStreak > 0 || row.playedToday || row.userId === userId.toString())
+    .sort(
+      (a, b) =>
+        b.currentStreak - a.currentStreak ||
+        Number(b.wonToday) - Number(a.wonToday) ||
+        (a.attemptsToday ?? 99) - (b.attemptsToday ?? 99)
+    );
 };

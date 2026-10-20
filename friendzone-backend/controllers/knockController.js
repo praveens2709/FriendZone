@@ -1,6 +1,9 @@
 import User from '../models/User.js';
 import Knock from '../models/Knock.js';
 import * as NotificationController from './notificationController.js';
+import { isObjectId, escapeRegex } from '../utils/validate.js';
+import mongoose from 'mongoose';
+import { canViewUser, getBlockedIds, getLockedInIds, isBlockedBetween } from '../services/privacyService.js';
 
 export const knockUser = async (req, res) => {
   const knockerId = req.user.id;
@@ -8,6 +11,10 @@ export const knockUser = async (req, res) => {
 
   const io = req.io;
   const userSocketMap = req.userSocketMap;
+
+  if (!isObjectId(knockedId)) {
+    return res.status(400).json({ message: 'Invalid user.' });
+  }
 
   if (knockerId === knockedId) {
     return res.status(400).json({ message: 'You cannot knock yourself.' });
@@ -17,7 +24,11 @@ export const knockUser = async (req, res) => {
     const knockerUser = await User.findById(knockerId).select('firstName lastName isPrivate');
     const knockedUser = await User.findById(knockedId).select('isPrivate firstName lastName');
 
-    if (!knockedUser) return res.status(404).json({ message: 'User not found.' });
+    if (!knockedUser || !knockerUser) return res.status(404).json({ message: 'User not found.' });
+
+    if (await isBlockedBetween(knockerId, knockedId)) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
 
     const existingKnock = await Knock.findOne({ knocker: knockerId, knocked: knockedId });
     if (existingKnock) {
@@ -292,7 +303,6 @@ export const acceptKnock = async (req, res) => {
       knockerNotificationContent = `accepted your knock request. You are now LockedIn!`;
       receiverNotificationContent = `knocked you back. You are now LockedIn!`;
 
-      // Emit lockedIn status to both users
       const originalKnockerSocketId = userSocketMap.get(originalKnockerId);
       const acceptorSocketId2 = userSocketMap.get(userId);
       if (originalKnockerSocketId) {
@@ -374,7 +384,6 @@ export const acceptKnock = async (req, res) => {
       }
     }
 
-    // In all other cases, simply update the existing knock to onesidedlock
     if (newStatus === 'onesidedlock') {
       existingKnock.status = newStatus;
       await existingKnock.save();
@@ -435,8 +444,6 @@ export const declineKnock = async (req, res) => {
     const originalKnockerSocketId = userSocketMap.get(originalKnockerId);
     const declinerSocketId = userSocketMap.get(userId);
 
-    // await NotificationController.deleteNotificationsByKnockId(originalKnockerId, declinedKnock._id);
-    // await NotificationController.deleteNotificationsByKnockId(userId, declinedKnock._id);
 
     if (declinerSocketId) {
       io.to(declinerSocketId).emit('knockStatusChanged', { userId: userId });
@@ -483,8 +490,6 @@ export const unknockUser = async (req, res) => {
       io.to(unknockedUserSocketId).emit('knockStatusChanged', { userId: unknockedUserId });
     }
 
-    // await NotificationController.deleteNotificationsByKnockId(userId, knockId);
-    // await NotificationController.deleteNotificationsByKnockId(unknockedUserId, knockId);
 
     res.json({ message: 'Knock unknocked successfully.' });
 
@@ -506,7 +511,7 @@ export const getKnockers = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    res.json(knockers.map(k => ({
+    res.json(knockers.filter(k => k.knocker).map(k => ({
       id: k._id.toString(),
       knockerId: k.knocker._id.toString(),
       knockedId: k.knocked.toString(),
@@ -533,7 +538,7 @@ export const getKnocked = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    res.json(knocked.map(k => ({
+    res.json(knocked.filter(k => k.knocked).map(k => ({
       id: k._id.toString(),
       knockerId: k.knocker.toString(),
       knockedId: k.knocked._id.toString(),
@@ -564,7 +569,7 @@ export const getPendingKnockRequests = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    res.json(pendingKnocks.map(k => ({
+    res.json(pendingKnocks.filter(k => k.knocker).map(k => ({
       id: k._id.toString(),
       knockerId: k.knocker._id.toString(),
       knockedId: k.knocked.toString(),
@@ -583,21 +588,26 @@ export const getPendingKnockRequests = async (req, res) => {
 };
 
 export const searchUsers = async (req, res) => {
-  const query = req.query.q;
+  const query = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 50) : '';
   const userId = req.user.id;
 
-  if (!query || query.trim() === '') {
+  if (!query) {
     return res.json([]);
   }
 
   try {
+    const blocked = await getBlockedIds(userId);
+    const pattern = escapeRegex(query);
     const users = await User.find({
-      _id: { $ne: userId },
+      _id: { $ne: userId, $nin: [...blocked] },
+      isVerified: true,
       $or: [
-        { firstName: { $regex: query, $options: 'i' } },
-        { lastName: { $regex: query, $options: 'i' } },
+        { firstName: { $regex: pattern, $options: 'i' } },
+        { lastName: { $regex: pattern, $options: 'i' } },
       ],
-    }).select('firstName lastName profileImage isPrivate');
+    })
+      .select('firstName lastName profileImage isPrivate')
+      .limit(30);
 
     res.json(users);
   } catch (err) {
@@ -609,7 +619,15 @@ export const searchUsers = async (req, res) => {
 export const getKnockersForUser = async (req, res) => {
   const { userId } = req.params;
 
+  if (!isObjectId(userId)) {
+    return res.status(400).json({ message: 'Invalid user.' });
+  }
+
   try {
+    if (!(await canViewUser(req.user.id, userId))) {
+      return res.json([]);
+    }
+
     const knockers = await Knock.find({
       knocked: userId,
       status: { $in: ['lockedIn'] }
@@ -619,7 +637,7 @@ export const getKnockersForUser = async (req, res) => {
       .limit(3)
       .lean();
 
-    res.json(knockers.map(k => ({
+    res.json(knockers.filter(k => k.knocker).map(k => ({
       id: k.knocker._id.toString(),
       username: `${k.knocker.firstName} ${k.knocker.lastName || ''}`,
       avatar: k.knocker.profileImage || null
@@ -636,6 +654,10 @@ export const breakLock = async (req, res) => {
   const targetId = otherUserId || knockedId;
   const io = req.io;
   const userSocketMap = req.userSocketMap;
+
+  if (!isObjectId(targetId)) {
+    return res.status(400).json({ message: 'Invalid user.' });
+  }
 
   try {
     const otherUserKnock = await Knock.findOne({ knocker: targetId, knocked: myUserId });
@@ -669,6 +691,10 @@ export const breakLock = async (req, res) => {
 export const getCountsForUser = async (req, res) => {
   const { userId } = req.params;
 
+  if (!isObjectId(userId)) {
+    return res.status(400).json({ message: 'Invalid user.' });
+  }
+
   try {
     const knockersCount = await Knock.countDocuments({
       knocked: userId,
@@ -695,6 +721,81 @@ export const getCountsForUser = async (req, res) => {
     });
   } catch (err) {
     console.error('Error getting counts for user:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+export const getSuggestions = async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const [friendIds, blocked, myKnocks] = await Promise.all([
+      getLockedInIds(userId),
+      getBlockedIds(userId),
+      Knock.find({ $or: [{ knocker: userId }, { knocked: userId }] })
+        .select('knocker knocked')
+        .lean(),
+    ]);
+
+    if (friendIds.length === 0) {
+      return res.json([]);
+    }
+
+    const excluded = new Set([userId.toString(), ...blocked]);
+    myKnocks.forEach((k) => {
+      excluded.add(k.knocker.toString());
+      excluded.add(k.knocked.toString());
+    });
+
+    const grouped = await Knock.aggregate([
+      {
+        $match: {
+          knocker: { $in: friendIds.map((id) => new mongoose.Types.ObjectId(id)) },
+          status: 'lockedIn',
+        },
+      },
+      { $group: { _id: '$knocked', mutuals: { $addToSet: '$knocker' } } },
+      { $addFields: { mutualCount: { $size: '$mutuals' } } },
+      { $sort: { mutualCount: -1 } },
+      { $limit: 60 },
+    ]);
+
+    const candidates = grouped.filter((g) => !excluded.has(g._id.toString())).slice(0, 15);
+    if (candidates.length === 0) {
+      return res.json([]);
+    }
+
+    const mutualIds = [...new Set(candidates.flatMap((c) => c.mutuals.slice(0, 2).map(String)))];
+    const [users, mutualUsers] = await Promise.all([
+      User.find({ _id: { $in: candidates.map((c) => c._id) }, isVerified: true })
+        .select('firstName lastName profileImage isPrivate')
+        .lean(),
+      User.find({ _id: { $in: mutualIds } }).select('firstName').lean(),
+    ]);
+
+    const userById = new Map(users.map((u) => [u._id.toString(), u]));
+    const mutualName = new Map(mutualUsers.map((u) => [u._id.toString(), u.firstName]));
+
+    res.json(
+      candidates
+        .filter((c) => userById.has(c._id.toString()))
+        .map((c) => {
+          const u = userById.get(c._id.toString());
+          return {
+            id: u._id.toString(),
+            firstName: u.firstName,
+            lastName: u.lastName,
+            profileImage: u.profileImage || null,
+            isPrivate: !!u.isPrivate,
+            mutualCount: c.mutualCount,
+            mutualNames: c.mutuals
+              .slice(0, 2)
+              .map((id) => mutualName.get(id.toString()))
+              .filter(Boolean),
+          };
+        })
+    );
+  } catch (err) {
+    console.error('Error getting suggestions:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 };

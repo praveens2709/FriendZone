@@ -50,6 +50,7 @@ export default (io, userSocketMap) => {
 
   router.get('/pending', protect, knockController.getPendingKnockRequests);
   router.get('/search', protect, knockController.searchUsers);
+  router.get('/suggestions', protect, knockController.getSuggestions);
 
   return router;
 };

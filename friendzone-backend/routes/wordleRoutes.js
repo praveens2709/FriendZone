@@ -1,15 +1,23 @@
-// routes:
 import express from 'express';
 import { protect } from '../middleware/authMiddleware.js';
+import { rateLimit } from '../middleware/rateLimit.js';
 
-export default (wordleController) => { // wordleController is an object of functions
-  const router = express.Router();
+const guessLimiter = rateLimit({
+  name: 'wordle-guess',
+  windowMs: 10 * 60 * 1000,
+  max: 60,
+  keyFn: (req) => req.user?.id || req.ip,
+});
 
-  router.get('/today', protect, wordleController.getTodayGame); // Line 7
-  router.post('/submit', protect, wordleController.submitGame);
-  router.get('/streak', protect, wordleController.checkStreak);
-  router.get('/stats', protect, wordleController.getStats);
-  router.post('/validate', protect, wordleController.validateWord);
+export default (wordleController) => {
+  const router = express.Router();
 
-  return router;
+  router.get('/today', protect, wordleController.getTodayGame);
+  router.post('/guess', protect, guessLimiter, wordleController.submitGuess);
+  router.get('/streak', protect, wordleController.checkStreak);
+  router.get('/circle', protect, wordleController.getCircleBoard);
+  router.get('/stats', protect, wordleController.getStats);
+  router.post('/validate', protect, wordleController.validateWord);
+
+  return router;
 };

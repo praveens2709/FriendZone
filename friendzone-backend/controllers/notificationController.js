@@ -1,13 +1,35 @@
 import Notification from '../models/Notification.js';
 import Knock from '../models/Knock.js';
 import User from '../models/User.js';
+import Meeting from '../models/Meeting.js';
 
 const emitUnreadNotificationCount = async (io, userId) => {
     try {
+        await purgeDeadMeetingNotifications(userId);
         const unreadCount = await Notification.countDocuments({ recipient: userId, isRead: false });
         io.to(`notifications-${userId}`).emit('unreadNotificationCountUpdate', { count: unreadCount });
     } catch (error) {
         console.error("Error emitting unread notification count:", error);
+    }
+};
+
+const purgeDeadMeetingNotifications = async (userId) => {
+    const candidates = await Notification.find({
+        recipient: userId,
+        $or: [{ relatedEntityType: 'Meeting' }, { type: 'meeting_invite' }]
+    }).select('relatedEntityId metadata').lean();
+    if (candidates.length === 0) return;
+    const ids = [...new Set(candidates.map((n) => (n.relatedEntityId || n.metadata?.meetingId)?.toString()).filter(Boolean))];
+    const alive = await Meeting.find({ _id: { $in: ids }, status: { $ne: 'cancelled' } }).select('_id').lean();
+    const aliveSet = new Set(alive.map((m) => m._id.toString()));
+    const deadNotificationIds = candidates
+        .filter((n) => {
+            const id = (n.relatedEntityId || n.metadata?.meetingId)?.toString();
+            return id && !aliveSet.has(id);
+        })
+        .map((n) => n._id);
+    if (deadNotificationIds.length) {
+        await Notification.deleteMany({ _id: { $in: deadNotificationIds } });
     }
 };
 
@@ -18,6 +40,7 @@ export const getUserNotifications = async (req, res) => {
     const skip = (page - 1) * limit;
 
     try {
+        await purgeDeadMeetingNotifications(userId);
         const totalNotificationsCount = await Notification.countDocuments({ recipient: userId });
 
         const rawNotifications = await Notification.find({ recipient: userId })
@@ -41,6 +64,25 @@ export const getUserNotifications = async (req, res) => {
                         username: `${relatedUser.firstName || ''} ${relatedUser.lastName || ''}`.trim(),
                         avatar: relatedUser.profileImage || null,
                     } : null;
+                } else if (notification.type === 'meeting_invite' || notification.relatedEntityType === 'Meeting') {
+                    const meetingId = notification.relatedEntityId || notification.metadata?.meetingId;
+                    if (meetingId) {
+                        try {
+                            const meeting = await Meeting.findById(meetingId).select('participants').lean();
+                            if (meeting && meeting.participants) {
+                                const p = meeting.participants.find(part => (part.user?._id || part.user)?.toString() === userId.toString());
+                                if (p && p.status) {
+                                    enriched.metadata = {
+                                        ...(notification.metadata || {}),
+                                        meetingId: meetingId.toString(),
+                                        status: p.status
+                                    };
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Error enriching meeting notification:', e);
+                        }
+                    }
                 }
                 return enriched;
             })
