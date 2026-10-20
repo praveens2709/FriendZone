@@ -112,7 +112,6 @@ export default function ImagePickerComponent({
         onRequestClose={() => setModalVisible(false)}
         onDismiss={handleModalDismissed}
         onShow={() => {
-          // No-op or additional logic for when modal appears
         }}
       >
         <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>

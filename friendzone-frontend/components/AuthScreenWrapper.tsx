@@ -1,4 +1,4 @@
-import { LinearGradient } from "expo-linear-gradient";
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import {
   StyleSheet,
   ViewStyle,
@@ -17,9 +17,9 @@ export default function AuthScreenWrapper({
 
   return (
     <>
-      <LinearGradient colors={colors.gradient} style={styles.container}>
+      <ScreenBackground style={styles.container}>
         <ThemedSafeArea style={[styles.safeArea, style]}>{children}</ThemedSafeArea>
-      </LinearGradient>
+      </ScreenBackground>
     </>
   );
 }

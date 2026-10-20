@@ -1,3 +1,4 @@
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, FlatList, Dimensions, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,9 +10,7 @@ import { ThemedText } from '@/components/ThemedText';
 import PhoneMockupPreview from '@/components/PhoneMockupPreview';
 import Button from '@/components/Button';
 import { useAuth } from '@/context/AuthContext';
-import { HandleApiError } from '@/constants/Functions';
 import { Colors } from '@/constants/Colors';
-import { useLoadingDialog } from '@/context/LoadingContext';
 import { ThemedView } from '@/components/ThemedView';
 import CommonHeader from '@/components/CommonHeader';
 import ThemedSafeArea from '@/components/ThemedSafeArea';
@@ -26,7 +25,6 @@ export default function ChangeThemeScreen() {
   const { colors } = useTheme();
   const { availableThemes, theme: currentGlobalTheme } = useThemeStore();
   const { session, updateUserTheme } = useAuth();
-  const loadingDialog = useLoadingDialog();
 
   const [selectedThemeForPreview, setSelectedThemeForPreview] = useState<ThemeType>(currentGlobalTheme);
 
@@ -52,20 +50,16 @@ export default function ChangeThemeScreen() {
       return;
     }
 
-    loadingDialog.show();
     try {
       await updateUserTheme(selectedThemeForPreview);
-      console.log('success', `Theme updated to ${selectedThemeForPreview}!`);
     } catch (error) {
-      HandleApiError(error);
-    } finally {
-      loadingDialog.hide();
+      console.error('Failed to update theme:', error);
     }
   };
 
   return (
     <>
-      <LinearGradient colors={colors.gradient} style={styles.container}>
+      <ScreenBackground style={styles.container}>
         <ThemedSafeArea style={styles.safeArea}>
           <CommonHeader title="Choose Theme" leftContent={<BackButton color={colors.text}/>} />
 
@@ -101,7 +95,7 @@ export default function ChangeThemeScreen() {
             style={styles.confirmButton}
           />
         </ThemedSafeArea>
-      </LinearGradient>
+      </ScreenBackground>
     </>
   );
 }

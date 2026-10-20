@@ -33,21 +33,19 @@ export default function QRModal({ visible, onClose, username }: QRModalProps) {
   const currentTheme = THEMES[currentThemeIndex];
   const qrValue = `friendzone.app/profile/${username}`;
 
-  // Simple QR code representation using squares
   const generateQRPattern = () => {
-    const size = 21; // Standard QR code size
+    const size = 21;
     const pattern = [];
     
     for (let i = 0; i < size; i++) {
       const row = [];
       for (let j = 0; j < size; j++) {
-        // Create a pseudo-random but deterministic pattern based on position
         const seed = (i * size + j + username.length) * 7;
         const shouldFill = (seed % 3) === 0 || 
-                          (i < 7 && j < 7) || // Top-left finder pattern
-                          (i < 7 && j >= size - 7) || // Top-right finder pattern
-                          (i >= size - 7 && j < 7) || // Bottom-left finder pattern
-                          (i === 6 || j === 6); // Timing patterns
+                          (i < 7 && j < 7) ||
+                          (i < 7 && j >= size - 7) ||
+                          (i >= size - 7 && j < 7) ||
+                          (i === 6 || j === 6);
         row.push(shouldFill);
       }
       pattern.push(row);
@@ -78,7 +76,6 @@ export default function QRModal({ visible, onClose, username }: QRModalProps) {
 
         <View style={styles.qrContent}>
           <View style={[styles.qrCodeContainer, { backgroundColor: currentTheme.bgColor }]}>
-            {/* QR Code Pattern */}
             <View style={styles.qrGrid}>
               {qrPattern.map((row, i) => (
                 <View key={i} style={styles.qrRow}>
@@ -97,7 +94,6 @@ export default function QRModal({ visible, onClose, username }: QRModalProps) {
               ))}
             </View>
             
-            {/* Profile Logo in center */}
             <View style={[styles.logoContainer, { backgroundColor: currentTheme.bgColor }]}>
               <Ionicons name="person-circle" size={32} color={currentTheme.qrColor} />
             </View>

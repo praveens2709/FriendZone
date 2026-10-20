@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import ScreenBackground from "@/components/ui/ScreenBackground";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   StyleSheet,
   TouchableOpacity,
@@ -6,9 +7,9 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
+import ProfileServices from "@/services/ProfileService";
 import { Feather } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/context/ThemeContext";
@@ -30,7 +31,16 @@ const Divider = () => {
 export default function SettingsScreen() {
   const router = useRouter();
   const { colors } = useTheme();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
+  const [closeFriendCount, setCloseFriendCount] = useState<number | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      ProfileServices.getCloseFriends()
+        .then((list) => setCloseFriendCount(list.filter((f) => f.isClose).length))
+        .catch(() => setCloseFriendCount(null));
+    }, [])
+  );
 
   const [searchQuery, setSearchQuery] = useState("");
   const [showAccountCentre, setShowAccountCentre] = useState(false);
@@ -39,7 +49,6 @@ export default function SettingsScreen() {
   const handleLogout = async () => {
     await signOut();
     router.replace("/(auth)/AuthChoice");
-    console.log("[auth.signOut] Removing session");
   };
 
   const sections: SectionType[] = useMemo(
@@ -89,15 +98,31 @@ export default function SettingsScreen() {
         data: [
           {
             title: "Account privacy",
-            subTitle: "Private",
+            subTitle: user?.isPrivate ? "Private" : "Public",
             iconName: "lock-closed-outline",
             onPress: () => router.push("/profile/privacy"),
           },
           {
             title: "Close Friends",
-            subTitle: "0",
+            subTitle: closeFriendCount === null ? undefined : String(closeFriendCount),
             iconName: "star-outline",
             onPress: () => router.push("/profile/close-friends"),
+          },
+        ],
+      },
+      {
+        title: "Safety",
+        data: [
+          {
+            title: "Blocked accounts",
+            iconName: "ban-outline",
+            onPress: () => router.push("/profile/blocked"),
+          },
+          {
+            title: "Delete account",
+            subTitle: "Permanently remove your account and data",
+            iconName: "trash-outline",
+            onPress: () => router.push("/profile/delete-account"),
           },
         ],
       },
@@ -114,10 +139,20 @@ export default function SettingsScreen() {
             iconName: "information-circle-outline",
             onPress: () => router.push("/profile/about"),
           },
+          {
+            title: "Terms of Service",
+            iconName: "document-text-outline",
+            onPress: () => router.push("/legal/terms"),
+          },
+          {
+            title: "Privacy Policy",
+            iconName: "shield-checkmark-outline",
+            onPress: () => router.push("/legal/privacy"),
+          },
         ],
       },
     ],
-    [router]
+    [router, user?.isPrivate, closeFriendCount]
   );
 
   const filteredSections = useMemo(() => {
@@ -136,7 +171,7 @@ export default function SettingsScreen() {
   }, [sections, searchQuery]);
 
   return (
-    <LinearGradient colors={colors.gradient} style={styles.container}>
+    <ScreenBackground style={styles.container}>
       <ThemedSafeArea style={styles.safeArea}>
         <CommonHeader
           title="Settings and activity"
@@ -189,6 +224,7 @@ export default function SettingsScreen() {
                   subTitle={item.subTitle}
                   iconName={item.iconName as any}
                   onPress={item.onPress}
+                  card
                 />
               ))}
               {index < filteredSections.length - 1 && <Divider />}
@@ -214,7 +250,7 @@ export default function SettingsScreen() {
         onClose={() => setShowLogoutModal(false)}
         onConfirm={handleLogout}
       />
-    </LinearGradient>
+    </ScreenBackground>
   );
 }
 
@@ -252,8 +288,10 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   divider: {
-    height: 3,
-    marginTop: 10,
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: 20,
+    marginTop: 6,
+    marginBottom: 4,
   },
   logoutContainer: {
     marginTop: 10,

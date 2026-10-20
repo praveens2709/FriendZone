@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import PostService from "@/services/PostService";
 import { useAuth } from "@/context/AuthContext";
-import { Post } from "@/types/post.type"; // Assuming you might need Post type, though mainly we need IDs
+import { Post } from "@/types/post.type";
 
 interface SavedPostsContextType {
     savedPostIds: Set<string>;
@@ -55,7 +55,6 @@ export const SavedPostsProvider = ({ children }: { children: ReactNode }) => {
         async (postId: string) => {
             if (!accessToken) return;
 
-            // Optimistic update
             setSavedPostIds((prev) => {
                 const newSet = new Set(prev);
                 if (newSet.has(postId)) {
@@ -68,7 +67,6 @@ export const SavedPostsProvider = ({ children }: { children: ReactNode }) => {
 
             try {
                 const response = await PostService.toggleSave(postId, accessToken);
-                // Re-sync if server response differs from optimistic state (optional but safe)
                 setSavedPostIds((prev) => {
                     const newSet = new Set(prev);
                     if (response.saved) {
@@ -81,7 +79,6 @@ export const SavedPostsProvider = ({ children }: { children: ReactNode }) => {
 
             } catch (error) {
                 console.error("Failed to toggle save in context:", error);
-                // Revert optimistic update on error
                 setSavedPostIds((prev) => {
                     const newSet = new Set(prev);
                     if (newSet.has(postId)) {
@@ -91,7 +88,7 @@ export const SavedPostsProvider = ({ children }: { children: ReactNode }) => {
                     }
                     return newSet;
                 });
-                throw error; // Re-throw so components can handle UI feedback (toasts etc)
+                throw error;
             }
         },
         [accessToken]

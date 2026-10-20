@@ -1,6 +1,6 @@
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useEffect, useState, useCallback } from "react";
 import { StyleSheet, ActivityIndicator, View } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -25,7 +25,6 @@ export default function SavedPostsScreen() {
     const { savedPostIds } = useSavedPosts();
     const [fetchedPosts, setFetchedPosts] = useState<Post[]>([]);
 
-    // Filter fetched posts against the global set of saved IDs to instantly remove unsaved ones
     const displayedPosts = fetchedPosts.filter(post => savedPostIds.has(post._id));
     const [loading, setLoading] = useState(true);
 
@@ -61,7 +60,7 @@ export default function SavedPostsScreen() {
     }));
 
     return (
-        <LinearGradient colors={colors.gradient} style={styles.container}>
+        <ScreenBackground style={styles.container}>
             <ThemedSafeArea style={styles.safeArea}>
                 <CommonHeader
                     title="Saved Posts"
@@ -92,7 +91,7 @@ export default function SavedPostsScreen() {
                     </ThemedView>
                 )}
             </ThemedSafeArea>
-        </LinearGradient>
+        </ScreenBackground>
     );
 }
 
@@ -110,6 +109,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     scrollContent: {
+        paddingTop: 8,
         paddingBottom: 20,
     },
     emptyContainer: {

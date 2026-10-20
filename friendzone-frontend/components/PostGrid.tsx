@@ -75,7 +75,7 @@ const PostGrid: React.FC<PostGridProps> = ({ posts, onPressPost }) => {
       numColumns={numColumns}
       contentContainerStyle={styles.gridContainer}
       showsVerticalScrollIndicator={false}
-      scrollEnabled={false} // Disable FlatList scrolling to allow the parent ScrollView to handle it
+      scrollEnabled={false}
     />
   );
 };

@@ -1,4 +1,5 @@
 import { _get, _post } from "../configs/api-methods.config";
+import httpClient from "../configs/axios.config";
 import { Post, Comment, IToggleSaveResponse, ISharePostResponse, IToggleLikeResponse } from "@/types/post.type";
 
 interface ICreatePostResponse {
@@ -14,6 +15,42 @@ interface IAddCommentResponse {
 }
 
 class PostService {
+  static async getArchivedPosts(token: string, page = 1): Promise<Post[]> {
+    return await _get<IGetPostsResponse>(`posts/archived?page=${page}`, token);
+  }
+
+  static async archivePost(postId: string): Promise<void> {
+    await httpClient.put(`posts/${postId}/archive`, {});
+  }
+
+  static async unarchivePost(postId: string): Promise<void> {
+    await httpClient.put(`posts/${postId}/unarchive`, {});
+  }
+
+  static async deletePost(postId: string): Promise<void> {
+    await httpClient.delete(`posts/${postId}`);
+  }
+
+  static async getDeletedPosts(token: string): Promise<(Post & { daysLeft: number })[]> {
+    return await _get(`posts/deleted`, token);
+  }
+
+  static async restorePost(postId: string): Promise<void> {
+    await httpClient.put(`posts/${postId}/restore`, {});
+  }
+
+  static async deletePostForever(postId: string): Promise<void> {
+    await httpClient.delete(`posts/${postId}/permanent`);
+  }
+
+  static async getLikedPosts(token: string, page = 1): Promise<Post[]> {
+    return await _get<IGetPostsResponse>(`posts/activity/liked?page=${page}`, token);
+  }
+
+  static async getCommentedPosts(token: string, page = 1): Promise<Post[]> {
+    return await _get<IGetPostsResponse>(`posts/activity/commented?page=${page}`, token);
+  }
+
   static async getSavedPosts(token: string): Promise<Post[]> {
     try {
       const response = await _get<IGetPostsResponse>("posts/saved", token);
@@ -64,9 +101,9 @@ class PostService {
     }
   }
 
-  static async getFeedPosts(token: string): Promise<Post[]> {
+  static async getFeedPosts(token: string, page = 1, limit = 12): Promise<Post[]> {
     try {
-      const response = await _get<IGetPostsResponse>("posts/", token);
+      const response = await _get<IGetPostsResponse>(`posts/?page=${page}&limit=${limit}`, token);
       return response;
     } catch (error) {
       console.error("Error while fetching feed posts:", error);

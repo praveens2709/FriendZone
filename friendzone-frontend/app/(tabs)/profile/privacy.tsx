@@ -1,6 +1,6 @@
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect, useCallback } from "react";
 import { StyleSheet, Switch, ActivityIndicator } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
@@ -55,7 +55,7 @@ export default function AccountPrivacyScreen() {
   };
 
   return (
-    <LinearGradient colors={colors.gradient} style={{ flex: 1 }}>
+    <ScreenBackground style={{ flex: 1 }}>
       <ThemedSafeArea style={styles.safeArea}>
         <CommonHeader
           title="Account privacy"
@@ -108,7 +108,7 @@ export default function AccountPrivacyScreen() {
           </ThemedView>
         </ThemedScrollView>
       </ThemedSafeArea>
-    </LinearGradient>
+    </ScreenBackground>
   );
 }
 

@@ -32,7 +32,6 @@ export default function CustomVideoPlayer({ visible, videoUrl, onClose, title }:
     const [showControls, setShowControls] = useState(true);
     const fadeAnim = useRef(new Animated.Value(1)).current;
 
-    // Auto-hide controls timer
     const controlsTimeoutRef = useRef<any>(null);
 
     useEffect(() => {
@@ -44,7 +43,6 @@ export default function CustomVideoPlayer({ visible, videoUrl, onClose, title }:
         };
     }, [visible]);
 
-    // Handle auto-hide only when playing
     useEffect(() => {
         if ((status as any)?.isPlaying && showControls) {
             resetControlsTimer();
@@ -54,7 +52,6 @@ export default function CustomVideoPlayer({ visible, videoUrl, onClose, title }:
     const resetControlsTimer = () => {
         if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
 
-        // Only set timer if we are playing
         if ((status as any)?.isPlaying) {
             controlsTimeoutRef.current = setTimeout(() => {
                 setShowControls(false);
@@ -87,7 +84,6 @@ export default function CustomVideoPlayer({ visible, videoUrl, onClose, title }:
         } else {
             await videoRef.current.playAsync();
         }
-        // Controls will stay visible for a moment then fade if playing
         resetControlsTimer();
     };
 
@@ -110,8 +106,6 @@ export default function CustomVideoPlayer({ visible, videoUrl, onClose, title }:
         resetControlsTimer();
     };
 
-    // Manual handling for slider tap is complex with expo-av standard slider, 
-    // relying on @react-native-community/slider standard behavior for now which supports sliding.
 
     if (!visible || !videoUrl) return null;
 
@@ -120,7 +114,6 @@ export default function CustomVideoPlayer({ visible, videoUrl, onClose, title }:
             <View style={styles.container}>
                 <StatusBar hidden />
 
-                {/* Main Pressable Area covers entire screen */}
                 <Pressable style={StyleSheet.absoluteFill} onPress={toggleControls}>
                     <Video
                         ref={videoRef}
@@ -133,16 +126,13 @@ export default function CustomVideoPlayer({ visible, videoUrl, onClose, title }:
                         onPlaybackStatusUpdate={status => setStatus(status)}
                     />
 
-                    {/* Dark Overlay for contrast when controls are shown */}
                     {showControls && (
                         <View style={styles.darkenOverlay} pointerEvents="none" />
                     )}
 
-                    {/* Controls */}
                     {showControls && (
                         <View style={[styles.controlsContainer, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 20 }]} pointerEvents="box-none">
 
-                            {/* Top Bar */}
                             <View style={styles.topBar}>
                                 <TouchableOpacity onPress={onClose} style={styles.iconButton}>
                                     <Ionicons name="arrow-back" size={28} color="#fff" />
@@ -150,7 +140,6 @@ export default function CustomVideoPlayer({ visible, videoUrl, onClose, title }:
                                 <Text style={styles.title} numberOfLines={1}>{title || 'Playback'}</Text>
                             </View>
 
-                            {/* Center Controls (Play/Pause/Skip) */}
                             <View style={styles.centerControls} pointerEvents="box-none">
                                 <TouchableOpacity onPress={() => handleSkip(-10000)} style={styles.skipButton}>
                                     <MaterialIcons name="replay-10" size={40} color="#fff" />
@@ -173,7 +162,6 @@ export default function CustomVideoPlayer({ visible, videoUrl, onClose, title }:
                                 </TouchableOpacity>
                             </View>
 
-                            {/* Bottom Controls */}
                             <View style={styles.bottomControls}>
                                 <View style={styles.sliderRow}>
                                     <Text style={styles.timeText}>{formatTime((status as any)?.positionMillis)}</Text>
@@ -214,12 +202,12 @@ export default function CustomVideoPlayer({ visible, videoUrl, onClose, title }:
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000', // Ensure black background
+        backgroundColor: '#000',
     },
     fullscreenVideo: {
         width: width,
         height: height,
-        backgroundColor: '#000', // Ensure video bg is black
+        backgroundColor: '#000',
     },
     darkenOverlay: {
         ...StyleSheet.absoluteFillObject,

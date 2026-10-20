@@ -39,7 +39,8 @@ export default function TabLayout() {
           styles.tabBarBase,
           {
             backgroundColor: colors.tabBarBackground,
-            borderTopColor: colors.tabBarBorder,
+            borderColor: colors.border,
+            borderTopColor: colors.border,
             height: totalTabBarHeight,
             paddingBottom: dynamicPaddingBottom,
             paddingTop: basePaddingTop,
@@ -70,13 +71,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="circle"
         options={{
-          title: "Explore",
+          title: "Circle",
           tabBarIcon: ({ focused }) => (
-            <Feather
-              name="search"
-              size={24}
+            <Ionicons
+              name={focused ? "people" : "people-outline"}
+              size={26}
               color={focused ? colors.tabBarActive : colors.tabBarInactive}
             />
           ),
@@ -98,7 +99,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="meetings"
         options={{
-          title: "Meetings",
+          title: "Plans",
           tabBarIcon: ({ focused }) => (
             <MaterialCommunityIcons
               name={focused ? "calendar-clock" : "calendar-clock-outline"}
@@ -127,7 +128,13 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabBarBase: {
-    // borderTopWidth: 0.5,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderBottomWidth: 0,
+    overflow: "hidden",
   },
   tabBarLabel: {
     fontSize: 12,

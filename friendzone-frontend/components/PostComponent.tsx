@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import {
   StyleSheet,
+  View,
   TouchableOpacity,
   Dimensions,
   Image,
@@ -15,9 +16,14 @@ import {
   ActivityIndicator,
   TouchableWithoutFeedback,
   TextInput,
+  Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
+import { renderSheetBackdrop } from "@/components/ui/SheetBackdrop";
+import SafetyService, { ReportReason } from "@/services/SafetyService";
+import PostService from "@/services/PostService";
+import VibeTag from "@/components/VibeTag";
 import { useSavedPosts } from "@/context/SavedPostsContext";
 import {
   Entypo,
@@ -43,8 +49,8 @@ import {
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { Post, Comment } from "@/types/post.type";
-import PostService from "@/services/PostService";
 import { useAuth } from "@/context/AuthContext";
+import { useSocket } from "@/context/SocketContext";
 import {
   formatPostTimestamp,
   formatCommentTimestamp,
@@ -58,7 +64,7 @@ import UserProfileCard from "@/components/UserProfileCard";
 import UserAvatar from "./UserAvatar";
 
 const { width, height } = Dimensions.get("window");
-const POST_WIDTH = width;
+const POST_WIDTH = Dimensions.get("window").width - 28;
 
 interface PostComponentProps {
   post: Post;
@@ -67,45 +73,8 @@ interface PostComponentProps {
   isActive: boolean;
   isGloballyMuted: boolean;
   setIsGloballyMuted: (isMuted: boolean) => void;
+  onRemoved?: (postId: string) => void;
 }
-
-const PostToast = ({
-  message,
-  visible,
-  colors,
-}: {
-  message: string;
-  visible: boolean;
-  colors: any;
-}) => {
-  if (!visible) return null;
-  return (
-    <MotiView
-      from={{ opacity: 0, translateY: 20 }}
-      animate={{ opacity: 1, translateY: 0 }}
-      exit={{ opacity: 0, translateY: 20 }}
-      style={{
-        position: "absolute",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: "rgba(26, 26, 26, 0.95)", // Dark background like Instagram
-        paddingVertical: 12,
-        paddingHorizontal: 15,
-        justifyContent: "space-between",
-        alignItems: "center",
-        flexDirection: "row",
-        zIndex: 1000,
-        borderTopWidth: 1,
-        borderTopColor: "rgba(255,255,255,0.1)",
-      }}
-    >
-      <ThemedText style={{ color: "#FFF", fontWeight: "600", fontSize: 13 }}>
-        {message}
-      </ThemedText>
-    </MotiView>
-  );
-};
 
 const CommentInput = React.memo(
   ({
@@ -160,6 +129,8 @@ const CommentInput = React.memo(
   )
 );
 
+import { emitPostRemoved } from "@/utils/postEvents";
+
 const PostComponent = ({
   post,
   currentlyPlayingId,
@@ -167,6 +138,7 @@ const PostComponent = ({
   isActive,
   isGloballyMuted,
   setIsGloballyMuted,
+  onRemoved,
 }: PostComponentProps) => {
   const { colors } = useTheme();
   const { user, accessToken } = useAuth();
@@ -181,13 +153,41 @@ const PostComponent = ({
   const [isLiked, setIsLiked] = useState(safeLikes.includes(user?._id || ""));
   const [postLikesCount, setPostLikesCount] = useState(safeLikes.length);
   const [localComments, setLocalComments] = useState<Comment[]>(safeComments);
+  const { socket } = useSocket();
+
+  useEffect(() => {
+    if (!socket) return;
+    const handleNewComment = ({ postId, comment }: { postId: string; comment: Comment }) => {
+      if (postId !== post._id) return;
+      setLocalComments((prev) =>
+        prev.some((existing) => existing._id === comment._id) ? prev : [comment, ...prev]
+      );
+    };
+    const handleLikeUpdated = ({
+      postId,
+      userId,
+      liked,
+      likesCount,
+    }: {
+      postId: string;
+      userId: string;
+      liked: boolean;
+      likesCount: number;
+    }) => {
+      if (postId !== post._id) return;
+      setPostLikesCount(likesCount);
+      if (userId === user?._id) setIsLiked(liked);
+    };
+    socket.on("newComment", handleNewComment);
+    socket.on("postLikeUpdated", handleLikeUpdated);
+    return () => {
+      socket.off("newComment", handleNewComment);
+      socket.off("postLikeUpdated", handleLikeUpdated);
+    };
+  }, [socket, post._id, user?._id]);
   const [commentCount, setCommentCount] = useState(safeComments.length);
   const [commentText, setCommentText] = useState("");
   const [isCommentSending, setIsCommentSending] = useState(false);
-
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
-  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [showFullCaption, setShowFullCaption] = useState(false);
@@ -203,15 +203,16 @@ const PostComponent = ({
 
   const commentsModalRef = useRef<BottomSheetModal>(null);
   const optionsModalRef = useRef<BottomSheetModal>(null);
+  const [removed, setRemoved] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const shareModalRef = useRef<BottomSheetModal>(null);
 
   const snapPointsComments = useMemo(() => [height * 0.55], []);
-  const snapPointsOptions = useMemo(() => [height * 0.4], []);
+  const snapPointsOptions = useMemo(() => [height * 0.46], []);
   const snapPointsShare = useMemo(() => ["70%"], []);
 
   const hasMultipleInfo = !!post.song && !!post.location;
 
-  // State for share modal search
   const [searchQuery, setSearchQuery] = useState("");
   const [usersToShareWith, setUsersToShareWith] = useState<DisplayUser[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -352,7 +353,7 @@ const PostComponent = ({
 
   const handlePresentShareModal = useCallback(() => {
     if (!accessToken)
-      return console.log("error", "You must be logged in to share a post.");
+      return;
     setSearchQuery("");
     fetchInitialUsersForShare();
     shareModalRef.current?.present();
@@ -372,12 +373,12 @@ const PostComponent = ({
           chatResponse.chatId,
           accessToken
         );
-        console.log("success", "Post shared successfully!");
+
         shareModalRef.current?.dismiss();
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch (error) {
         console.error("Failed to share post:", error);
-        console.log("error", "Failed to share post. Please try again.");
+
       } finally {
         setSharingToChatId(null);
       }
@@ -520,18 +521,7 @@ const PostComponent = ({
   const handleSavePress = useCallback(async () => {
     if (!accessToken) return;
     try {
-      const wasSaved = isSaved;
       await toggleSave(post._id);
-
-      const message = !wasSaved ? "Saved to collection" : "Removed from collection";
-      setToastMessage(message);
-      setToastVisible(true);
-
-      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-      toastTimeoutRef.current = setTimeout(() => {
-        setToastVisible(false);
-      }, 2000);
-
       optionsModalRef.current?.dismiss();
     } catch (error) {
       console.error("Failed to toggle save:", error);
@@ -548,7 +538,9 @@ const PostComponent = ({
         commentText.trim(),
         accessToken
       );
-      setLocalComments((prev) => [newComment, ...prev]);
+      setLocalComments((prev) =>
+        prev.some((existing) => existing._id === newComment._id) ? prev : [newComment, ...prev]
+      );
       setCommentCount((prev) => prev + 1);
       setCommentText("");
     } catch (error) {
@@ -603,10 +595,125 @@ const PostComponent = ({
     );
   };
 
+  const handleArchivePost = async () => {
+    optionsModalRef.current?.dismiss();
+    setArchiving(true);
+    try {
+      await PostService.archivePost(post._id);
+      emitPostRemoved(post._id);
+      setRemoved(true);
+      onRemoved?.(post._id);
+    } catch {
+      setArchiving(false);
+    }
+  };
+
+  const handleDeletePost = () => {
+    optionsModalRef.current?.dismiss();
+    Alert.alert("Delete this post?", "It moves to Recently deleted for 30 days, then it's gone for good.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await PostService.deletePost(post._id);
+            emitPostRemoved(post._id);
+            setRemoved(true);
+            onRemoved?.(post._id);
+          } catch {
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleAboutAccount = () => {
+    optionsModalRef.current?.dismiss();
+    if (post.user._id !== user?._id) {
+      router.push({ pathname: "/profile/UserProfile", params: { userId: post.user._id } });
+    } else {
+      router.push("/(tabs)/profile");
+    }
+  };
+
+  const submitPostReport = (reason: ReportReason) => {
+    if (!accessToken) return;
+    SafetyService.report("post", post._id, reason, accessToken)
+      .then(() => undefined)
+      .catch(() => undefined);
+  };
+
+  const handleReportPost = () => {
+    optionsModalRef.current?.dismiss();
+    Alert.alert("Report this post", "Why are you reporting it?", [
+      { text: "Spam", onPress: () => submitPostReport("spam") },
+      { text: "Harassment", onPress: () => submitPostReport("harassment") },
+      { text: "Inappropriate content", onPress: () => submitPostReport("nudity") },
+      { text: "Other", onPress: () => submitPostReport("other") },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
+  const handleBlockAuthor = () => {
+    optionsModalRef.current?.dismiss();
+    Alert.alert(
+      `Block ${post.user.firstName}?`,
+      "They won't be able to find you, message you or see your posts, and any knocks between you will be removed.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Block",
+          style: "destructive",
+          onPress: async () => {
+            if (!accessToken) return;
+            try {
+              await SafetyService.blockUser(post.user._id, accessToken);
+              emitPostRemoved(post._id);
+              setRemoved(true);
+              onRemoved?.(post._id);
+            } catch {
+              return;
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  if (!post.user || removed) return null;
+
+  const friendNames = post.likedByNames ?? [];
+  const likedNames = [...(isLiked ? ["you"] : []), ...friendNames].slice(0, 2);
+  const otherLikes = Math.max(postLikesCount - likedNames.length, 0);
+  const likedByText =
+    likedNames.length === 0
+      ? ""
+      : `Liked by ${likedNames.join(", ")}${otherLikes > 0 ? ` and ${otherLikes} ${otherLikes === 1 ? "other" : "others"}` : ""}`;
+
   const captionContent = typeof post.caption === "string" ? post.caption : "";
 
   return (
-    <ThemedView style={styles.postContainer}>
+    <ThemedView
+      style={[
+        styles.postContainer,
+        {
+          backgroundColor: colors.backgroundSecondary,
+          borderColor: colors.border,
+        },
+      ]}
+    >
+      {archiving && (
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            styles.archivingOverlay,
+            { backgroundColor: colors.backgroundSecondary },
+          ]}
+        >
+          <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+      )}
       <ThemedView style={styles.postHeader}>
         <TouchableOpacity
           style={styles.userInfoContainer}
@@ -621,43 +728,17 @@ const PostComponent = ({
             }
           }}
         >
-          <ThemedView
-            style={[
-              styles.userImageBorder,
-              post.user.hasStory && {
-                borderColor: post.user.storySeen
-                  ? colors.border
-                  : "transparent",
-              },
-            ]}
-          >
-            {post.user.hasStory && (
-              <LinearGradient
-                colors={
-                  post.user.storySeen
-                    ? [colors.background, colors.background]
-                    : [colors.storyGradient1, colors.storyGradient2]
-                }
-                style={[
-                  StyleSheet.absoluteFillObject,
-                  {
-                    borderRadius: 50,
-                    borderWidth: 2,
-                    borderColor: colors.background,
-                  },
-                ]}
-              />
-            )}
-            <UserAvatar
-              imageUri={post.user.profileImage}
-              size={34}
-              style={styles.userImage}
-            />
-          </ThemedView>
+          <UserAvatar
+            imageUri={post.user.profileImage}
+            size={36}
+          />
           <ThemedView style={styles.userInfoText}>
-            <ThemedText style={[styles.userName, { color: colors.text }]}>
-              {post.user.firstName} {post.user.lastName}
-            </ThemedText>
+            <ThemedView style={styles.nameRow}>
+              <ThemedText style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
+                {post.user.firstName} {post.user.lastName}
+              </ThemedText>
+              {post.user.vibe && <VibeTag kind={post.user.vibe.kind} compact />}
+            </ThemedView>
             {hasMultipleInfo ? (
               <ThemedView style={styles.slidingContainer}>
                 <Animated.View style={[styles.slidingItem, slideStyleLocation]}>
@@ -739,7 +820,6 @@ const PostComponent = ({
               </TouchableOpacity>
             </MotiView>
           )}
-          <PostToast message={toastMessage} visible={toastVisible} colors={colors} />
         </ThemedView>
       </TouchableWithoutFeedback>
       <ThemedView style={styles.postFooter}>
@@ -792,6 +872,11 @@ const PostComponent = ({
         </ThemedView>
       </ThemedView>
       <ThemedView style={styles.postDetails}>
+        {likedByText ? (
+          <ThemedText style={[styles.likedByText, { color: colors.textDim }]} numberOfLines={2}>
+            {likedByText}
+          </ThemedText>
+        ) : null}
         <ThemedView style={styles.captionRow}>
           <ThemedText style={styles.captionText}>
             <ThemedText style={styles.captionUserName}>
@@ -821,6 +906,7 @@ const PostComponent = ({
         snapPoints={snapPointsComments}
         enableDynamicSizing={false}
         enablePanDownToClose
+        backdropComponent={renderSheetBackdrop}
         keyboardBehavior="interactive"
         keyboardBlurBehavior="restore"
         handleIndicatorStyle={{ backgroundColor: colors.textDim }}
@@ -861,66 +947,57 @@ const PostComponent = ({
         snapPoints={snapPointsOptions}
         enableDynamicSizing={false}
         enablePanDownToClose={true}
-        handleIndicatorStyle={{ backgroundColor: colors.textDim }}
-        backgroundStyle={{ backgroundColor: colors.backgroundSecondary }}
+        backdropComponent={renderSheetBackdrop}
+        handleIndicatorStyle={{ backgroundColor: colors.border, width: 44 }}
+        backgroundStyle={{
+          backgroundColor: colors.backgroundSecondary,
+          borderTopLeftRadius: 28,
+          borderTopRightRadius: 28,
+        }}
       >
         <ThemedView style={styles.optionsModal}>
-          <TouchableOpacity
-            style={[styles.optionItem, { borderBottomColor: colors.border }]}
-            onPress={() => console.log("Option", "About this account")}
-          >
-            <MaterialCommunityIcons
-              name="account"
-              size={24}
-              color={colors.text}
-              style={styles.optionIcon}
+          <ThemedView style={styles.optionsHeader}>
+            <UserAvatar
+              imageUri={post.user.profileImage}
+              size={38}
             />
-            <ThemedText style={[styles.optionText, { color: colors.text }]}>
-              About this account
-            </ThemedText>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleSavePress}
-            style={[styles.optionItem, { borderBottomColor: colors.border }]}
+            <ThemedView style={{ flex: 1 }}>
+              <ThemedText style={styles.optionsName} numberOfLines={1}>
+                {post.user.firstName} {post.user.lastName}
+              </ThemedText>
+              <ThemedText style={[styles.optionsSub, { color: colors.textDim }]}>
+                Post options
+              </ThemedText>
+            </ThemedView>
+          </ThemedView>
+
+          <ThemedView
+            style={[styles.optionGroup, { backgroundColor: colors.background, borderColor: colors.border }]}
           >
-            <MaterialCommunityIcons
-              name={isSaved ? "bookmark" : "bookmark-outline"}
-              size={24}
-              color={isSaved ? colors.text : colors.text}
-              style={styles.optionIcon}
+            <OptionRow icon="account-outline" label="About this account" onPress={handleAboutAccount} />
+            <OptionRow
+              icon={isSaved ? "bookmark" : "bookmark-outline"}
+              label={isSaved ? "Unsave" : "Save"}
+              onPress={handleSavePress}
+              last
             />
-            <ThemedText style={[styles.optionText, { color: colors.text }]}>
-              {isSaved ? "Unsave" : "Save"}
-            </ThemedText>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.optionItem, { borderBottomColor: colors.border }]}
-            onPress={() => console.log("Option", "Report")}
-          >
-            <MaterialCommunityIcons
-              name="alert-circle-outline"
-              size={24}
-              color={colors.red}
-              style={styles.optionIcon}
-            />
-            <ThemedText style={[styles.optionText, { color: colors.red }]}>
-              Report
-            </ThemedText>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.optionItem, { borderBottomColor: colors.border }]}
-            onPress={() => console.log("Option", "Block user")}
-          >
-            <MaterialCommunityIcons
-              name="block-helper"
-              size={24}
-              color={colors.text}
-              style={styles.optionIcon}
-            />
-            <ThemedText style={[styles.optionText, { color: colors.text }]}>
-              Block user
-            </ThemedText>
-          </TouchableOpacity>
+          </ThemedView>
+
+          {post.user._id !== user?._id ? (
+            <ThemedView
+              style={[styles.optionGroup, { backgroundColor: colors.background, borderColor: colors.border }]}
+            >
+              <OptionRow icon="alert-circle-outline" label="Report" onPress={handleReportPost} danger />
+              <OptionRow icon="block-helper" label="Block user" onPress={handleBlockAuthor} danger last />
+            </ThemedView>
+          ) : (
+            <ThemedView
+              style={[styles.optionGroup, { backgroundColor: colors.background, borderColor: colors.border }]}
+            >
+              <OptionRow icon="archive-outline" label="Archive" onPress={handleArchivePost} />
+              <OptionRow icon="trash-can-outline" label="Delete post" onPress={handleDeletePost} danger last />
+            </ThemedView>
+          )}
         </ThemedView>
       </BottomSheetModal>
       <BottomSheetModal
@@ -929,6 +1006,7 @@ const PostComponent = ({
         snapPoints={snapPointsShare}
         enableDynamicSizing={false}
         enablePanDownToClose={true}
+        backdropComponent={renderSheetBackdrop}
         handleIndicatorStyle={{ backgroundColor: colors.textDim }}
         backgroundStyle={{ backgroundColor: colors.backgroundSecondary }}
         keyboardBehavior="interactive"
@@ -1011,10 +1089,55 @@ const PostComponent = ({
   );
 };
 
+const OptionRow = ({
+  icon,
+  label,
+  onPress,
+  danger = false,
+  last = false,
+}: {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
+  last?: boolean;
+}) => {
+  const { colors } = useTheme();
+  const tint = danger ? colors.red : colors.primary;
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[
+        styles.optionRow,
+        !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+      ]}
+    >
+      <ThemedView style={[styles.optionIconBox, { backgroundColor: tint + "1F" }]}>
+        <MaterialCommunityIcons name={icon} size={20} color={tint} />
+      </ThemedView>
+      <ThemedText style={[styles.optionLabel, { color: danger ? colors.red : colors.text }]}>
+        {label}
+      </ThemedText>
+      <MaterialCommunityIcons name="chevron-right" size={22} color={colors.textDim} />
+    </TouchableOpacity>
+  );
+};
+
 const styles = StyleSheet.create({
+  archivingOverlay: {
+    zIndex: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    opacity: 0.85,
+    borderRadius: 20,
+  },
   postContainer: {
-    width: "100%",
-    marginBottom: 20,
+    marginHorizontal: 14,
+    marginTop: 10,
+    marginBottom: 10,
+    borderRadius: 26,
+    borderWidth: 1,
     overflow: "hidden",
   },
   postHeader: {
@@ -1044,6 +1167,11 @@ const styles = StyleSheet.create({
   userInfoText: {
     marginLeft: 10,
     width: "70%",
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   userName: {
     fontSize: 14,
@@ -1126,8 +1254,13 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginLeft: 5,
   },
+  likedByText: {
+    fontSize: 13,
+    marginBottom: 6,
+  },
   postDetails: {
     paddingHorizontal: 15,
+    paddingBottom: 16,
   },
   captionRow: {
     flexDirection: "row",
@@ -1143,6 +1276,7 @@ const styles = StyleSheet.create({
   timeAgoText: {
     fontSize: 12,
     lineHeight: 14,
+    marginTop: 8,
   },
   modalContent: {
     flex: 1,
@@ -1224,20 +1358,47 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   optionsModal: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+    gap: 12,
   },
-  optionItem: {
+  optionsHeader: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 15,
-    paddingHorizontal: 10,
-    borderBottomWidth: 1,
+    gap: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
   },
-  optionIcon: {
-    marginRight: 15,
-  },
-  optionText: {
+  optionsName: {
     fontSize: 16,
+    fontWeight: "800",
+  },
+  optionsSub: {
+    fontSize: 12,
+  },
+  optionGroup: {
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  optionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  optionIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  optionLabel: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "600",
   },
   searchContainer: {
     flexDirection: "row",

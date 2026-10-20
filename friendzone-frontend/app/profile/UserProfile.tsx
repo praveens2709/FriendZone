@@ -1,3 +1,4 @@
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useEffect, useState, useCallback } from "react";
 import {
   StyleSheet,
@@ -6,6 +7,7 @@ import {
   Dimensions,
   TouchableOpacity,
   FlatList,
+  Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ThemedView } from "@/components/ThemedView";
@@ -26,7 +28,7 @@ import ThemedModal from "@/components/ThemedModal";
 import Button from "@/components/Button";
 import { PostItem } from "@/components/PostGrid";
 import PostService from "@/services/PostService";
-import { LinearGradient } from "expo-linear-gradient";
+import SafetyService, { ReportReason } from "@/services/SafetyService";
 
 interface ExploreDisplayUser {
   id: string;
@@ -41,7 +43,44 @@ interface ExploreDisplayUser {
 const screenWidth = Dimensions.get("window").width;
 const POST_ITEM_SIZE = (screenWidth - 4) / 3;
 
-export default function UserProfileScreen() {
+const REPORT_REASONS: { value: ReportReason; label: string }[] = [
+  { value: "spam", label: "Spam" },
+  { value: "harassment", label: "Harassment" },
+  { value: "nudity", label: "Inappropriate content" },
+  { value: "underage", label: "Under 18" },
+  { value: "other", label: "Something else" },
+];
+
+function OptionRowItem({
+  icon,
+  label,
+  onPress,
+  danger,
+  last,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
+  last?: boolean;
+}) {
+  const { colors } = useTheme();
+  const color = danger ? colors.error : colors.text;
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[
+        styles.optionRow,
+        !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+      ]}
+    >
+      <Ionicons name={icon} size={22} color={color} />
+      <ThemedText style={{ color, fontSize: 16, fontWeight: "600" }}>{label}</ThemedText>
+    </TouchableOpacity>
+  );
+}
+
+function UserProfileContent() {
   const { colors } = useTheme();
   const router = useRouter();
   const { accessToken, user } = useAuth();
@@ -57,6 +96,8 @@ export default function UserProfileScreen() {
     "pending" | "lockedIn" | "onesidedlock" | "declined" | undefined
   >(undefined);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const [optionsStep, setOptionsStep] = useState<null | "menu" | "report" | "block">(null);
   const [postsCount, setPostsCount] = useState(0);
   const [knockersCount, setKnockersCount] = useState(0);
   const [knockingCount, setKnockingCount] = useState(0);
@@ -65,6 +106,31 @@ export default function UserProfileScreen() {
   const [userPosts, setUserPosts] = useState<PostItem[]>([]);
 
   const [showUnknockConfirmModal, setShowUnknockConfirmModal] = useState(false);
+
+  const submitReport = (reason: ReportReason) => {
+    if (!accessToken || !userId) return;
+    SafetyService.report("user", userId as string, reason, accessToken)
+      .then(() => undefined)
+      .catch(() => undefined);
+  };
+
+  const handleReport = (reason: ReportReason) => {
+    setOptionsStep(null);
+    submitReport(reason);
+  };
+
+  const handleBlock = async () => {
+    setOptionsStep(null);
+    if (!accessToken || !userId) return;
+    try {
+      await SafetyService.blockUser(userId as string, accessToken);
+      router.back();
+    } catch {
+      return;
+    }
+  };
+
+  const handleMoreOptions = () => setOptionsStep("menu");
 
   const fetchUserProfile = useCallback(async () => {
     if (!userId || !accessToken || !user?._id) {
@@ -136,7 +202,7 @@ export default function UserProfileScreen() {
       setUserProfile(targetProfile);
     } catch (error) {
       console.error("Failed to fetch user profile:", error);
-      console.log("error", "Failed to load user profile.");
+
       setUserProfile(null);
     } finally {
       setIsLoading(false);
@@ -184,26 +250,23 @@ export default function UserProfileScreen() {
       return;
     }
     setActionLoadingId(targetUser._id);
+    setLoadingAction("primary");
 
     try {
       if (relationToMe === "lockedIn") {
         await KnockService.breakLock(targetUser._id, accessToken);
-        console.log("success", `You have unknocked ${targetUser.firstName}.`);
+
       } else if (knockId) {
         await KnockService.unknockUser(knockId, accessToken);
-        console.log("success", `You have unknocked ${targetUser.firstName}.`);
-      } else {
-        console.log("error", "Knock ID not found for unknock action.");
+
       }
       fetchUserProfile();
     } catch (error: any) {
       console.error("Action failed:", error);
-      console.log(
-        "error",
-        error.response?.data?.message || "Failed to perform action."
-      );
+
     } finally {
       setActionLoadingId(null);
+      setLoadingAction(null);
     }
   };
 
@@ -221,6 +284,7 @@ export default function UserProfileScreen() {
     }
 
     setActionLoadingId(targetUser._id);
+    setLoadingAction(actionType === "message" ? "message" : "primary");
 
     try {
       if (actionType === "message") {
@@ -240,27 +304,20 @@ export default function UserProfileScreen() {
         });
       } else if (actionType === "knock") {
         await KnockService.knockUser(targetUser._id, accessToken);
-        console.log("success", `Knock sent to ${targetUser.firstName}!`);
+
       } else if (actionType === "knockBack") {
         if (knockId) {
           await KnockService.knockBack(knockId, accessToken);
-          console.log(
-            "success",
-            `You knocked back ${targetUser.firstName}! You are now LockedIn!`
-          );
-        } else {
-          console.log("error", "Knock ID not found for knock back action.");
+
         }
       }
       fetchUserProfile();
     } catch (error: any) {
       console.error("Action failed:", error);
-      console.log(
-        "error",
-        error.response?.data?.message || "Failed to perform action."
-      );
+
     } finally {
       setActionLoadingId(null);
+      setLoadingAction(null);
     }
   };
 
@@ -317,7 +374,7 @@ export default function UserProfileScreen() {
           onPress={() => handleUserAction(userProfile, primaryButtonAction)}
           disabled={primaryButtonDisabled}
         >
-          {actionLoadingId === userProfile._id ? (
+          {loadingAction === "primary" ? (
             <ActivityIndicator size="small" color={colors.text} />
           ) : (
             <ThemedText
@@ -339,9 +396,13 @@ export default function UserProfileScreen() {
           onPress={() => handleUserAction(userProfile, "message")}
           disabled={secondaryButtonDisabled}
         >
-          <ThemedText style={[styles.actionButtonText, { color: colors.text }]}>
-            Message
-          </ThemedText>
+          {loadingAction === "message" ? (
+            <ActivityIndicator size="small" color={colors.text} />
+          ) : (
+            <ThemedText style={[styles.actionButtonText, { color: colors.text }]}>
+              Message
+            </ThemedText>
+          )}
         </TouchableOpacity>
       </ThemedView>
     );
@@ -556,7 +617,7 @@ export default function UserProfileScreen() {
   }
 
   return (
-    <LinearGradient colors={colors.gradient} style={styles.gradientContainer}>
+    <ScreenBackground style={styles.gradientContainer}>
       <ThemedSafeArea style={styles.container}>
         <CommonHeader
           leftContent={<BackButton color={colors.text} />}
@@ -567,7 +628,7 @@ export default function UserProfileScreen() {
           }
           rightContent1={
             <TouchableOpacity
-              onPress={() => console.log("info", "More info about this user.")}
+              onPress={handleMoreOptions}
             >
               <Feather name="info" size={24} color={colors.text} />
             </TouchableOpacity>
@@ -630,9 +691,51 @@ export default function UserProfileScreen() {
             />
           </ThemedView>
         </ThemedModal>
+        <ThemedModal visible={optionsStep !== null} onClose={() => setOptionsStep(null)}>
+          {optionsStep === "menu" && (
+            <>
+              <OptionRowItem icon="flag-outline" label="Report" onPress={() => setOptionsStep("report")} />
+              <OptionRowItem icon="ban-outline" label="Block" danger onPress={() => setOptionsStep("block")} last />
+            </>
+          )}
+          {optionsStep === "report" && (
+            <>
+              <ThemedText type="subtitle" style={styles.optionsTitle}>
+                Why are you reporting this account?
+              </ThemedText>
+              {REPORT_REASONS.map((reason, index) => (
+                <OptionRowItem
+                  key={reason.value}
+                  icon="alert-circle-outline"
+                  label={reason.label}
+                  onPress={() => handleReport(reason.value)}
+                  last={index === REPORT_REASONS.length - 1}
+                />
+              ))}
+            </>
+          )}
+          {optionsStep === "block" && (
+            <>
+              <ThemedText type="subtitle" style={styles.optionsTitle}>
+                Block {userProfile?.firstName}?
+              </ThemedText>
+              <ThemedText style={[styles.optionsCopy, { color: colors.textDim }]}>
+                They won't be able to find you, message you or see your posts, and any knocks between you will be removed.
+              </ThemedText>
+              <ThemedView style={styles.modalButtons}>
+                <Button title="Cancel" onPress={() => setOptionsStep(null)} style={styles.button} />
+                <Button title="Block" onPress={handleBlock} style={styles.button} />
+              </ThemedView>
+            </>
+          )}
+        </ThemedModal>
       </ThemedSafeArea>
-    </LinearGradient>
+    </ScreenBackground>
   );
+}
+
+export default function UserProfileScreen() {
+  return <UserProfileContent />;
 }
 
 const styles = StyleSheet.create({
@@ -721,6 +824,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     gap: 10,
   },
+  optionsTitle: { textAlign: "center", marginBottom: 16 },
+  optionsCopy: { textAlign: "center", marginBottom: 20, lineHeight: 20 },
+  optionRow: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 14 },
   modalButtons: {
     flexDirection: "row",
     justifyContent: "space-around",

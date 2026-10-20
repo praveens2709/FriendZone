@@ -18,7 +18,6 @@ interface ThemeCardProps {
   themeName: ThemeType;
   onPress: (themeName: ThemeType) => void;
   isSelected?: boolean;
-  //   isLarge?: boolean;
   style?: ViewStyle;
 }
 
@@ -40,7 +39,6 @@ const ThemeCard: React.FC<ThemeCardProps> = ({
           borderColor: themeColors.primary,
           borderWidth: 3,
         },
-        // isLarge && styles.largeCard,
         style,
       ]}
       onPress={() => onPress(themeName)}

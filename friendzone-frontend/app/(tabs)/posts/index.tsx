@@ -1,3 +1,5 @@
+import { useTabBarSpace } from "@/hooks/useTabBarSpace";
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet,
@@ -7,7 +9,6 @@ import {
   Image,
   ActivityIndicator,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
@@ -37,6 +38,7 @@ const PREVIEW_CONTAINER_SIZE = width;
 
 export default function PostsScreen() {
   const { colors } = useTheme();
+  const { space: tabSpace } = useTabBarSpace();
   const router = useRouter();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -627,7 +629,7 @@ export default function PostsScreen() {
           renderItem={renderAssetItem}
           keyExtractor={(item) => item.id}
           numColumns={NUM_COLUMNS}
-          contentContainerStyle={styles.gridContainer}
+          contentContainerStyle={[styles.gridContainer, { paddingBottom: tabSpace }]}
         />
       </ThemedView>
     );
@@ -635,7 +637,7 @@ export default function PostsScreen() {
 
   return (
     <GestureHandlerRootView style={styles.root}>
-      <LinearGradient colors={colors.gradient} style={styles.gradientContainer}>
+      <ScreenBackground style={styles.gradientContainer}>
         <ThemedSafeArea style={styles.safeArea}>
           <CommonHeader
             title="New Post"
@@ -658,7 +660,7 @@ export default function PostsScreen() {
           />
           {renderContent()}
         </ThemedSafeArea>
-      </LinearGradient>
+      </ScreenBackground>
     </GestureHandlerRootView>
   );
 }

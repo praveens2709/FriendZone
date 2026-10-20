@@ -1,3 +1,4 @@
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React from "react";
 import { Modal, StyleSheet, TouchableOpacity, Image, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,7 +8,6 @@ import { ThemedView } from "./ThemedView";
 import { ThemedText } from "./ThemedText";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CommonHeader from "@/components/CommonHeader";
-import { LinearGradient } from "expo-linear-gradient";
 
 interface FullImageViewerProps {
   imageUri: string;
@@ -59,7 +59,7 @@ const FullImageViewer: React.FC<FullImageViewerProps> = ({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <LinearGradient colors={colors.gradient} style={styles.container}>
+      <ScreenBackground style={styles.container}>
         <ImageViewer
           imageUrls={imageUrls}
           enableSwipeDown
@@ -68,7 +68,7 @@ const FullImageViewer: React.FC<FullImageViewerProps> = ({
           renderIndicator={() => <View />}
           renderHeader={renderHeader}
         />
-      </LinearGradient>
+      </ScreenBackground>
     </Modal>
   );
 };

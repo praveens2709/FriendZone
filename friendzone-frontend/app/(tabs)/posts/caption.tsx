@@ -1,3 +1,4 @@
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
@@ -8,7 +9,6 @@ import {
   TouchableWithoutFeedback,
   ActivityIndicator,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
@@ -18,6 +18,7 @@ import ThemedSafeArea from "@/components/ThemedSafeArea";
 import CommonHeader from "@/components/CommonHeader";
 import { Image } from "expo-image";
 import BackButton from "@/components/BackButton";
+import InlineError from "@/components/InlineError";
 import ThemedModal from "@/components/ThemedModal";
 import useCurrentLocation from "@/hooks/useCurrentLocation";
 import { countWords, getAddressFromCoords } from "@/constants/Functions";
@@ -38,6 +39,7 @@ export default function CaptionScreen() {
   const [location, setLocation] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [isPosting, setIsPosting] = useState(false);
+  const [postError, setPostError] = useState("");
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
 
@@ -48,7 +50,7 @@ export default function CaptionScreen() {
       try {
         setSelectedAssets(JSON.parse(params.selectedAssets as string));
       } catch {
-        console.log("error", "Failed to load selected images");
+        
       }
     }
     if (params.selectedTrack) {
@@ -63,16 +65,9 @@ export default function CaptionScreen() {
   };
 
   const handlePost = async () => {
-    if (!accessToken) {
-      console.log("error", "Please log in to create a post.");
-      return;
-    }
+    if (!accessToken || !selectedAssets.length) return;
 
-    if (!selectedAssets.length) {
-      console.log("error", "No images to post");
-      return;
-    }
-
+    setPostError("");
     setIsPosting(true);
     try {
       const formData = new FormData();
@@ -99,14 +94,10 @@ export default function CaptionScreen() {
       }
 
       await PostService.createPost(formData, accessToken);
-      console.log("success", "Post created successfully!");
       router.push("/(tabs)/home");
     } catch (error) {
       console.error("Failed to create post:", error);
-      console.log(
-        "error",
-        "Failed to create post. Please check your network and try again."
-      );
+      setPostError("Couldn't post. Check your connection and try again.");
     } finally {
       setIsPosting(false);
     }
@@ -128,7 +119,7 @@ export default function CaptionScreen() {
   );
 
   return (
-    <LinearGradient colors={colors.gradient} style={styles.gradientContainer}>
+    <ScreenBackground style={styles.gradientContainer}>
       <ThemedSafeArea style={styles.safeArea}>
         <CommonHeader
           leftContent={<BackButton color={colors.text} />}
@@ -154,6 +145,7 @@ export default function CaptionScreen() {
             )
           }
         />
+        <InlineError message={postError} style={styles.postError} />
         <ScrollView
           style={styles.container}
           showsVerticalScrollIndicator={false}
@@ -344,7 +336,7 @@ export default function CaptionScreen() {
           </TouchableWithoutFeedback>
         </ThemedModal>
       )}
-    </LinearGradient>
+    </ScreenBackground>
   );
 }
 
@@ -352,6 +344,7 @@ const styles = StyleSheet.create({
   gradientContainer: { flex: 1 },
   safeArea: { flex: 1, backgroundColor: "transparent" },
   container: { flex: 1, backgroundColor: "transparent" },
+  postError: { paddingHorizontal: 16, paddingVertical: 8 },
   postButton: { paddingVertical: 5, paddingHorizontal: 10 },
   postButtonText: { fontSize: 16, fontWeight: "bold" },
   imagesContainer: { paddingVertical: 15 },

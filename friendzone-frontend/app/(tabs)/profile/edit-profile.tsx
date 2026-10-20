@@ -1,3 +1,4 @@
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState } from "react";
 import {
   StyleSheet,
@@ -9,7 +10,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemedText } from "@/components/ThemedText";
 import { useRouter } from "expo-router";
@@ -207,7 +207,7 @@ export default function EditProfileScreen() {
   }
 
   return (
-    <LinearGradient colors={colors.gradient} style={styles.container}>
+    <ScreenBackground style={styles.container}>
       <ThemedSafeArea style={styles.safeArea}>
         <ThemedView style={styles.header}>
           <TouchableOpacity
@@ -350,7 +350,7 @@ export default function EditProfileScreen() {
           </ThemedText>
         </ThemedView>
       </ThemedModal>
-    </LinearGradient>
+    </ScreenBackground>
   );
 }
 

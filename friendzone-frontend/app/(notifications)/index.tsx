@@ -1,3 +1,4 @@
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   StyleSheet,
@@ -6,7 +7,6 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
@@ -108,12 +108,10 @@ export default function NotificationsScreen() {
           `[NotificationsScreen] Received ${res.notifications.length} notifications for page ${pageNum}.`
         );
 
-        // Check for mutual knock requests for each notification
         const enrichedNotifications = await Promise.all(
           res.notifications.map(async (n) => {
             let hasMutualKnockRequest = false;
 
-            // If this is a knock notification, check if user has sent a mutual request
             if (
               n.type === "activity" &&
               n.relatedEntityType === "Knock" &&
@@ -156,7 +154,6 @@ export default function NotificationsScreen() {
           }`
         );
       } catch (error) {
-        console.log("error", "Failed to load notifications.");
         console.error(
           "[NotificationsScreen] Error fetching notifications:",
           error
@@ -184,7 +181,6 @@ export default function NotificationsScreen() {
         );
         setPendingKnockRequestsData(filteredPendingKnocks);
 
-        // Also fetch knocked users to track mutual requests
         const knocked = await KnockService.getKnocked(accessToken);
         const mutualRequests = new Set(
           knocked.filter((k) => k.status === "pending").map((k) => k.knockedId)
@@ -230,7 +226,6 @@ export default function NotificationsScreen() {
       console.log(
         "[NotificationsScreen] useFocusEffect triggered. Fetching and marking all as read."
       );
-      // Pass showLoading = false so we don't trigger the full screen loader on every focus
       fetchNotifications(1, false, false);
       fetchPendingKnockRequests();
       markAllNotificationsAsRead();
@@ -268,7 +263,7 @@ export default function NotificationsScreen() {
       const enrichedN: EnrichedNotificationItem = {
         ...n,
         knockStatus: n.knockStatus || null,
-        hasMutualKnockRequest: false, // Will be updated if needed
+        hasMutualKnockRequest: false,
       };
       setNotifications((prev) =>
         prev.some((p) => p.id === n.id) ? prev : [enrichedN, ...prev]
@@ -307,7 +302,6 @@ export default function NotificationsScreen() {
         `[NotificationsScreen] Received knockStatusUpdated for knockId: ${knockId}, newStatus: ${newStatus}`
       );
 
-      // Update notification status
       setNotifications((prevNotifications) =>
         prevNotifications.map((notification) => {
           if (notification.relatedEntityId === knockId) {
@@ -320,7 +314,6 @@ export default function NotificationsScreen() {
         })
       );
 
-      // Refresh mutual knock requests to update button states
       fetchPendingKnockRequests();
     };
 
@@ -331,21 +324,51 @@ export default function NotificationsScreen() {
       fetchPendingKnockRequests();
     };
 
+    const handleMeetingInviteStatusUpdated = (data: { meetingId: string; status: "pending" | "accepted" | "declined" }) => {
+      setNotifications((prev) =>
+        prev.map((n) => {
+          const nMeetingId = n.metadata?.meetingId || n.relatedEntityId;
+          if (nMeetingId === data.meetingId) {
+            return {
+              ...n,
+              metadata: {
+                ...n.metadata,
+                status: data.status,
+              },
+            } as EnrichedNotificationItem;
+          }
+          return n;
+        })
+      );
+    };
+
+    const handleMeetingNotificationsRemoved = ({ meetingId }: { meetingId: string }) => {
+      setNotifications((prev) =>
+        prev.filter(
+          (n) => (n.metadata?.meetingId || n.relatedEntityId) !== meetingId
+        )
+      );
+    };
+
+    socket.on("meetingNotificationsRemoved", handleMeetingNotificationsRemoved);
     socket.on("newNotification", handleNewNotification);
     socket.on("newKnockRequest", handleNewKnockRequest);
     socket.on("knockRequestRemoved", handleKnockRequestRemoved);
     socket.on("knockStatusUpdated", handleKnockStatusUpdated);
     socket.on("userProfileUpdated", handleUserProfileUpdated);
+    socket.on("meetingInviteStatusUpdated", handleMeetingInviteStatusUpdated);
 
     console.log("[NotificationsScreen] All socket listeners set up.");
 
     return () => {
       console.log("[NotificationsScreen] Cleaning up socket listeners.");
+      socket.off("meetingNotificationsRemoved", handleMeetingNotificationsRemoved);
       socket.off("newNotification", handleNewNotification);
       socket.off("newKnockRequest", handleNewKnockRequest);
       socket.off("knockRequestRemoved", handleKnockRequestRemoved);
       socket.off("knockStatusUpdated", handleKnockStatusUpdated);
       socket.off("userProfileUpdated", handleUserProfileUpdated);
+      socket.off("meetingInviteStatusUpdated", handleMeetingInviteStatusUpdated);
     };
   }, [socket, accessToken, fetchPendingKnockRequests]);
 
@@ -425,7 +448,6 @@ export default function NotificationsScreen() {
 
     try {
       await KnockService.knockBack(knockId, accessToken);
-      console.log("success", "You knocked them back!");
 
       setNotifications((prev) =>
         prev.map((n) => {
@@ -446,10 +468,6 @@ export default function NotificationsScreen() {
         `[NotificationsScreen] Knock back successful for notification: ${notificationId}`
       );
     } catch (error: any) {
-      console.log(
-        "error",
-        error.response?.data?.message || "Failed to knock back."
-      );
       console.error("[NotificationsScreen] Error knocking back:", error);
     } finally {
       setActionLoadingId(null);
@@ -471,7 +489,6 @@ export default function NotificationsScreen() {
     try {
       await MeetingService.respondToInvitation(meetingId, response, accessToken);
 
-      // Update notification locally
       setNotifications((prev) =>
         prev.map((n) => {
           if (n.id === notificationId) {
@@ -489,17 +506,11 @@ export default function NotificationsScreen() {
 
       console.log(`Meeting invite ${response}`);
     } catch (error: any) {
-      console.log(
-        "error",
-        error.response?.data?.message || `Failed to ${response} invite.`
-      );
       console.error("Error responding to meeting invite:", error);
     } finally {
       setActionLoadingId(null);
     }
   };
-
-
 
   const renderKnockActionButton = (item: EnrichedNotificationItem) => {
     const knockId = item.relatedEntityId;
@@ -521,7 +532,6 @@ export default function NotificationsScreen() {
     const hasMutualRequest =
       item.hasMutualKnockRequest || mutualKnockRequests.has(knockerUserId);
 
-    // Show "Requested" if user has sent a mutual knock request to the knocker
     if ((isOneSided && hasMutualRequest) || isPending) {
       return (
         <TouchableOpacity
@@ -544,7 +554,6 @@ export default function NotificationsScreen() {
       );
     }
 
-    // Show "Knock Back" for one-sided knocks where no mutual request exists
     if (isOneSided && !hasMutualRequest) {
       return (
         <TouchableOpacity
@@ -570,7 +579,6 @@ export default function NotificationsScreen() {
       );
     }
 
-    // Show "Knocked" for locked connections
     if (isLocked) {
       return (
         <TouchableOpacity
@@ -599,7 +607,6 @@ export default function NotificationsScreen() {
 
     if (!meetingId) return null;
 
-    // Already responded
     if (inviteStatus === 'accepted') {
       return (
         <TouchableOpacity
@@ -632,7 +639,6 @@ export default function NotificationsScreen() {
       );
     }
 
-    // Pending - show accept/decline
     return (
       <ThemedView style={styles.meetingActionButtons}>
         <TouchableOpacity
@@ -698,29 +704,37 @@ export default function NotificationsScreen() {
     );
 
     const onPressNotificationItem = () => {
-      console.log(`[NotificationsScreen] Tapped notification item: ${item.id}`);
       markNotificationAsRead(item.id);
+
       if (item.type === "message" && item.relatedEntityId) {
-        const chatId = item.relatedEntityId;
-        console.log(
-          `[NotificationsScreen] Navigating to chat: ${chatId}`
-        );
         router.push({
           pathname: "/(chat)/[id]",
           params: {
-            id: chatId,
+            id: item.relatedEntityId,
             chatName: sender.username,
             chatAvatar: sender.avatar || "",
           },
         });
-      } else if (item.type === "meeting_invite" && item.relatedEntityId) {
-        router.push("/(tabs)/meetings");
+        return;
+      }
+
+      if (item.type === "meeting_invite" || item.relatedEntityType === "Meeting") {
+        const meetingId = item.metadata?.meetingId || item.relatedEntityId;
+        if (meetingId) router.push(`/plan/${meetingId}`);
+        return;
+      }
+
+      if (item.relatedEntityType === "Post" && item.relatedEntityId) {
+        router.push({ pathname: "/posts/[postId]", params: { postId: item.relatedEntityId } });
+        return;
+      }
+
+      if (sender.id && sender.id !== user?._id) {
+        router.push({ pathname: "/profile/UserProfile", params: { userId: sender.id } });
       }
     };
 
     const isLoadingAction = actionLoadingId === item.id;
-
-
 
     const isKnockNotif =
       item.type === "activity" &&
@@ -734,7 +748,10 @@ export default function NotificationsScreen() {
       <TouchableOpacity
         style={[
           styles.notificationItem,
-          isNew && { backgroundColor: colors.buttonBackgroundSecondary + "1A" },
+          {
+            backgroundColor: colors.backgroundSecondary,
+            borderColor: isNew ? colors.primary : colors.border,
+          },
         ]}
         onPress={onPressNotificationItem}
         disabled={isLoadingAction}
@@ -777,7 +794,7 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <LinearGradient colors={colors.gradient} style={styles.gradientContainer}>
+    <ScreenBackground style={styles.gradientContainer}>
       <ThemedSafeArea style={styles.safeArea}>
         <CommonHeader
           title="Notifications"
@@ -914,7 +931,7 @@ export default function NotificationsScreen() {
           </>
         )}
       </ThemedSafeArea>
-    </LinearGradient>
+    </ScreenBackground>
   );
 }
 
@@ -1009,9 +1026,12 @@ const styles = StyleSheet.create({
   notificationItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    marginBottom: 2,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginHorizontal: 14,
+    marginBottom: 8,
+    borderRadius: 18,
+    borderWidth: 1,
   },
   notificationAvatar: {
     marginRight: 12,

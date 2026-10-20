@@ -1,3 +1,4 @@
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React from "react";
 import { StyleSheet, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
@@ -8,7 +9,6 @@ import { useTheme } from "@/context/ThemeContext";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import CommonHeader from "@/components/CommonHeader";
 import BackButton from "@/components/BackButton";
-import { LinearGradient } from "expo-linear-gradient";
 import SettingsItem from "@/components/SettingsItem";
 import ThemedScrollView from "@/components/ThemedScrollView";
 
@@ -23,7 +23,7 @@ const ActivityItem: React.FC<ActivityItemProps> = ({
   onPress,
   iconName,
 }) => {
-  return <SettingsItem title={title} iconName={iconName} onPress={onPress} />;
+  return <SettingsItem title={title} iconName={iconName} onPress={onPress} card />;
 };
 
 export default function YourActivityScreen() {
@@ -31,7 +31,7 @@ export default function YourActivityScreen() {
   const router = useRouter();
 
   return (
-    <LinearGradient colors={colors.gradient} style={{ flex: 1 }}>
+    <ScreenBackground style={{ flex: 1 }}>
       <ThemedSafeArea style={styles.safeArea}>
         <CommonHeader
           title="Your activity"
@@ -58,35 +58,31 @@ export default function YourActivityScreen() {
           </ThemedText>
           <ActivityItem
             title="Likes"
-            onPress={() => {}}
+            onPress={() => router.push({ pathname: "/profile/activity-posts", params: { kind: "liked" } })}
             iconName="heart-outline"
           />
           <ActivityItem
             title="Comments"
-            onPress={() => {}}
+            onPress={() => router.push({ pathname: "/profile/activity-posts", params: { kind: "commented" } })}
             iconName="chatbubble-outline"
           />
-          {/* <ActivityItem title="Reposts" onPress={() => {}} iconName="repeat-outline" />
-          <ActivityItem title="Tags" onPress={() => {}} iconName="pricetag-outline" />
-          <ActivityItem title="Sticker responses" onPress={() => {}} iconName="happy-outline" />
-          <ActivityItem title="Reviews" onPress={() => {}} iconName="star-outline" /> */}
 
           <ThemedText style={[styles.sectionTitle, { color: colors.textDim }]}>
             Removed and archived content
           </ThemedText>
           <ActivityItem
             title="Recently Deleted"
-            onPress={() => {}}
+            onPress={() => router.push("/profile/recently-deleted")}
             iconName="trash-outline"
           />
           <ActivityItem
             title="Archived"
-            onPress={() => {}}
+            onPress={() => router.push("/profile/archive")}
             iconName="archive-outline"
           />
         </ThemedScrollView>
       </ThemedSafeArea>
-    </LinearGradient>
+    </ScreenBackground>
   );
 }
 
@@ -96,12 +92,12 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   scrollContainer: {
-    paddingHorizontal: 16,
     backgroundColor: "transparent",
   },
   headerBox: {
     marginTop: 10,
     marginBottom: 20,
+    marginHorizontal: 20,
   },
   headerTitle: {
     fontSize: 20,
@@ -119,7 +115,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     marginTop: 15,
-    marginBottom: 5,
+    marginBottom: 8,
+    marginHorizontal: 20,
     textTransform: "uppercase",
   },
 });

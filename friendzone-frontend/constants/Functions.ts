@@ -1,4 +1,3 @@
-import Toast, { ToastType } from "react-native-toast-message";
 import {
   Keyboard,
   NativeSyntheticEvent,
@@ -11,11 +10,30 @@ import { ChatPreviewResponse } from "@/services/ChatService";
 import * as Location from "expo-location";
 import { GOOGLE_MAPS_API_KEY } from "./const";
 
-export function HandleApiError(error: unknown) {
-  // Your error handling logic
+export type ApiErrorInfo = { message: string; code?: string; status?: number };
+
+export function getApiError(error: unknown): ApiErrorInfo {
+  const err = error as any;
+  const data = err?.response?.data;
+
+  if (data?.message) {
+    return { message: data.message, code: data.code, status: err.response.status };
+  }
+
+  if (err?.response) {
+    return { message: "Something went wrong. Please try again.", status: err.response.status };
+  }
+
+  if (err?.code === "ECONNABORTED") {
+    return { message: "The server took too long to respond. Please try again." };
+  }
+
+  return {
+    message: "Can't reach the server. Check that you're online and on the right network.",
+  };
 }
 
-export const OTP_LENGTH = 4;
+export const OTP_LENGTH = 6;
 
 export const handleInputChange = (
   text: string,

@@ -1,26 +1,25 @@
 import { _get, _post } from "../configs/api-methods.config";
 
+export type TileEvaluation = "green" | "yellow" | "grey";
+
 interface GameState {
   hasPlayed: boolean;
   guesses: string[];
+  evaluations: TileEvaluation[][];
   won: boolean;
   streak: number;
-  word?: string;
+  word?: string | null;
 }
 
-interface SubmitGameData {
-  guesses: string[];
-  won: boolean;
-  word: string;
-}
-
-interface GameResult {
-  success: boolean;
-  won: boolean;
-  streak: number;
-  streakEnded: boolean;
-  attempts: number;
-  word?: string;
+export interface GuessResult {
+  isValid: boolean;
+  evaluation?: TileEvaluation[];
+  finished?: boolean;
+  won?: boolean;
+  attempts?: number;
+  streak?: number;
+  streakEnded?: boolean;
+  word?: string | null;
 }
 
 interface StreakStatus {
@@ -37,68 +36,47 @@ interface UserStats {
   winPercentage: number;
 }
 
-interface ValidateWordResponse {
-  success: boolean;
-  isValid: boolean;
+export interface CircleBoardRow {
+  userId: string;
+  isMe: boolean;
+  firstName: string;
+  lastName?: string;
+  profileImage: string | null;
+  theme: string;
+  currentStreak: number;
+  longestStreak: number;
+  playedToday: boolean;
+  wonToday: boolean;
+  attemptsToday: number | null;
 }
 
 class WordleService {
   static async getTodayGame(token: string): Promise<GameState> {
+    return await _get<GameState>("wordle/today", token);
+  }
+
+  static async submitGuess(guess: string, token: string): Promise<GuessResult> {
     try {
-      const response = await _get<GameState>("wordle/today", token);
-      return response;
-    } catch (error) {
-      console.error('Error getting today\'s game:', error);
+      return await _post<GuessResult>("wordle/guess", { guess }, token);
+    } catch (error: any) {
+      if (error?.response?.data?.isValid === false) {
+        return { isValid: false };
+      }
       throw error;
     }
   }
 
-  static async submitGame(data: SubmitGameData, token: string): Promise<GameResult> {
-    try {
-      const response = await _post<GameResult>(
-        "wordle/submit",
-        { guesses: data.guesses, won: data.won },
-        token
-      );
-      return response;
-    } catch (error) {
-      console.error('Error submitting game:', error);
-      throw error;
-    }
+  static async getCircleBoard(token: string): Promise<CircleBoardRow[]> {
+    const response = await _get<{ success: boolean; board: CircleBoardRow[] }>("wordle/circle", token);
+    return response.board;
   }
 
   static async checkStreak(token: string): Promise<StreakStatus> {
-    try {
-      const response = await _get<StreakStatus>("wordle/streak", token);
-      return response;
-    } catch (error) {
-      console.error('Error checking streak:', error);
-      throw error;
-    }
+    return await _get<StreakStatus>("wordle/streak", token);
   }
 
   static async getStats(token: string): Promise<{ success: boolean; stats: UserStats }> {
-    try {
-      const response = await _get<{ success: boolean; stats: UserStats }>("wordle/stats", token);
-      return response;
-    } catch (error) {
-      console.error('Error getting stats:', error);
-      throw error;
-    }
-  }
-
-  static async validateWord(word: string, token: string): Promise<boolean> {
-    try {
-      const response = await _post<ValidateWordResponse>(
-        "wordle/validate",
-        { word },
-        token
-      );
-      return response.isValid;
-    } catch (error) {
-      console.error('Error validating word:', error);
-      return false;
-    }
+    return await _get<{ success: boolean; stats: UserStats }>("wordle/stats", token);
   }
 }
 

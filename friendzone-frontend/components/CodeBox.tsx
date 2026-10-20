@@ -42,8 +42,8 @@ const CodeBox = forwardRef<TextInput, CodeBoxProps>(
 
 const styles = StyleSheet.create({
   codeBox: {
-    width: 60,
-    height: 60,
+    width: 48,
+    height: 56,
     borderRadius: 14,
     fontSize: 28,
     fontFamily: 'Poppins-Bold',

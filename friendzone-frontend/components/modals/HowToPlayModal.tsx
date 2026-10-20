@@ -119,7 +119,6 @@ const styles = StyleSheet.create({
     margin: -8,
   },
   scrollView: {
-    // flex: 1,
   },
   subtitle: {
     fontSize: 16,

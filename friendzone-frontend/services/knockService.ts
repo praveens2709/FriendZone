@@ -21,13 +21,23 @@ export interface UserSearchResult {
   isPrivate: boolean;
 }
 
+export interface Suggestion {
+  id: string;
+  firstName: string;
+  lastName?: string;
+  profileImage: string | null;
+  theme: string;
+  isPrivate: boolean;
+  mutualCount: number;
+  mutualNames: string[];
+}
+
 export interface UserAvatar {
   id: string;
   username: string;
   avatar: string | null;
 }
 
-// New interface for user profile counts
 export interface UserCounts {
   knockersCount: number;
   knockingCount: number;
@@ -67,7 +77,6 @@ class KnockService {
     return await _post('knock/break-lock', { knockedId }, token);
   }
 
-  // --- NEW UNKNOCK METHOD ---
   static async unknockUser(knockId: string, token: string): Promise<{ message: string }> {
     return await _delete(`knock/${knockId}/unknock`, token);
   }
@@ -80,7 +89,10 @@ class KnockService {
     return await _get('knock/search', token, { q: query });
   }
 
-  // New method to get counts for a specific user profile
+  static async getSuggestions(token: string): Promise<Suggestion[]> {
+    return await _get('knock/suggestions', token);
+  }
+
   static async getCountsForUser(token: string, userId: string): Promise<UserCounts> {
     return await _get(`knock/counts/${userId}`, token);
   }

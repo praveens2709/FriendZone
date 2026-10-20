@@ -1,3 +1,4 @@
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet,
@@ -6,7 +7,6 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
@@ -52,7 +52,7 @@ export default function KnockRequestsScreen() {
           "[KnockRequestsScreen] Error fetching knock requests:",
           error
         );
-        console.log("error", "Failed to load knock requests.");
+
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -85,13 +85,12 @@ export default function KnockRequestsScreen() {
           return newRequests;
         });
 
-        console.log("success", "Knock request accepted.");
       } catch (error) {
         console.error(
           `[KnockRequestsScreen] Error accepting knock request ${requestId}:`,
           error
         );
-        console.log("error", "Failed to accept knock request.");
+
       }
     },
     [accessToken, router]
@@ -109,13 +108,13 @@ export default function KnockRequestsScreen() {
           }
           return newRequests;
         });
-        console.log("success", "Knock request declined.");
+
       } catch (error) {
         console.error(
           `[KnockRequestsScreen] Error declining knock request ${requestId}:`,
           error
         );
-        console.log("error", "Failed to decline knock request.");
+
       }
     },
     [accessToken, router]
@@ -174,7 +173,7 @@ export default function KnockRequestsScreen() {
   );
 
   return (
-    <LinearGradient colors={colors.gradient} style={styles.gradientContainer}>
+    <ScreenBackground style={styles.gradientContainer}>
       <ThemedSafeArea style={styles.safeArea}>
         <CommonHeader
           leftContent={<BackButton color={colors.text} />}
@@ -217,7 +216,7 @@ export default function KnockRequestsScreen() {
           />
         )}
       </ThemedSafeArea>
-    </LinearGradient>
+    </ScreenBackground>
   );
 }
 
@@ -243,7 +242,8 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   requestsListContent: {
-    paddingVertical: 10,
+    paddingTop: 12,
+    paddingBottom: 10,
     paddingHorizontal: 10,
     flexGrow: 1,
   },

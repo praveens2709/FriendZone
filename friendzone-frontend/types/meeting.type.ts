@@ -33,6 +33,10 @@ export interface Meeting {
     endTime?: string;
     actualStartTime?: string;
     actualEndTime?: string;
+    kind?: 'video' | 'in_person';
+    audioOnly?: boolean;
+    instant?: boolean;
+    location?: string;
     status: 'upcoming' | 'live' | 'completed' | 'cancelled';
     maxParticipants: number;
     settings: MeetingSettings;
@@ -43,6 +47,8 @@ export interface Meeting {
 
 export interface CreateMeetingInput {
     title: string;
+    kind?: 'video' | 'in_person';
+    location?: string;
     description?: string;
     startTime: string;
     participants?: string[];

@@ -17,9 +17,22 @@ export interface User {
   __v?: number;
   hasStory?: boolean;
   storySeen?: boolean;
+  isLockedIn?: boolean;
+  termsAccepted?: boolean;
+  vibe?: { kind: string; note?: string; expiresAt: string } | null;
+  relationship?: UserRelationship;
+}
+
+export interface UserRelationship {
+  isLockedIn: boolean;
+  lockedInCount: number;
+  mutualCount: number;
+  mutualNames: string[];
+  vibe: { kind: string; note?: string; expiresAt: string } | null;
 }
 
 export interface UserProfileResponse {
   success: boolean;
   user: User;
+  relationship?: UserRelationship;
 }

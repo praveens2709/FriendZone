@@ -1,3 +1,4 @@
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet,
@@ -6,7 +7,6 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
@@ -54,7 +54,7 @@ export default function KnockListScreen() {
       setListData(updatedList);
     } catch (error) {
       console.error("Failed to refresh knock data:", error);
-      console.log("error", "Failed to refresh data.");
+
     } finally {
       setLoading(false);
     }
@@ -94,23 +94,18 @@ export default function KnockListScreen() {
                 chatResponse.firstMessageByKnockerId || "",
             },
           });
-        } else {
-          console.log("error", "Failed to open chat.");
         }
       } else if (listType === "Knockers" && item.status === "onesidedlock") {
         await KnockService.knockBack(item.id, accessToken);
-        console.log("success", "You knocked them back! You are now LockedIn!");
+
       } else if (listType === "Knocking" && item.status === "onesidedlock") {
         await KnockService.unknockUser(item.id, accessToken);
-        console.log("success", "You have unknocked them.");
+
       }
       refreshData();
     } catch (error: any) {
       console.error("Action failed:", error);
-      console.log(
-        "error",
-        error.response?.data?.message || "Failed to perform action."
-      );
+
     } finally {
       setActionLoading(null);
     }
@@ -163,7 +158,7 @@ export default function KnockListScreen() {
   };
 
   return (
-    <LinearGradient colors={colors.gradient} style={styles.container}>
+    <ScreenBackground style={styles.container}>
       <ThemedSafeArea style={styles.safeArea}>
         <CommonHeader
           leftContent={<BackButton color={colors.text} />}
@@ -201,7 +196,7 @@ export default function KnockListScreen() {
           />
         )}
       </ThemedSafeArea>
-    </LinearGradient>
+    </ScreenBackground>
   );
 }
 
@@ -224,7 +219,8 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingTop: 12,
+    paddingBottom: 8,
     flexGrow: 1,
   },
   statusButton: {

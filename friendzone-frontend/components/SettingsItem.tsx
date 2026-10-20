@@ -15,6 +15,7 @@ interface SettingsItemProps {
   rightContent?: React.ReactNode;
   textStyle?: TextStyle;
   noHorizontalPadding?: boolean;
+  card?: boolean;
 }
 
 const SettingsItem: React.FC<SettingsItemProps> = ({
@@ -25,6 +26,7 @@ const SettingsItem: React.FC<SettingsItemProps> = ({
   rightContent,
   textStyle,
   noHorizontalPadding,
+  card = false,
 }) => {
   const { colors } = useTheme();
 
@@ -39,7 +41,12 @@ const SettingsItem: React.FC<SettingsItemProps> = ({
   const Icon = IconComponent();
 
   const itemContainerStyle: ViewStyle[] = [styles.itemContainer];
-  if (!noHorizontalPadding) {
+  if (card) {
+    itemContainerStyle.push(styles.itemCard, {
+      backgroundColor: colors.backgroundSecondary,
+      borderColor: colors.border,
+    });
+  } else if (!noHorizontalPadding) {
     itemContainerStyle.push(styles.itemDefaultPadding);
   }
 
@@ -84,6 +91,13 @@ const styles = StyleSheet.create({
   },
   itemDefaultPadding: {
     paddingHorizontal: 20,
+  },
+  itemCard: {
+    paddingHorizontal: 16,
+    marginHorizontal: 14,
+    marginBottom: 8,
+    borderRadius: 18,
+    borderWidth: 1,
   },
   itemLeft: {
     flexDirection: "row",

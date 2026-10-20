@@ -1,8 +1,5 @@
-// export const API_BASE_URL = 'http://192.168.1.4:3000/api/';
-export const API_BASE_URL = 'http://172.20.10.4:3000/api/';
-// export const API_BASE_URL = 'http://192.168.1.7:3000/api/';
-// export const API_BASE_URL = 'http://192.0.0.2:3000/api/';
-// export const API_BASE_URL = 'https://0575-49-43-178-192.ngrok-free.app/api';
+export const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000/api/';
 
 export const MIN_USER_AGE = 18;
 export const MAX_USER_AGE = 100;
@@ -12,4 +9,4 @@ export const USER_GENDER = [
   { label: "Female", value: "female" },
 ];
 
-export const GOOGLE_MAPS_API_KEY = 'AIzaSyBBU50Ma35xsEznPeGONkYU6VTuTtVQZdw';
+export const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';

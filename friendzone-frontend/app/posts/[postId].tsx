@@ -1,3 +1,4 @@
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   StyleSheet,
@@ -9,7 +10,6 @@ import {
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
 import PostComponent from "@/components/PostComponent";
 import PostService from "@/services/PostService";
@@ -139,6 +139,7 @@ export default function PostScreen() {
             isActive={currentlyPlayingId === item._id}
             isGloballyMuted={isGloballyMuted}
             setIsGloballyMuted={setIsGloballyMuted}
+            onRemoved={() => router.back()}
           />
         )}
         keyExtractor={item => item._id}
@@ -159,7 +160,7 @@ export default function PostScreen() {
   };
 
   return (
-    <LinearGradient colors={colors.gradient} style={styles.gradientContainer}>
+    <ScreenBackground style={styles.gradientContainer}>
       <ThemedSafeArea style={styles.safeArea}>
         <CommonHeader
           leftContent={<BackButton onPress={() => router.back()} color={colors.text} />}
@@ -167,7 +168,7 @@ export default function PostScreen() {
         />
         {renderContent()}
       </ThemedSafeArea>
-    </LinearGradient>
+    </ScreenBackground>
   );
 }
 

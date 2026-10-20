@@ -1,3 +1,4 @@
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React from "react";
 import {
   KeyboardAvoidingView,
@@ -7,7 +8,6 @@ import {
   StyleSheet,
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
-import { LinearGradient } from "expo-linear-gradient";
 import ThemedSafeArea from "@/components/ThemedSafeArea"; 
 import { ThemedView } from "./ThemedView";
 
@@ -19,7 +19,7 @@ const AuthFormLayout = ({ children }: Props) => {
   const { colors } = useTheme();
 
   return (
-    <LinearGradient colors={colors.gradient} style={styles.gradient}>
+    <ScreenBackground style={styles.gradient}>
       <ThemedSafeArea style={{ flex: 1, backgroundColor: 'transparent' }}>
         <KeyboardAvoidingView
           style={styles.wrapper}
@@ -30,7 +30,7 @@ const AuthFormLayout = ({ children }: Props) => {
           </TouchableWithoutFeedback>
         </KeyboardAvoidingView>
       </ThemedSafeArea>
-    </LinearGradient>
+    </ScreenBackground>
   );
 };
 

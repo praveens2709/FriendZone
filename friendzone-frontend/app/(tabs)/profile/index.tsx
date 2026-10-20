@@ -1,3 +1,5 @@
+import { useTabBarSpace } from "@/hooks/useTabBarSpace";
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet,
@@ -10,11 +12,11 @@ import {
   Dimensions,
   ScrollView,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
+import { readableTextOn } from "@/utils/theme-utils";
 import { ThemedText } from "@/components/ThemedText";
 import Button from "@/components/Button";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import {
   Ionicons,
   Feather,
@@ -27,7 +29,6 @@ import { useAuth } from "@/context/AuthContext";
 import { useSavedPosts } from "@/context/SavedPostsContext";
 import UserAvatar from "@/components/UserAvatar";
 import ThemedModal from "@/components/ThemedModal";
-import AuthModalContent from "@/components/AuthModalContent";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import CommonHeader from "@/components/CommonHeader";
 import KnockService, { KnockRequest } from "@/services/knockService";
@@ -40,71 +41,30 @@ import PostGrid, { PostItem } from "@/components/PostGrid";
 import ThemedScrollView from "@/components/ThemedScrollView";
 import WordleGameModal from "@/components/modals/WordleGameModal";
 import QRModal from "@/components/modals/QRModal";
-import MoodStatusModal, {
-  MoodStatus,
-} from "@/components/modals/MoodStatusModal";
+import VibePickerModal from "@/components/VibePickerModal";
+import VibeService, { Vibe } from "@/services/VibeService";
+import { vibeOption } from "@/constants/vibes";
+import * as ImagePicker from "expo-image-picker";
+import { onPostRemoved } from "@/utils/postEvents";
 
 const { width, height } = Dimensions.get("window");
 
-// Predefined Avatar Types
-interface Avatar {
-  id: string;
-  uri: string;
-  category: string;
-}
-
-// Mock avatars
-const PRESET_AVATARS: Avatar[] = [
-  {
-    id: "avatar1",
-    uri: "https://api.dicebear.com/7.x/avataaars/png?seed=1",
-    category: "Classic",
-  },
-  {
-    id: "avatar2",
-    uri: "https://api.dicebear.com/7.x/avataaars/png?seed=2",
-    category: "Classic",
-  },
-  {
-    id: "avatar3",
-    uri: "https://api.dicebear.com/7.x/personas/png?seed=1",
-    category: "Personas",
-  },
-  {
-    id: "avatar4",
-    uri: "https://api.dicebear.com/7.x/personas/png?seed=2",
-    category: "Personas",
-  },
-  {
-    id: "avatar5",
-    uri: "https://api.dicebear.com/7.x/fun-emoji/png?seed=1",
-    category: "Fun",
-  },
-  {
-    id: "avatar6",
-    uri: "https://api.dicebear.com/7.x/fun-emoji/png?seed=2",
-    category: "Fun",
-  },
-];
-
 export default function ProfileScreen() {
   const { colors } = useTheme();
+  const { space: tabSpace } = useTabBarSpace();
   const router = useRouter();
-  const { user, authLoading, signOut, accessToken } = useAuth();
+  const { user, authLoading, signOut, accessToken, updateProfile } = useAuth();
   const { socket } = useSocket();
 
   const [showMainModal, setShowMainModal] = useState(false);
-  const [showAddAccountModal, setShowAddAccountModal] = useState(false);
   const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState(false);
-  const [showAuthFlowModal, setShowAuthFlowModal] = useState(false);
   const [showMoodModal, setShowMoodModal] = useState(false);
-  const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [savingVibe, setSavingVibe] = useState(false);
+  const [updatingPhoto, setUpdatingPhoto] = useState(false);
   const [showWordleModal, setShowWordleModal] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
-  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
 
-  const [currentMood, setCurrentMood] = useState<MoodStatus | null>(null);
-  const [selectedAvatar, setSelectedAvatar] = useState<Avatar | null>(null);
+  const [myVibe, setMyVibe] = useState<Vibe | null>(null);
 
   const [knockersCount, setKnockersCount] = useState(0);
   const [knockingCount, setKnockingCount] = useState(0);
@@ -205,18 +165,65 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleMoodSelect = (mood: MoodStatus) => {
-    setCurrentMood(mood);
+  const loadVibe = useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      const data = await VibeService.getVibes(accessToken);
+      setMyVibe(data.mine);
+    } catch {
+      setMyVibe(null);
+    }
+  }, [accessToken]);
+
+  const handleSaveVibe = async (data: { kind: Vibe["kind"]; note: string; hours: number }) => {
+    if (!accessToken) return;
+    try {
+      setSavingVibe(true);
+      setMyVibe(await VibeService.setVibe(data, accessToken));
+      setShowMoodModal(false);
+    } catch {
+    } finally {
+      setSavingVibe(false);
+    }
   };
 
-  const handleRemoveMood = () => {
-    setCurrentMood(null);
+  const handleClearVibe = async () => {
+    try {
+      await VibeService.clearVibe();
+      setMyVibe(null);
+      setShowMoodModal(false);
+    } catch {
+    }
   };
 
-  const handleAvatarSelect = (avatar: Avatar) => {
-    setSelectedAvatar(avatar);
-    setShowAvatarModal(false);
-    // Here you would typically update the user's avatar
+  const handleChangePhoto = async () => {
+    if (!user || updatingPhoto) return;
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+    try {
+      setUpdatingPhoto(true);
+      await updateProfile({
+        firstName: user.firstName,
+        lastName: user.lastName,
+        bio: user.bio || "",
+        gender: user.gender,
+        dob: user.dob,
+        profileImage: result.assets[0].uri,
+      });
+
+    } catch (error: any) {
+    } finally {
+      setUpdatingPhoto(false);
+    }
   };
 
   useEffect(() => {
@@ -226,6 +233,23 @@ export default function ProfileScreen() {
   useEffect(() => {
     savedPostsRef.current = savedPosts;
   }, [savedPosts]);
+
+  useEffect(
+    () =>
+      onPostRemoved((postId) => {
+        setUserPosts((prev) => prev.filter((p) => p._id !== postId));
+        setSavedPosts((prev) => prev.filter((p) => p._id !== postId));
+      }),
+    []
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      loadVibe();
+      fetchKnockData();
+      fetchUserPosts();
+    }, [loadVibe, fetchKnockData, fetchUserPosts])
+  );
 
   useEffect(() => {
     fetchKnockData();
@@ -266,11 +290,6 @@ export default function ProfileScreen() {
       </ThemedSafeArea>
     );
   }
-
-  const closeAuthFlowModal = () => {
-    setShowAuthFlowModal(false);
-    setAuthMode("login");
-  };
 
   const navigateToKnockList = (type: KnockListType, data: KnockRequest[]) => {
     router.push({
@@ -320,8 +339,8 @@ export default function ProfileScreen() {
   }));
 
   return (
-    <LinearGradient colors={colors.gradient} style={styles.container}>
-      <ThemedSafeArea style={styles.safeAreaTransparentBg}>
+    <ScreenBackground style={styles.container}>
+      <ThemedSafeArea style={styles.safeAreaTransparentBg} edges={["top", "left", "right"]}>
         <CommonHeader
           leftContent={
             <TouchableOpacity
@@ -355,6 +374,7 @@ export default function ProfileScreen() {
 
         <ThemedScrollView
           style={styles.scrollView}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: tabSpace }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -379,7 +399,7 @@ export default function ProfileScreen() {
                     <ThemedText
                       style={[styles.statusText, { color: colors.text }]}
                     >
-                      {currentMood ? currentMood.label : "What’s the vibe?"}
+                      {myVibe ? vibeOption(myVibe.kind).label : "What’s the vibe?"}
                     </ThemedText>
                   </View>
                   <View
@@ -396,11 +416,18 @@ export default function ProfileScreen() {
                   />
                 </TouchableOpacity>
                 <View style={styles.avatarContainer}>
-                  <TouchableOpacity onPress={() => setShowAvatarModal(true)}>
-                    <UserAvatar
-                      imageUri={selectedAvatar?.uri || user.profileImage}
-                      size={85}
-                    />
+                  <TouchableOpacity onPress={handleChangePhoto}>
+                    <View
+                      style={[
+                        styles.avatarRing,
+                        { borderColor: colors.primary },
+                      ]}
+                    >
+                      <UserAvatar
+                        imageUri={user.profileImage}
+                        size={85}
+                      />
+                    </View>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -408,7 +435,7 @@ export default function ProfileScreen() {
                       styles.plusIcon,
                       { backgroundColor: colors.backgroundSecondary },
                     ]}
-                    onPress={() => setShowAvatarModal(true)}
+                    onPress={handleChangePhoto}
                   >
                     <Ionicons name="add" size={16} color={colors.text} />
                   </TouchableOpacity>
@@ -466,14 +493,14 @@ export default function ProfileScreen() {
                   {user.bio}
                 </ThemedText>
               )}
-              {currentMood && (
+              {myVibe?.note ? (
                 <ThemedText
                   type="default"
                   style={[styles.moodDescription, { color: colors.textDim }]}
                 >
-                  {currentMood.description}
+                  {myVibe.note}
                 </ThemedText>
-              )}
+              ) : null}
             </ThemedView>
 
             <ThemedView style={styles.actionButtonsContainer}>
@@ -487,7 +514,7 @@ export default function ProfileScreen() {
                 <ThemedText
                   style={[
                     styles.primaryActionButtonText,
-                    { color: colors.text },
+                    { color: readableTextOn(colors.primary, colors.buttonText) },
                   ]}
                 >
                   Edit Profile
@@ -607,62 +634,14 @@ export default function ProfileScreen() {
         </ThemedScrollView>
       </ThemedSafeArea>
 
-      <MoodStatusModal
+      <VibePickerModal
         visible={showMoodModal}
+        current={myVibe}
+        saving={savingVibe}
         onClose={() => setShowMoodModal(false)}
-        onMoodSelect={handleMoodSelect}
-        userProfileImage={
-          selectedAvatar?.uri ||
-          user.profileImage ||
-          "https://via.placeholder.com/150"
-        }
+        onSave={handleSaveVibe}
+        onClear={handleClearVibe}
       />
-
-      <ThemedModal
-        visible={showAvatarModal}
-        onClose={() => setShowAvatarModal(false)}
-        fullHeight={true}
-      >
-        <ThemedView style={styles.avatarModalContent}>
-          <ThemedView style={styles.avatarModalHeader}>
-            <TouchableOpacity
-              onPress={() => setShowAvatarModal(false)}
-              style={styles.modalCloseButton}
-            >
-              <MaterialIcons name="close" size={24} color={colors.text} />
-            </TouchableOpacity>
-            <ThemedText
-              type="subtitle"
-              style={[styles.avatarModalTitle, { color: colors.text }]}
-            >
-              Choose Your Avatar
-            </ThemedText>
-            <View style={styles.modalPlaceholder} />
-          </ThemedView>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.avatarScroll}
-          >
-            {PRESET_AVATARS.map((avatar) => (
-              <TouchableOpacity
-                key={avatar.id}
-                style={[
-                  styles.avatarOption,
-                  selectedAvatar?.id === avatar.id && {
-                    borderColor: colors.primary,
-                    borderWidth: 3,
-                  },
-                ]}
-                onPress={() => handleAvatarSelect(avatar)}
-              >
-                <UserAvatar imageUri={avatar.uri} size={60} />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </ThemedView>
-      </ThemedModal>
 
       <WordleGameModal
         visible={showWordleModal}
@@ -679,7 +658,7 @@ export default function ProfileScreen() {
         onClose={() => setShowMainModal(false)}
       >
         <ThemedView style={[styles.mainModal, { borderColor: colors.border }]}>
-          <TouchableOpacity style={styles.modalItem} onPress={() => { }}>
+          <TouchableOpacity style={styles.modalItem} onPress={() => setShowMainModal(false)}>
             <UserAvatar imageUri={user.profileImage} size={42} />
             <ThemedView style={{ flex: 1, marginLeft: 10 }}>
               <ThemedText
@@ -694,34 +673,6 @@ export default function ProfileScreen() {
               size={22}
               color={colors.textSecondary}
             />
-          </TouchableOpacity>
-          <ThemedView
-            style={[styles.divider, { backgroundColor: colors.border }]}
-          />
-          <TouchableOpacity
-            style={styles.modalItem}
-            onPress={() => {
-              setShowMainModal(false);
-              setShowAddAccountModal(true);
-            }}
-          >
-            <ThemedView
-              style={[
-                styles.iconCircle,
-                {
-                  backgroundColor: colors.backgroundSecondary,
-                  borderColor: colors.textSecondary,
-                },
-              ]}
-            >
-              <Ionicons name="add" size={28} color={colors.textSecondary} />
-            </ThemedView>
-            <ThemedText
-              type="defaultSemiBold"
-              style={{ marginLeft: 10, color: colors.textSecondary }}
-            >
-              Add FriendZone Account
-            </ThemedText>
           </TouchableOpacity>
         </ThemedView>
 
@@ -739,62 +690,6 @@ export default function ProfileScreen() {
             }}
           />
         </ThemedView>
-      </ThemedModal>
-
-      <ThemedModal
-        visible={showAddAccountModal}
-        onClose={() => setShowAddAccountModal(false)}
-      >
-        <TouchableOpacity
-          style={[styles.modalItemCentered, { borderColor: colors.border }]}
-          onPress={() => {
-            setShowAddAccountModal(false);
-            setAuthMode("login");
-            setShowAuthFlowModal(true);
-          }}
-        >
-          <ThemedText
-            type="defaultSemiBold"
-            style={{ color: colors.textSecondary }}
-          >
-            Login to existing account
-          </ThemedText>
-        </TouchableOpacity>
-
-        <ThemedView
-          style={[styles.divider, { backgroundColor: colors.border }]}
-        />
-
-        <TouchableOpacity
-          style={[styles.modalItemCentered, { borderColor: colors.border }]}
-          onPress={() => {
-            setShowAddAccountModal(false);
-            setAuthMode("signup");
-            setShowAuthFlowModal(true);
-          }}
-        >
-          <ThemedText
-            type="defaultSemiBold"
-            style={{
-              color: colors.textSecondary,
-              marginBottom: Platform.OS === "ios" ? 20 : 40,
-            }}
-          >
-            Create a new account
-          </ThemedText>
-        </TouchableOpacity>
-      </ThemedModal>
-
-      <ThemedModal
-        visible={showAuthFlowModal}
-        onClose={closeAuthFlowModal}
-        fullHeight={true}
-        containerStyle={styles.authModalContainerStyle}
-      >
-        <AuthModalContent
-          initialMode={authMode}
-          onCloseModal={closeAuthFlowModal}
-        />
       </ThemedModal>
 
       <ThemedModal
@@ -821,7 +716,7 @@ export default function ProfileScreen() {
           <Button title="OK" onPress={signOut} style={styles.button} />
         </ThemedView>
       </ThemedModal>
-    </LinearGradient>
+    </ScreenBackground>
   );
 }
 
@@ -910,6 +805,14 @@ const styles = StyleSheet.create({
   avatarContainer: {
     position: "relative",
     alignItems: "center",
+  },
+  avatarRing: {
+    width: 93,
+    height: 93,
+    borderRadius: 47,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
   },
   plusIcon: {
     position: "absolute",
@@ -1024,7 +927,7 @@ const styles = StyleSheet.create({
     paddingVertical: 50,
     justifyContent: "flex-start",
     alignItems: "center",
-    minHeight: 200, // Ensure it takes some space to center the visual
+    minHeight: 200,
   },
   noPostsContainer: {
     flex: 0.8,
@@ -1061,7 +964,6 @@ const styles = StyleSheet.create({
     width: 24,
   },
   avatarModalContent: {
-    // maxHeight: height * 0.6,
   },
   avatarModalHeader: {
     flexDirection: "row",

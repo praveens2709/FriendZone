@@ -1,4 +1,7 @@
-import React, { useEffect, useState, useCallback } from "react";
+import { readableTextOn } from "@/utils/theme-utils";
+import { useTabBarSpace } from "@/hooks/useTabBarSpace";
+import ScreenBackground from "@/components/ui/ScreenBackground";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   StyleSheet,
   TouchableOpacity,
@@ -6,6 +9,7 @@ import {
   FlatList,
   ViewToken,
   Platform,
+  RefreshControl,
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
@@ -14,9 +18,9 @@ import { Redirect, useRouter } from "expo-router";
 import { Ionicons, SimpleLineIcons } from "@expo/vector-icons";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import CommonHeader from "@/components/CommonHeader";
+import VibeStrip from "@/components/VibeStrip";
 import StoryRingList from "@/components/StoryRingList";
 import { ThemedText } from "@/components/ThemedText";
-import { LinearGradient } from "expo-linear-gradient";
 import ChatService, { ChatPreviewResponse } from "@/services/ChatService";
 import NotificationService from "@/services/NotificationService";
 import { ThemedView } from "@/components/ThemedView";
@@ -33,6 +37,7 @@ interface ViewableItem extends ViewToken {
 
 export default function HomeScreen() {
   const { colors } = useTheme();
+  const { space: tabSpace } = useTabBarSpace();
   const { isAuthenticated, authLoading, user, accessToken } = useAuth();
   const { socket } = useSocket();
   const router = useRouter();
@@ -41,6 +46,7 @@ export default function HomeScreen() {
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
   const [postsLoading, setPostsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [isGloballyMuted, setIsGloballyMuted] = useState(false);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(
@@ -80,33 +86,70 @@ export default function HomeScreen() {
 
   const totalUnreadChats = unreadChatIds.size;
 
-  const fetchPosts = useCallback(async () => {
-    if (!accessToken) return;
+  const FEED_PAGE_SIZE = 12;
+  const pageRef = useRef(1);
+  const loadingMoreRef = useRef(false);
+  const [hasMorePosts, setHasMorePosts] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const fetchPosts = useCallback(
+    async (silent = false) => {
+      if (!accessToken) return;
+      try {
+        if (!silent) setPostsLoading(true);
+        const fetchedPosts = await PostService.getFeedPosts(accessToken, 1, FEED_PAGE_SIZE);
+        pageRef.current = 1;
+        setPosts(fetchedPosts);
+        setHasMorePosts(fetchedPosts.length >= FEED_PAGE_SIZE);
+      } catch (err) {
+        console.error("Error fetching posts:", err);
+      } finally {
+        setPostsLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [accessToken]
+  );
+
+  const loadMorePosts = useCallback(async () => {
+    if (!accessToken || !hasMorePosts || loadingMoreRef.current || postsLoading) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
     try {
-      setPostsLoading(true);
-      const fetchedPosts = await PostService.getFeedPosts(accessToken);
-      setPosts(fetchedPosts);
+      const next = pageRef.current + 1;
+      const more = await PostService.getFeedPosts(accessToken, next, FEED_PAGE_SIZE);
+      pageRef.current = next;
+      setPosts((current) => {
+        const seen = new Set(current.map((p) => p._id));
+        return [...current, ...more.filter((p) => !seen.has(p._id))];
+      });
+      setHasMorePosts(more.length >= FEED_PAGE_SIZE);
     } catch (err) {
-      console.error("Error fetching posts:", err);
+      console.error("Error loading more posts:", err);
     } finally {
-      setPostsLoading(false);
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
     }
-  }, [accessToken]);
+  }, [accessToken, hasMorePosts, postsLoading]);
+
+  const firstFocusRef = useRef(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (firstFocusRef.current) {
+        firstFocusRef.current = false;
+        return;
+      }
+      fetchPosts(true);
+    }, [fetchPosts])
+  );
 
   const fetchInitialUnreadChats = useCallback(async () => {
     if (!accessToken) return;
 
     try {
-      const res = await ChatService.getUserChats(accessToken, 1, 1000);
-      const chats: ChatPreviewResponse[] = res.chats || [];
-
-      const initialUnreadSet = new Set<string>();
-      chats.forEach((chat) => {
-        if (chat.unreadCount > 0) {
-          initialUnreadSet.add(chat.id);
-        }
-      });
-      setUnreadChatIds(initialUnreadSet);
+      const chatIds = await ChatService.getUnreadChatIds();
+      setUnreadChatIds(new Set(chatIds));
     } catch (err) {
       console.error("Error fetching initial unread chats:", err);
     }
@@ -172,6 +215,8 @@ export default function HomeScreen() {
       handleUnreadNotificationCountUpdate
     );
     socket.on("newPost", handleNewPost);
+    const handleKnockChange = () => fetchPosts(true);
+    socket.on("knockStatusChanged", handleKnockChange);
 
     return () => {
       socket.off("chatPreviewUpdate", handleChatPreviewUpdate);
@@ -180,8 +225,9 @@ export default function HomeScreen() {
         handleUnreadNotificationCountUpdate
       );
       socket.off("newPost", handleNewPost);
+      socket.off("knockStatusChanged", handleKnockChange);
     };
-  }, [socket, user]);
+  }, [socket, user, fetchPosts]);
 
   if (authLoading)
     return (
@@ -195,8 +241,8 @@ export default function HomeScreen() {
   if (!isAuthenticated) return <Redirect href="/(auth)/AuthChoice" />;
 
   return (
-    <LinearGradient colors={colors.gradient} style={styles.gradientContainer}>
-      <ThemedSafeArea style={styles.container}>
+    <ScreenBackground style={styles.gradientContainer}>
+      <ThemedSafeArea style={styles.container} edges={["top", "left", "right"]}>
         <CommonHeader
           leftContent={<ThemedText style={styles.title}>FriendZone</ThemedText>}
           rightContent1={
@@ -245,28 +291,59 @@ export default function HomeScreen() {
             />
           )}
           keyExtractor={(item) => item._id}
-          ListHeaderComponent={() => <StoryRingList />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                fetchPosts(true);
+              }}
+              tintColor={colors.primary}
+            />
+          }
+          onEndReached={loadMorePosts}
+          onEndReachedThreshold={0.6}
+          ListFooterComponent={
+            loadingMore ? <ActivityIndicator style={{ marginVertical: 16 }} color={colors.primary} /> : null
+          }
+          ListHeaderComponent={
+            <ThemedView>
+              <StoryRingList />
+              <VibeStrip />
+            </ThemedView>
+          }
+          ListEmptyComponent={
+            postsLoading ? null : (
+              <ThemedView style={styles.emptyFeed}>
+                <Ionicons name="people-outline" size={44} color={colors.textDim} />
+                <ThemedText style={[styles.emptyFeedTitle, { color: colors.text }]}>
+                  Your feed is quiet
+                </ThemedText>
+                <ThemedText style={[styles.emptyFeedText, { color: colors.textDim }]}>
+                  Posts from the people you've locked in with show up here.
+                </ThemedText>
+                <TouchableOpacity
+                  onPress={() => router.push("/(tabs)/circle")}
+                  style={[styles.emptyFeedButton, { backgroundColor: colors.primary }]}
+                >
+                  <ThemedText
+                    style={{ color: readableTextOn(colors.primary, colors.buttonText), fontWeight: "700" }}
+                  >
+                    Find your people
+                  </ThemedText>
+                </TouchableOpacity>
+              </ThemedView>
+            )
+          }
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
           initialNumToRender={5}
           maxToRenderPerBatch={5}
           windowSize={10}
-          contentContainerStyle={styles.postListContainer}
+          contentContainerStyle={[styles.postListContainer, { paddingBottom: tabSpace - 10 }]}
         />
-        {/* <ThemedView>
-          <TouchableOpacity onPress={() => setShowWordleGame(true)}>
-            <ThemedText>Play Wordle</ThemedText>
-          </TouchableOpacity>
-
-          <StreakEndedModal onPlayAgain={() => setShowWordleGame(true)} />
-
-          <WordleGameModal
-            visible={showWordleGame}
-            onClose={() => setShowWordleGame(false)}
-          />
-        </ThemedView> */}
       </ThemedSafeArea>
-    </LinearGradient>
+    </ScreenBackground>
   );
 }
 
@@ -279,7 +356,21 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   postListContainer: {
-    paddingBottom: Platform.OS === "ios" ? 50 : 20,
+    paddingTop: 4,
+  },
+  emptyFeed: {
+    alignItems: "center",
+    paddingHorizontal: 32,
+    paddingTop: 48,
+    gap: 8,
+  },
+  emptyFeedTitle: { fontSize: 20, fontWeight: "800", marginTop: 6 },
+  emptyFeedText: { textAlign: "center", lineHeight: 20 },
+  emptyFeedButton: {
+    marginTop: 12,
+    borderRadius: 12,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
   },
   activityIndicator: {
     flex: 1,

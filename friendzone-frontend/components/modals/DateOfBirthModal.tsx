@@ -6,6 +6,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import ThemedModal from "@/components/ThemedModal";
 import { formatDateOfBirth } from "@/constants/Functions";
+import { useRouter } from "expo-router";
 
 interface DateOfBirthModalProps {
   visible: boolean;
@@ -19,6 +20,7 @@ export default function DateOfBirthModal({
   dob,
 }: DateOfBirthModalProps) {
   const { colors } = useTheme();
+  const router = useRouter();
 
   return (
     <ThemedModal
@@ -43,7 +45,13 @@ export default function DateOfBirthModal({
         <ThemedText style={[styles.warningText, { color: colors.textDim }]}>
           There is a limit to how many times you can change your date of birth.
           Please contact us in order to request a date of birth change.
-          <ThemedText style={[styles.linkText, { color: colors.primary }]}>
+          <ThemedText
+            style={[styles.linkText, { color: colors.primary }]}
+            onPress={() => {
+              onClose();
+              router.push({ pathname: "/profile/help", params: { topic: "dob" } });
+            }}
+          >
             {" "}
             Contact us
           </ThemedText>

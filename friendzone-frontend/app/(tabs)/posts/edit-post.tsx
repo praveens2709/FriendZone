@@ -1,3 +1,4 @@
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React from "react";
 import {
   StyleSheet,
@@ -8,7 +9,6 @@ import {
   Keyboard,
   ActivityIndicator,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useLocalSearchParams } from "expo-router";
@@ -123,7 +123,7 @@ export default function EditPostScreen() {
 
   if (selectedAssets.length === 0) {
     return (
-      <LinearGradient colors={colors.gradient} style={styles.gradientContainer}>
+      <ScreenBackground style={styles.gradientContainer}>
         <ThemedSafeArea style={styles.safeArea}>
           <CommonHeader
             title="Edit Post"
@@ -134,12 +134,12 @@ export default function EditPostScreen() {
             <ThemedText style={{ marginTop: 10 }}>Loading images...</ThemedText>
           </ThemedView>
         </ThemedSafeArea>
-      </LinearGradient>
+      </ScreenBackground>
     );
   }
 
   return (
-    <LinearGradient colors={colors.gradient} style={styles.gradientContainer}>
+    <ScreenBackground style={styles.gradientContainer}>
       <ThemedSafeArea style={styles.safeArea}>
         <CommonHeader
           leftContent={<BackButton color={colors.text} />}
@@ -389,7 +389,7 @@ export default function EditPostScreen() {
           />
         </ThemedModal>
       </ThemedSafeArea>
-    </LinearGradient>
+    </ScreenBackground>
   );
 }
 

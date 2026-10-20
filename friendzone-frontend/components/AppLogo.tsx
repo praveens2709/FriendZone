@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, StyleSheet, ImageStyle, StyleProp, ViewStyle } from 'react-native';
+import { Image, StyleSheet, ImageStyle, StyleProp, View, ViewStyle } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { ThemedView } from './ThemedView';
 import { ThemedText } from './ThemedText';
@@ -35,11 +35,13 @@ const AppLogo: React.FC<AppLogoProps> = ({
         containerStyle,
       ]}
     >
-      <Image
-        source={require('@/assets/images/logo3.png')}
-        style={[{ width: size, height: size }, style]}
-        resizeMode={resizeMode}
-      />
+      <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+        <Image
+          source={require('@/assets/images/logo3.png')}
+          style={[{ width: size, height: size }, style]}
+          resizeMode={resizeMode}
+        />
+      </View>
       {showText && !!text && (
         <ThemedText
           style={[

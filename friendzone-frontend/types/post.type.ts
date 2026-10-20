@@ -26,13 +26,13 @@ export interface Post {
   location?: string;
   song?: Song;
   likes: string[];
+  likedByNames?: string[];
   saves: string[];
   shares: number;
   comments: Comment[];
   createdAt: string;
 }
 
-// API Response wrappers
 export interface ICreatePostResponse {
   message: string;
   post: Post;

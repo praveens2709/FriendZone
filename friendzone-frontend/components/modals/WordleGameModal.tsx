@@ -7,8 +7,43 @@ import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from "@/context/ThemeContext";
 import HowToPlayModal from "./HowToPlayModal";
 import ResultModal from "./ResultModal";
-import WordleService from "@/services/WordleService";
+import WordleService, { TileEvaluation } from "@/services/WordleService";
 import { useAuth } from "@/context/AuthContext";
+
+type KeyStatus = 'correct' | 'present' | 'absent' | 'unused';
+
+const EVALUATION_TO_KEY: Record<TileEvaluation, KeyStatus> = {
+  green: 'correct',
+  yellow: 'present',
+  grey: 'absent',
+};
+
+const KEY_RANK: Record<KeyStatus, number> = {
+  unused: 0,
+  absent: 1,
+  present: 2,
+  correct: 3,
+};
+
+const EMPTY_GUESSES = ['', '', '', '', '', ''];
+
+const buildKeyboardStatus = (
+  guesses: string[],
+  evaluations: TileEvaluation[][],
+  base: { [key: string]: KeyStatus } = {}
+) => {
+  const status = { ...base };
+  guesses.forEach((guess, guessIndex) => {
+    const evaluation = evaluations[guessIndex];
+    if (!guess || !evaluation) return;
+    for (let i = 0; i < guess.length; i++) {
+      const next = EVALUATION_TO_KEY[evaluation[i]];
+      const current = status[guess[i]] ?? 'unused';
+      if (KEY_RANK[next] > KEY_RANK[current]) status[guess[i]] = next;
+    }
+  });
+  return status;
+};
 
 const { width } = Dimensions.get('window');
 const TILE_SIZE = (width - 80) / 5;
@@ -22,7 +57,8 @@ const WordleGameModal: React.FC<WordleGameModalProps> = ({ visible, onClose }) =
   const { colors } = useTheme();
   const { accessToken } = useAuth();
   const [solution, setSolution] = useState('');
-  const [guesses, setGuesses] = useState<string[]>(['', '', '', '', '', '']);
+  const [guesses, setGuesses] = useState<string[]>(EMPTY_GUESSES);
+  const [evaluations, setEvaluations] = useState<TileEvaluation[][]>([]);
   const [currentGuessIndex, setCurrentGuessIndex] = useState(0);
   const [currentGuess, setCurrentGuess] = useState('');
   const [message, setMessage] = useState('');
@@ -53,54 +89,42 @@ const WordleGameModal: React.FC<WordleGameModalProps> = ({ visible, onClose }) =
     try {
       setLoading(true);
       const gameState = await WordleService.getTodayGame(accessToken);
-      
-      if (gameState.word) {
-        setSolution(gameState.word);
-      }
-      
+      const serverGuesses = gameState.guesses || [];
+      const serverEvaluations = gameState.evaluations || [];
+      const padded = [...serverGuesses, ...EMPTY_GUESSES].slice(0, 6);
+
       if (gameState.hasPlayed) {
-        const playedGuesses = gameState.guesses || ['', '', '', '', '', ''];
-        setGuesses(playedGuesses);
-        setCurrentGuessIndex(playedGuesses.length || 0);
+        setSolution(gameState.word || '');
+        setGuesses(padded);
+        setEvaluations(serverEvaluations);
+        setCurrentGuessIndex(serverGuesses.length);
+        setCurrentGuess('');
         setGameOver(true);
         setGameWon(gameState.won || false);
         setStreak(gameState.streak || 0);
-        setAttempts(playedGuesses.filter(g => g !== '').length);
-        
-        const playedWord = solution || gameState.word;
-        
-        if (playedWord && playedGuesses.length > 0) {
-          const newKeyboardStatus: {[key: string]: 'correct' | 'present' | 'absent' | 'unused'} = {};
-          playedGuesses.forEach((guess: string) => {
-            if (guess) {
-              for (let i = 0; i < guess.length; i++) {
-                const letter = guess[i];
-                const isCorrectPosition = playedWord[i] === letter;
-                const isPresentInWord = playedWord.includes(letter);
-                
-                if (isCorrectPosition) {
-                  newKeyboardStatus[letter] = 'correct';
-                } else if (isPresentInWord && newKeyboardStatus[letter] !== 'correct') {
-                  newKeyboardStatus[letter] = 'present';
-                } else if (!isPresentInWord) {
-                  newKeyboardStatus[letter] = 'absent';
-                }
-              }
-            }
-          });
-          setKeyboardStatus(newKeyboardStatus);
-        }
-        
+        setAttempts(serverGuesses.length);
+        setKeyboardStatus(buildKeyboardStatus(serverGuesses, serverEvaluations));
+
         setTimeout(() => {
           setShowResult(true);
         }, 500);
+      } else if (serverGuesses.length > 0) {
+        resetGame();
+        setSolution('');
+        setGuesses(padded);
+        setEvaluations(serverEvaluations);
+        setCurrentGuessIndex(serverGuesses.length);
+        setAttempts(serverGuesses.length);
+        setStreak(gameState.streak || 0);
+        setKeyboardStatus(buildKeyboardStatus(serverGuesses, serverEvaluations));
       } else {
         resetGame();
+        setSolution('');
         setStreak(gameState.streak || 0);
-        
+
         setTimeout(() => {
             setShowHowToPlay(true);
-        }, 500); 
+        }, 500);
       }
     } catch (error) {
       console.error('Error loading game state:', error);
@@ -113,7 +137,8 @@ const WordleGameModal: React.FC<WordleGameModalProps> = ({ visible, onClose }) =
   };
 
   const resetGame = () => {
-    setGuesses(['', '', '', '', '', '']);
+    setGuesses(EMPTY_GUESSES);
+    setEvaluations([]);
     setCurrentGuessIndex(0);
     setCurrentGuess('');
     setMessage('');
@@ -122,28 +147,6 @@ const WordleGameModal: React.FC<WordleGameModalProps> = ({ visible, onClose }) =
     setGameWon(false);
     setStreakEnded(false);
     setAttempts(0);
-  };
-
-  const updateKeyboardStatus = (guess: string) => {
-    const newStatus = { ...keyboardStatus };
-    
-    for (let i = 0; i < guess.length; i++) {
-      const letter = guess[i];
-      const isCorrectPosition = solution[i] === letter;
-      const isPresentInWord = solution.includes(letter);
-      
-      if (isCorrectPosition) {
-        newStatus[letter] = 'correct';
-      }
-      else if (isPresentInWord && newStatus[letter] !== 'correct') {
-        newStatus[letter] = 'present';
-      }
-      else if (!isPresentInWord) {
-        newStatus[letter] = 'absent';
-      }
-    }
-    
-    setKeyboardStatus(newStatus);
   };
 
   const checkGuess = async () => {
@@ -161,58 +164,43 @@ const WordleGameModal: React.FC<WordleGameModalProps> = ({ visible, onClose }) =
     }
 
     setValidating(true);
+    let result;
     try {
-      const isValid = await WordleService.validateWord(currentGuess, accessToken);
-      
-      if (!isValid) {
-        setMessage('Not in word list');
-        setTimeout(() => setMessage(''), 2000);
-        setValidating(false);
-        return;
-      }
+      result = await WordleService.submitGuess(currentGuess, accessToken);
     } catch (error) {
-      console.error('Error validating word:', error);
-      setMessage('Error validating word');
+      setMessage('Could not submit your guess. Try again.');
       setTimeout(() => setMessage(''), 2000);
       setValidating(false);
       return;
     }
     setValidating(false);
 
+    if (!result.isValid || !result.evaluation) {
+      setMessage('Not in word list');
+      setTimeout(() => setMessage(''), 2000);
+      return;
+    }
+
     const newGuesses = [...guesses];
     newGuesses[currentGuessIndex] = currentGuess;
+    const newEvaluations = [...evaluations];
+    newEvaluations[currentGuessIndex] = result.evaluation;
+
     setGuesses(newGuesses);
-    
-    updateKeyboardStatus(currentGuess);
+    setEvaluations(newEvaluations);
+    setKeyboardStatus(buildKeyboardStatus([currentGuess], [result.evaluation], keyboardStatus));
+    setAttempts(currentGuessIndex + 1);
 
-    const isWin = currentGuess.toUpperCase() === solution.toUpperCase();
-    const isLastAttempt = currentGuessIndex === 5;
-    const finalAttempts = currentGuessIndex + 1;
-    setAttempts(finalAttempts);
-
-    if (isWin || isLastAttempt) {
+    if (result.finished) {
       setGameOver(true);
-      setGameWon(isWin);
+      setGameWon(!!result.won);
+      setSolution(result.word || '');
+      setStreak(result.streak ?? 0);
+      setStreakEnded(result.streakEnded || false);
 
-      try {
-        const result = await WordleService.submitGame({
-          guesses: newGuesses.filter(g => g !== ''),
-          won: isWin,
-          word: solution
-        }, accessToken);
-
-        setStreak(result.streak);
-        setStreakEnded(result.streakEnded || false);
-
-      } catch (error) {
-        console.error('Error submitting game:', error);
-        setMessage('Game submitted with error. Check backend logs.');
-      }
-      
       setTimeout(() => {
         setShowResult(true);
-      }, 1000); 
-
+      }, 1000);
     } else {
       setCurrentGuessIndex(currentGuessIndex + 1);
       setCurrentGuess('');
@@ -220,7 +208,7 @@ const WordleGameModal: React.FC<WordleGameModalProps> = ({ visible, onClose }) =
   };
 
   const handleKeyPress = (key: string) => {
-    if (gameOver || validating || !solution) return;
+    if (gameOver || validating) return;
     
     if (currentGuess.length < 5 && key !== 'ENTER' && key !== 'BACKSPACE') {
       setCurrentGuess(currentGuess + key.toUpperCase());
@@ -232,11 +220,10 @@ const WordleGameModal: React.FC<WordleGameModalProps> = ({ visible, onClose }) =
   };
 
   const getTileStyle = (letter: string, guessIndex: number, letterIndex: number) => {
-    const guess = guesses[guessIndex];
-    const hasGuess = guessIndex < currentGuessIndex || (guessIndex === currentGuessIndex && gameOver);
-    
-    if (!hasGuess) {
-      if (guessIndex === currentGuessIndex && letterIndex < currentGuess.length) {
+    const evaluation = evaluations[guessIndex]?.[letterIndex];
+
+    if (!evaluation) {
+      if (guessIndex === currentGuessIndex && !gameOver && letterIndex < currentGuess.length) {
         return {
           backgroundColor: colors.backgroundSecondary,
           borderColor: colors.primary,
@@ -250,16 +237,13 @@ const WordleGameModal: React.FC<WordleGameModalProps> = ({ visible, onClose }) =
       };
     }
 
-    const isCorrectPosition = guess[letterIndex] === solution[letterIndex];
-    const isCorrectLetter = solution.includes(guess[letterIndex]);
-
-    if (isCorrectPosition) {
+    if (evaluation === 'green') {
       return {
         backgroundColor: '#6aaa64',
         borderColor: '#6aaa64',
         borderWidth: 2,
       };
-    } else if (isCorrectLetter) {
+    } else if (evaluation === 'yellow') {
       return {
         backgroundColor: '#c9b458',
         borderColor: '#c9b458',
@@ -276,7 +260,7 @@ const WordleGameModal: React.FC<WordleGameModalProps> = ({ visible, onClose }) =
 
   const renderTile = (letter: string, guessIndex: number, letterIndex: number) => {
     const tileStyle = getTileStyle(letter, guessIndex, letterIndex);
-    const textColor = tileStyle.backgroundColor === 'transparent' ? colors.text : 'white';
+    const textColor = evaluations[guessIndex]?.[letterIndex] ? 'white' : colors.text;
 
     return (
       <View key={letterIndex} style={[styles.tile, tileStyle]}>
@@ -326,7 +310,7 @@ const WordleGameModal: React.FC<WordleGameModalProps> = ({ visible, onClose }) =
                     keyStyle,
                   ]}
                   onPress={() => handleKeyPress(key)}
-                  disabled={validating || !solution}
+                  disabled={validating || gameOver}
                 >
                   {key === 'BACKSPACE' ? (
                     <Ionicons name="backspace-outline" size={16} color={textColor} />

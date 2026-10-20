@@ -47,7 +47,7 @@ class NotificationService {
     return await _get(`notifications?page=${page}&limit=${limit}`, token);
   }
 
-  static async getUnreadNotificationCount(token: string): Promise<UnreadNotificationCountResponse> { // New method
+  static async getUnreadNotificationCount(token: string): Promise<UnreadNotificationCountResponse> {
     return await _get(`notifications/unread-count`, token);
   }
 

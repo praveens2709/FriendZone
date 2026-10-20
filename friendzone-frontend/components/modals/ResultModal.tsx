@@ -5,6 +5,7 @@ import ThemedModal from "@/components/ThemedModal";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/context/ThemeContext";
+import CircleBoard from "@/components/CircleBoard";
 
 interface ResultModalProps {
   visible: boolean;
@@ -30,7 +31,6 @@ const ResultModal: React.FC<ResultModalProps> = ({
   return (
     <ThemedModal visible={visible} onClose={onClose}>
       <ThemedView style={styles.container}>
-        {/* Header with close icon */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -40,10 +40,8 @@ const ResultModal: React.FC<ResultModalProps> = ({
           <View style={{ flex: 1 }} />
         </View>
 
-        {/* Main Content */}
         {won ? (
           <>
-            {/* Success Icon */}
             <View style={styles.iconContainer}>
               <View style={[styles.iconCircle, { backgroundColor: '#6aaa64' }]}>
                 <MaterialIcons name="celebration" size={64} color="white" />
@@ -80,7 +78,6 @@ const ResultModal: React.FC<ResultModalProps> = ({
           </>
         ) : (
           <>
-            {/* Failure Icon */}
             <View style={styles.iconContainer}>
               <View style={[styles.iconCircle, { backgroundColor: '#e74c3c' }]}>
                 <MaterialIcons name="sentiment-dissatisfied" size={64} color="white" />
@@ -116,6 +113,7 @@ const ResultModal: React.FC<ResultModalProps> = ({
             </ThemedText>
           </>
         )}
+        <CircleBoard visible={visible} />
       </ThemedView>
     </ThemedModal>
   );
