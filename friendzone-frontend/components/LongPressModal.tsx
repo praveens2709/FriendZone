@@ -21,11 +21,16 @@ interface LongPressModalProps {
   onClose: () => void;
   selectedMessage: MessageResponse | null;
   onReply: () => void;
+  onEdit: () => void;
+  onReact: (emoji: string) => void;
   onDeleteForMe: () => void;
   onUnsend: () => void;
   myUserId: string;
   modalPosition: { x: number; y: number } | null;
 }
+
+export const REACTION_EMOJIS = ["❤️", "😂", "😮", "😢", "👍", "🔥"];
+const EDIT_WINDOW_MS = 15 * 60 * 1000;
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 
@@ -34,6 +39,8 @@ export const LongPressModal: React.FC<LongPressModalProps> = ({
   onClose,
   selectedMessage,
   onReply,
+  onEdit,
+  onReact,
   onDeleteForMe,
   onUnsend,
   myUserId,
@@ -71,12 +78,25 @@ export const LongPressModal: React.FC<LongPressModalProps> = ({
   const isMyMessage = selectedMessage.sender === myUserId;
   const isTempMessage = selectedMessage.isTemp;
 
+  const canEdit =
+    isMyMessage &&
+    !isTempMessage &&
+    !!selectedMessage.text &&
+    Date.now() - new Date(selectedMessage.timestamp).getTime() < EDIT_WINDOW_MS;
+  const myReaction = selectedMessage.reactions?.find((r) => r.user === myUserId)?.emoji;
+
   const modalOptions = [
     {
       text: "Reply",
       icon: <Feather name="corner-up-left" size={24} color={colors.text} />,
       action: onReply,
       show: true,
+    },
+    {
+      text: "Edit",
+      icon: <Feather name="edit-2" size={22} color={colors.text} />,
+      action: onEdit,
+      show: canEdit,
     },
     {
       text: "Unsend",
@@ -94,11 +114,9 @@ export const LongPressModal: React.FC<LongPressModalProps> = ({
 
   const filteredOptions = modalOptions.filter((option) => option.show);
 
-  // Calculate modal position
   let modalTop = modalPosition.y - modalLayout.height - 20;
   let modalLeft = modalPosition.x - modalLayout.width / 2;
 
-  // Ensure modal is not off-screen vertically
   if (modalTop < insets.top) {
     modalTop = modalPosition.y + 20;
   }
@@ -106,7 +124,6 @@ export const LongPressModal: React.FC<LongPressModalProps> = ({
     modalTop = screenHeight - modalLayout.height - insets.bottom - 20;
   }
 
-  // Ensure modal is not off-screen horizontally
   if (modalLeft < 10) {
     modalLeft = 10;
   }
@@ -145,6 +162,25 @@ export const LongPressModal: React.FC<LongPressModalProps> = ({
           ]}
           onLayout={handleLayout}
         >
+          {!isTempMessage && (
+            <ThemedView style={[styles.reactionRow, { borderBottomColor: colors.border }]}>
+              {REACTION_EMOJIS.map((emoji) => (
+                <TouchableOpacity
+                  key={emoji}
+                  onPress={() => {
+                    onReact(emoji);
+                    onClose();
+                  }}
+                  style={[
+                    styles.reactionButton,
+                    myReaction === emoji && { backgroundColor: colors.buttonBackgroundSecondary },
+                  ]}
+                >
+                  <ThemedText style={styles.reactionEmoji}>{emoji}</ThemedText>
+                </TouchableOpacity>
+              ))}
+            </ThemedView>
+          )}
           {filteredOptions.map((option, index) => (
             <TouchableOpacity
               key={index}
@@ -163,7 +199,12 @@ export const LongPressModal: React.FC<LongPressModalProps> = ({
                 onClose();
               }}
             >
-              <ThemedView style={styles.modalIconWrapper}>
+              <ThemedView
+                style={[
+                  styles.modalIconWrapper,
+                  { backgroundColor: colors.buttonBackgroundSecondary },
+                ]}
+              >
                 {option.icon}
               </ThemedView>
               <ThemedText style={[styles.modalButtonText, { color: colors.text }]}>
@@ -193,10 +234,29 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.3,
     shadowRadius: 4.65,
-    minWidth: 200,
-    maxWidth: 250,
+    minWidth: 260,
+    maxWidth: 300,
     alignItems: 'flex-start',
     borderWidth: 1,
+  },
+  reactionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingBottom: 8,
+    marginBottom: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  reactionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reactionEmoji: {
+    fontSize: 22,
+    lineHeight: 28,
   },
   modalButton: {
     flexDirection: 'row',
@@ -209,7 +269,6 @@ const styles = StyleSheet.create({
     width: 35,
     height: 35,
     borderRadius: 17.5,
-    backgroundColor: '#383838',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,

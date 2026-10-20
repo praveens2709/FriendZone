@@ -1,3 +1,4 @@
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet,
@@ -10,7 +11,6 @@ import {
   Dimensions,
   TouchableOpacity,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
@@ -134,7 +134,7 @@ export default function NewChatScreen() {
       setUsers(sortedUsers);
     } catch (error: any) {
       console.error("Failed to fetch potential chat users:", error);
-      console.log("error", "Failed to load users for new chat.");
+
       setUsers([]);
     } finally {
       setIsLoading(false);
@@ -196,7 +196,7 @@ export default function NewChatScreen() {
           setUsers(processedSearchResults);
         } catch (error) {
           console.error("Error searching users:", error);
-          console.log("error", "Failed to search users.");
+
           setUsers([]);
         } finally {
           setIsSearching(false);
@@ -223,7 +223,6 @@ export default function NewChatScreen() {
     recipientAvatar: string | null
   ) => {
     if (!accessToken) {
-      console.log("error", "You are not authenticated.");
       return;
     }
     if (creatingChatId) return;
@@ -244,11 +243,7 @@ export default function NewChatScreen() {
       });
     } catch (error: any) {
       console.error("Failed to create chat:", error);
-      console.log(
-        "error",
-        error.response?.data?.message ||
-        "Failed to create chat. Please try again."
-      );
+
     } finally {
       setCreatingChatId(null);
     }
@@ -288,7 +283,7 @@ export default function NewChatScreen() {
     (isSearching && users.length === 0);
 
   return (
-    <LinearGradient colors={colors.gradient} style={styles.container}>
+    <ScreenBackground style={styles.container}>
       <ThemedSafeArea style={styles.safeArea}>
         <CommonHeader
           leftContent={<BackButton color={colors.text} />}
@@ -337,7 +332,6 @@ export default function NewChatScreen() {
             )}
           </ThemedView>
 
-          {/* Group Chat Option */}
           <TouchableOpacity
             style={styles.groupChatOption}
             onPress={navigateToGroupChat}
@@ -409,7 +403,7 @@ export default function NewChatScreen() {
           )}
         </KeyboardAvoidingView>
       </ThemedSafeArea>
-    </LinearGradient>
+    </ScreenBackground>
   );
 }
 
@@ -483,6 +477,7 @@ const styles = StyleSheet.create({
   listContent: {
     flexGrow: 1,
     paddingHorizontal: 10,
+    paddingTop: 8,
   },
   separator: {
     height: StyleSheet.hairlineWidth,

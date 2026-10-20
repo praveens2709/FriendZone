@@ -1,3 +1,4 @@
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   StyleSheet,
@@ -7,12 +8,11 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import CommonHeader from "@/components/CommonHeader";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import BackButton from "@/components/BackButton";
@@ -291,6 +291,12 @@ export default function ChatsScreen() {
     }
   }, [socket, user?._id]);
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchChats(1);
+    }, [fetchChats])
+  );
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     setPage(1);
@@ -518,7 +524,13 @@ export default function ChatsScreen() {
 
     return (
       <TouchableOpacity
-        style={styles.chatItem}
+        style={[
+          styles.chatItem,
+          {
+            backgroundColor: isSelected ? colors.selectedItemBackground : colors.backgroundSecondary,
+            borderColor: isSelected ? colors.primary : colors.border,
+          },
+        ]}
         onPress={() =>
           isSelectionMode
             ? toggleSelectChat(item.id)
@@ -585,7 +597,7 @@ export default function ChatsScreen() {
 
   if (isLoading) {
     return (
-      <LinearGradient colors={colors.gradient} style={styles.gradientContainer}>
+      <ScreenBackground style={styles.gradientContainer}>
         <ThemedSafeArea style={styles.safeArea}>
           <CommonHeader
             leftContent={<BackButton color={colors.text} />}
@@ -608,7 +620,7 @@ export default function ChatsScreen() {
             </ThemedText>
           </ThemedView>
         </ThemedSafeArea>
-      </LinearGradient>
+      </ScreenBackground>
     );
   }
 
@@ -646,7 +658,7 @@ export default function ChatsScreen() {
   );
 
   return (
-    <LinearGradient colors={colors.gradient} style={styles.gradientContainer}>
+    <ScreenBackground style={styles.gradientContainer}>
       <ThemedSafeArea style={styles.safeArea}>
         <CommonHeader
           leftContent={headerLeftContent}
@@ -750,7 +762,7 @@ export default function ChatsScreen() {
           </ThemedView>
         </ThemedModal>
       </ThemedSafeArea>
-    </LinearGradient>
+    </ScreenBackground>
   );
 }
 
@@ -791,8 +803,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 12,
-    paddingHorizontal: 20,
-    backgroundColor: "transparent",
+    paddingHorizontal: 14,
+    marginHorizontal: 14,
+    marginBottom: 8,
+    borderRadius: 18,
+    borderWidth: 1,
   },
   checkboxContainer: {
     paddingRight: 15,
@@ -853,8 +868,7 @@ const styles = StyleSheet.create({
     marginTop: -1,
   },
   separator: {
-    height: StyleSheet.hairlineWidth,
-    marginHorizontal: 15,
+    height: 0,
   },
   emptyListContainer: {
     flex: 1,

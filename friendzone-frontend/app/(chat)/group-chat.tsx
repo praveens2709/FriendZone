@@ -1,3 +1,4 @@
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet,
@@ -10,7 +11,6 @@ import {
   Dimensions,
   TouchableOpacity,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
@@ -31,6 +31,7 @@ import UserSearchLoader from "@/components/UserSearchLoader";
 import { DisplayUser } from "@/types/chat.type";
 import Button from "@/components/Button";
 
+import InlineError from "@/components/InlineError";
 const screenWidth = Dimensions.get("window").width;
 const LIST_ITEM_HORIZONTAL_PADDING = 10;
 
@@ -51,6 +52,7 @@ export default function GroupChatScreen() {
   const [isSearching, setIsSearching] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
+  const [createError, setCreateError] = useState("");
   const [groupName, setGroupName] = useState("");
 
   const listItemWidth = screenWidth - LIST_ITEM_HORIZONTAL_PADDING * 2;
@@ -143,7 +145,7 @@ export default function GroupChatScreen() {
       setUsers(sortedUsers);
     } catch (error: any) {
       console.error("Failed to fetch potential chat users:", error);
-      console.log("error", "Failed to load users for group chat.");
+
       setUsers([]);
     } finally {
       setIsLoading(false);
@@ -205,7 +207,7 @@ export default function GroupChatScreen() {
           setUsers(processedSearchResults);
         } catch (error) {
           console.error("Error searching users:", error);
-          console.log("error", "Failed to search users.");
+
           setUsers([]);
         } finally {
           setIsSearching(false);
@@ -232,10 +234,8 @@ export default function GroupChatScreen() {
     const isSelected = selectedUsers.find((u) => u.id === item.id);
 
     if (isSelected) {
-      // Deselect user
       setSelectedUsers((prev) => prev.filter((u) => u.id !== item.id));
     } else {
-      // Select user
       const newSelectedUser: SelectedUser = {
         id: item.id,
         username: item.username,
@@ -250,18 +250,10 @@ export default function GroupChatScreen() {
   };
 
   const handleCreateGroupChat = async () => {
-    if (!accessToken || selectedUsers.length < 2) {
-      console.log("error", "Please select at least 2 users for a group chat.");
-      return;
-    }
-
-    if (!groupName.trim()) {
-      console.log("error", "Please enter a group name.");
-      return;
-    }
-
+    if (!accessToken || selectedUsers.length < 2 || !groupName.trim()) return;
     if (isCreatingChat) return;
 
+    setCreateError("");
     setIsCreatingChat(true);
     try {
       const participantIds = selectedUsers.map((u) => u.id);
@@ -283,10 +275,8 @@ export default function GroupChatScreen() {
       });
     } catch (error: any) {
       console.error("Failed to create group chat:", error);
-      console.log(
-        "error",
-        error.response?.data?.message ||
-        "Failed to create group chat. Please try again."
+      setCreateError(
+        error.response?.data?.message || "Couldn't create the group. Try again."
       );
     } finally {
       setIsCreatingChat(false);
@@ -360,7 +350,7 @@ export default function GroupChatScreen() {
     (isSearching && users.length === 0);
 
   return (
-    <LinearGradient colors={colors.gradient} style={styles.container}>
+    <ScreenBackground style={styles.container}>
       <ThemedSafeArea style={styles.safeArea}>
         <CommonHeader
           leftContent={<BackButton color={colors.text} />}
@@ -384,7 +374,6 @@ export default function GroupChatScreen() {
           style={styles.content}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
-          {/* Group Name Input */}
           <ThemedView style={styles.groupNameSection}>
             <ThemedView
               style={[
@@ -414,7 +403,6 @@ export default function GroupChatScreen() {
             </ThemedView>
           </ThemedView>
 
-          {/* Selected Users Section */}
           {selectedUsers.length > 0 && (
             <ThemedView style={styles.selectedUsersSection}>
               <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
@@ -430,7 +418,6 @@ export default function GroupChatScreen() {
             </ThemedView>
           )}
 
-          {/* Search Section */}
           <ThemedView
             style={[
               styles.searchContainer,
@@ -470,7 +457,6 @@ export default function GroupChatScreen() {
             )}
           </ThemedView>
 
-          {/* Users List */}
           {showLoader ? (
             <ThemedView style={styles.loaderContainer}>
               {[...Array(5)].map((_, i) => (
@@ -513,9 +499,9 @@ export default function GroupChatScreen() {
             />
           )}
 
-          {/* Create Group Button */}
           {selectedUsers.length >= 2 && groupName.trim() && (
             <ThemedView style={styles.actionButtonContainer}>
+              <InlineError message={createError} style={{ marginBottom: 8 }} />
               <Button
                 onPress={handleCreateGroupChat}
                 disabled={isCreatingChat}
@@ -540,7 +526,7 @@ export default function GroupChatScreen() {
           )}
         </KeyboardAvoidingView>
       </ThemedSafeArea>
-    </LinearGradient>
+    </ScreenBackground>
   );
 }
 
@@ -649,6 +635,7 @@ const styles = StyleSheet.create({
   listContent: {
     flexGrow: 1,
     paddingHorizontal: 10,
+    paddingTop: 8,
     paddingBottom: 100,
   },
   separator: {

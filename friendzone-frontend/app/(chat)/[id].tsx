@@ -1,3 +1,4 @@
+import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   StyleSheet,
@@ -5,6 +6,7 @@ import {
   TouchableOpacity,
   FlatList,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   ActivityIndicator,
   Alert,
@@ -16,14 +18,13 @@ import {
   NativeTouchEvent,
 } from "react-native";
 import { PanGestureHandler } from "react-native-gesture-handler";
-import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { Ionicons, Feather, FontAwesome5, Entypo } from "@expo/vector-icons";
 import { Animated as RNAnimated } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import CommonHeader from "@/components/CommonHeader";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import BackButton from "@/components/BackButton";
@@ -36,14 +37,17 @@ import {
   compareMessageTimestamps,
   generateClientTempId,
 } from "@/constants/Functions";
+import MeetingService from "@/services/MeetingService";
 import ChatService, {
   MessageResponse,
+  MessageReaction,
   GetMessagesResponse,
   Attachment,
   ReplyToMessage,
 } from "@/services/ChatService";
 import TypingIndicator from "@/components/TypingIndicator";
 import MessageBubble from "@/components/MessageBubble";
+import VibeTag from "@/components/VibeTag";
 import FullImageViewer from "@/components/FullImageViewer";
 import { useAuth } from "@/context/AuthContext";
 import { useSocket } from "@/context/SocketContext";
@@ -83,6 +87,7 @@ export default function ChatMessagesScreen() {
   const { colors } = useTheme();
   const { accessToken, user } = useAuth();
   const { socket } = useSocket();
+  const router = useRouter();
 
   const {
     id: chatId,
@@ -113,6 +118,10 @@ export default function ChatMessagesScreen() {
     isRestricted === "true"
   );
   const [chatIsLockedIn, setChatIsLockedIn] = useState(isLockedIn === "true");
+  const [chatType, setChatType] = useState<"private" | "group">("private");
+  const [liveName, setLiveName] = useState(chatName);
+  const [liveAvatar, setLiveAvatar] = useState(chatAvatar);
+  const [otherVibe, setOtherVibe] = useState<{ kind: string; note?: string } | null>(null);
   const [knockerId, setKnockerId] = useState<string | null>(
     firstMessageByKnockerId || null
   );
@@ -121,7 +130,7 @@ export default function ChatMessagesScreen() {
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [showMediaPicker, setShowMediaPicker] = useState(false);
 
-  // Reply functionality states
+  const [editingMessage, setEditingMessage] = useState<MessageResponse | null>(null);
   const [replyToMessage, setReplyToMessage] = useState<MessageResponse | null>(
     null
   );
@@ -142,6 +151,29 @@ export default function ChatMessagesScreen() {
 
   const recordingRef = useRef<Audio.Recording | null>(null);
   const flatListRef = useRef<FlatList<MessageResponse>>(null);
+  const atBottomRef = useRef(true);
+
+  const stickToBottom = useCallback(() => {
+    if (!atBottomRef.current) return;
+    requestAnimationFrame(() =>
+      flatListRef.current?.scrollToEnd({ animated: false })
+    );
+  }, []);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const show = Keyboard.addListener(showEvent, () => {
+      setTimeout(stickToBottom, 60);
+    });
+    const hide = Keyboard.addListener(hideEvent, () => {
+      setTimeout(stickToBottom, 60);
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [stickToBottom]);
   const loadingMoreRef = useRef(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -166,18 +198,7 @@ export default function ChatMessagesScreen() {
           await ImagePicker.requestCameraPermissionsAsync();
         const { status: galleryStatus } =
           await ImagePicker.requestMediaLibraryPermissionsAsync();
-        const { status: audioStatus } = await Audio.requestPermissionsAsync();
-
-        if (
-          cameraStatus !== "granted" ||
-          galleryStatus !== "granted" ||
-          audioStatus !== "granted"
-        ) {
-          Alert.alert(
-            "Permissions Required",
-            "Camera, gallery, and microphone permissions are needed to use these features."
-          );
-        }
+        await Audio.requestPermissionsAsync();
       }
     })();
   }, []);
@@ -206,7 +227,7 @@ export default function ChatMessagesScreen() {
       startRecordingAnimation();
     } catch (err) {
       console.error("Failed to start recording", err);
-      console.log("error", "Failed to start voice recording.");
+
       cancelRecording();
     }
   };
@@ -348,7 +369,7 @@ export default function ChatMessagesScreen() {
       isStoppingOrSendingRef.current = false;
     } catch (error) {
       console.error("Failed to stop recording", error);
-      console.log("error", "Failed to stop voice recording.");
+
       cancelRecording();
       isStoppingOrSendingRef.current = false;
     }
@@ -400,14 +421,9 @@ export default function ChatMessagesScreen() {
     ) => {
       const currentUserId = user?._id?.toString();
       if (!accessToken || !chatId || !currentUserId) {
-        console.log(
-          "error",
-          "Failed to send message: Missing user or chat info."
-        );
         return;
       }
       if (chatIsRestricted && !chatIsLockedIn && knockerId === currentUserId) {
-        console.log("error", "The recipient needs to reply to unlock this chat.");
         return;
       }
       setIsSendingMessage(true);
@@ -474,7 +490,7 @@ export default function ChatMessagesScreen() {
         );
       } catch (error) {
         console.error("Failed to send message with attachment:", error);
-        console.log("error", "Failed to send message. Please try again.");
+
         setCurrentMessages((prevMessages) =>
           prevMessages.filter((msg) => msg.id !== clientTempId)
         );
@@ -522,7 +538,7 @@ export default function ChatMessagesScreen() {
       }
     } catch (e) {
       console.error(e);
-      console.log("error", "Failed to capture image.");
+
     }
   }, [sendMediaMessage]);
 
@@ -555,7 +571,7 @@ export default function ChatMessagesScreen() {
       }
     } catch (e) {
       console.error(e);
-      console.log("error", "Failed to pick image from gallery.");
+
     }
   }, [sendMediaMessage]);
 
@@ -577,7 +593,7 @@ export default function ChatMessagesScreen() {
       }
     } catch (error) {
       console.error("Document picking failed:", error);
-      console.log("error", "Failed to pick file.");
+
     }
   }, [sendMediaMessage]);
 
@@ -620,9 +636,14 @@ export default function ChatMessagesScreen() {
         );
         setChatIsRestricted(response.isRestricted);
         setChatIsLockedIn(response.isLockedIn);
+        setChatType(response.chatType ?? "private");
+        if (response.chatType === "group") {
+          if (response.chatName) setLiveName(response.chatName);
+          setLiveAvatar(response.chatAvatar || "");
+        }
+        setOtherVibe(response.otherVibe ?? null);
         setKnockerId(response.firstMessageByKnockerId || null);
       } catch (error: any) {
-        console.log("error", "Failed to load messages. Please try again.");
       } finally {
         if (initialLoad) setIsLoadingMessages(false);
         loadingMoreRef.current = false;
@@ -672,6 +693,15 @@ export default function ChatMessagesScreen() {
   useEffect(() => {
     if (socket) {
       const currentUserId = user?._id?.toString();
+      const handleGroupUpdated = async ({ chatId: updatedId }: { chatId: string }) => {
+        if (updatedId !== chatId) return;
+        try {
+          const info = await ChatService.getGroupInfo(chatId);
+          setLiveName(info.name);
+          setLiveAvatar(info.avatar || "");
+        } catch {}
+      };
+
       const handleNewMessage = (message: any) => {
         if (message.chat === chatId) {
           const messageSenderId =
@@ -683,12 +713,15 @@ export default function ChatMessagesScreen() {
           const formattedMessage: MessageResponse = {
             id: message.id || message._id,
             sender: messageSenderId,
+            type: message.type === "system" ? "system" : "user",
             text: message.text,
             attachments: message.attachments,
             timestamp: message.timestamp || new Date().toISOString(),
             read: message.read,
             isTemp: false,
             replyTo: message.replyTo || null,
+            reactions: message.reactions || [],
+            editedAt: message.editedAt || null,
           };
           setCurrentMessages((prevMessages) => {
             let updatedMessages = [...prevMessages];
@@ -763,7 +796,7 @@ export default function ChatMessagesScreen() {
         setCurrentMessages((prevMessages) =>
           prevMessages.filter((msg) => msg.id !== clientTempId)
         );
-        console.log("error", error || "Your message could not be sent.");
+
         setIsSendingMessage(false);
       };
       const handleTyping = ({
@@ -816,20 +849,62 @@ export default function ChatMessagesScreen() {
           );
         }
       };
+      const handleMessageEdited = ({
+        chatId: editedChatId,
+        messageId,
+        text,
+        editedAt,
+      }: {
+        chatId: string;
+        messageId: string;
+        text: string;
+        editedAt: string;
+      }) => {
+        if (editedChatId !== chatId) return;
+        setCurrentMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === messageId
+              ? { ...msg, text, editedAt }
+              : msg.replyTo?.id === messageId
+              ? { ...msg, replyTo: { ...msg.replyTo, text } }
+              : msg
+          )
+        );
+      };
+      const handleMessageReacted = ({
+        chatId: reactedChatId,
+        messageId,
+        reactions,
+      }: {
+        chatId: string;
+        messageId: string;
+        reactions: MessageReaction[];
+      }) => {
+        if (reactedChatId !== chatId) return;
+        setCurrentMessages((prev) =>
+          prev.map((msg) => (msg.id === messageId ? { ...msg, reactions } : msg))
+        );
+      };
+      socket.on("messageEdited", handleMessageEdited);
+      socket.on("messageReacted", handleMessageReacted);
       socket.on("message", handleNewMessage);
       socket.on("messagesRead", handleMessagesRead);
       socket.on("messageFailed", handleMessageFailed);
       socket.on("typing", handleTyping);
       socket.on("stopTyping", handleStopTyping);
       socket.on("messageDeleted", handleMessageDeleted);
+      socket.on("groupUpdated", handleGroupUpdated);
       socket.on("messageDeletedForUser", handleMessageDeletedForUser);
       return () => {
+        socket.off("messageEdited", handleMessageEdited);
+        socket.off("messageReacted", handleMessageReacted);
         socket.off("message", handleNewMessage);
         socket.off("messagesRead", handleMessagesRead);
         socket.off("messageFailed", handleMessageFailed);
         socket.off("typing", handleTyping);
         socket.off("stopTyping", handleStopTyping);
         socket.off("messageDeleted", handleMessageDeleted);
+        socket.off("groupUpdated", handleGroupUpdated);
         socket.off("messageDeletedForUser", handleMessageDeletedForUser);
       };
     }
@@ -855,7 +930,39 @@ export default function ChatMessagesScreen() {
     }
   };
 
+  const submitEdit = async () => {
+    const target = editingMessage;
+    const text = messageText.trim();
+    if (!target || !accessToken || !text || isSendingMessage) return;
+    if (text === (target.text || "")) {
+      setEditingMessage(null);
+      setMessageText("");
+      return;
+    }
+    setIsSendingMessage(true);
+    try {
+      const result = await ChatService.editMessage(accessToken, target.id, text);
+      setCurrentMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === target.id
+            ? { ...msg, text: result.text, editedAt: result.editedAt }
+            : msg
+        )
+      );
+      setEditingMessage(null);
+      setMessageText("");
+    } catch (error: any) {
+      console.error("Failed to edit message:", error);
+    } finally {
+      setIsSendingMessage(false);
+    }
+  };
+
   const handleSendMessage = async () => {
+    if (editingMessage) {
+      await submitEdit();
+      return;
+    }
     const currentUserId = user?._id?.toString();
     if (
       messageText.trim().length === 0 ||
@@ -866,10 +973,6 @@ export default function ChatMessagesScreen() {
     )
       return;
     if (chatIsRestricted && !chatIsLockedIn && knockerId === currentUserId) {
-      console.log(
-        "error",
-        "You've already sent your first message in this restricted chat. The recipient needs to reply to unlock it."
-      );
       return;
     }
     setIsSendingMessage(true);
@@ -908,7 +1011,7 @@ export default function ChatMessagesScreen() {
       return newMessages;
     });
     setMessageText("");
-    setReplyToMessage(null); // Clear reply after sending
+    setReplyToMessage(null);
     flatListRef.current?.scrollToEnd({ animated: true });
     if (user?._id) {
       socket?.emit("stopTyping", { chatId, userId: user._id.toString() });
@@ -925,7 +1028,6 @@ export default function ChatMessagesScreen() {
         clientTempId: clientTempId,
       });
     } catch (error: any) {
-      console.log("error", "Failed to send message. Please try again.");
       setCurrentMessages((prevMessages) =>
         prevMessages.filter((msg) => msg.id !== clientTempId)
       );
@@ -941,11 +1043,22 @@ export default function ChatMessagesScreen() {
     }
   };
 
+  const startCall = async (audioOnly: boolean) => {
+    if (!chatId) return;
+    try {
+      const result = await MeetingService.startCall(chatId, audioOnly);
+      router.push(
+        `/live-meeting/${result.meetingId}?isHost=true&audio=${audioOnly ? 1 : 0}&instant=1`
+      );
+    } catch (error: any) {
+    }
+  };
+
   const showTypingIndicator = typingUsers.size > 0;
 
   if (!chatId) {
     return (
-      <LinearGradient colors={colors.gradient} style={styles.container}>
+      <ScreenBackground style={styles.container}>
         <ThemedSafeArea style={styles.safeArea}>
           <CommonHeader
             leftContent={<BackButton color={colors.text} />}
@@ -957,7 +1070,7 @@ export default function ChatMessagesScreen() {
             </ThemedText>
           </ThemedView>
         </ThemedSafeArea>
-      </LinearGradient>
+      </ScreenBackground>
     );
   }
 
@@ -988,10 +1101,10 @@ export default function ChatMessagesScreen() {
       setCurrentMessages((prev) =>
         prev.filter((msg) => msg.id !== selectedMessage?.id)
       );
-      console.log("success", "Message deleted for you.");
+
     } catch (error) {
       console.error("Failed to delete message for you:", error);
-      console.log("error", "Failed to delete message.");
+
     } finally {
       closeLongPressModal();
     }
@@ -1001,10 +1114,10 @@ export default function ChatMessagesScreen() {
     if (!selectedMessage || !accessToken) return;
     try {
       await ChatService.deleteMessage(accessToken, selectedMessage.id, true);
-      console.log("success", "Message unsent.");
+
     } catch (error) {
       console.error("Failed to unsend message:", error);
-      console.log("error", "Failed to unsend message.");
+
     } finally {
       closeLongPressModal();
     }
@@ -1012,8 +1125,49 @@ export default function ChatMessagesScreen() {
 
   const handleReply = () => {
     if (selectedMessage) {
+      setEditingMessage(null);
       setReplyToMessage(selectedMessage);
       closeLongPressModal();
+    }
+  };
+
+  const handleEdit = () => {
+    if (selectedMessage) {
+      setReplyToMessage(null);
+      setEditingMessage(selectedMessage);
+      setMessageText(selectedMessage.text || "");
+      closeLongPressModal();
+    }
+  };
+
+  const cancelEdit = () => {
+    setEditingMessage(null);
+    setMessageText("");
+  };
+
+  const handleReact = async (emoji: string) => {
+    const target = selectedMessage;
+    const myId = user?._id?.toString();
+    if (!target || !accessToken || !myId) return;
+    closeLongPressModal();
+    const previous = target.reactions || [];
+    const mine = previous.find((r) => r.user === myId);
+    const next = previous.filter((r) => r.user !== myId);
+    if (!mine || mine.emoji !== emoji) next.push({ user: myId, emoji });
+    setCurrentMessages((prev) =>
+      prev.map((msg) => (msg.id === target.id ? { ...msg, reactions: next } : msg))
+    );
+    try {
+      const result = await ChatService.reactToMessage(accessToken, target.id, emoji);
+      setCurrentMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === target.id ? { ...msg, reactions: result.reactions } : msg
+        )
+      );
+    } catch {
+      setCurrentMessages((prev) =>
+        prev.map((msg) => (msg.id === target.id ? { ...msg, reactions: previous } : msg))
+      );
     }
   };
 
@@ -1075,14 +1229,54 @@ export default function ChatMessagesScreen() {
             </ThemedText>
           </ThemedView>
         )}
+        {item.type === "system" ? (
+          <ThemedView style={styles.systemMessage}>
+            <ThemedText style={[styles.systemMessageText, { color: colors.textDim }]}>
+              {item.text}
+            </ThemedText>
+          </ThemedView>
+        ) : (
         <MessageBubble
           message={item}
           isMyMessage={isMyMessage}
           isTemp={item.isTemp || false}
+          myUserId={myUserIdString || ""}
           onImagePress={handleImagePress}
           onLongPress={handleLongPress}
         />
+        )}
       </>
+    );
+  };
+
+  const EditPreview = () => {
+    if (!editingMessage) return null;
+    return (
+      <ThemedView
+        style={[
+          styles.replyPreviewContainer,
+          {
+            backgroundColor: colors.backgroundSecondary,
+            borderLeftColor: colors.primary,
+          },
+        ]}
+      >
+        <ThemedView style={styles.replyPreviewContent}>
+          <ThemedText style={[styles.replyPreviewSender, { color: colors.primary }]}>
+            Editing message
+          </ThemedText>
+          <ThemedText
+            style={[styles.replyPreviewText, { color: colors.textDim }]}
+            numberOfLines={2}
+            ellipsizeMode="tail"
+          >
+            {editingMessage.text}
+          </ThemedText>
+        </ThemedView>
+        <TouchableOpacity onPress={cancelEdit} style={styles.replyPreviewCancelButton}>
+          <Ionicons name="close" size={20} color={colors.textDim} />
+        </TouchableOpacity>
+      </ThemedView>
     );
   };
 
@@ -1144,29 +1338,41 @@ export default function ChatMessagesScreen() {
       <CommonHeader
         leftContent={<BackButton color={colors.text} />}
         titleComponent={
-          <ThemedView style={styles.headerTitleContainer}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            disabled={chatType !== "group"}
+            onPress={() =>
+              router.push({ pathname: "/(chat)/group-info", params: { id: chatId } })
+            }
+            style={styles.headerTitleContainer}
+          >
             <UserAvatar
-              imageUri={chatAvatar}
+              imageUri={liveAvatar}
               size={32}
               style={styles.headerAvatar}
             />
-            <ThemedText
-              style={[styles.headerTitleText, { color: colors.text }]}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {chatName}
-            </ThemedText>
-            {showTypingIndicator && <AnimatedTypingText />}
-          </ThemedView>
+            <ThemedView style={styles.headerTextColumn}>
+              <ThemedText
+                style={[styles.headerTitleText, { color: colors.text }]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {liveName}
+              </ThemedText>
+              {otherVibe && !showTypingIndicator && (
+                <VibeTag kind={otherVibe.kind} compact />
+              )}
+              {showTypingIndicator && <AnimatedTypingText />}
+            </ThemedView>
+          </TouchableOpacity>
         }
         rightContent1={
-          <TouchableOpacity style={styles.iconButton}>
+          <TouchableOpacity style={styles.iconButton} onPress={() => startCall(true)}>
             <Feather name="phone" size={24} color={colors.text} />
           </TouchableOpacity>
         }
         rightContent2={
-          <TouchableOpacity style={styles.iconButton}>
+          <TouchableOpacity style={styles.iconButton} onPress={() => startCall(false)}>
             <Feather name="video" size={24} color={colors.text} />
           </TouchableOpacity>
         }
@@ -1175,8 +1381,7 @@ export default function ChatMessagesScreen() {
         style={styles.keyboardAvoidingContainer}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <LinearGradient
-          colors={colors.gradient}
+        <ScreenBackground
           style={styles.gradientMessagesContainer}
         >
           {isLoadingMessages && page === 1 ? (
@@ -1199,8 +1404,19 @@ export default function ChatMessagesScreen() {
               }
               contentContainerStyle={styles.messagesList}
               inverted={false}
-              onEndReached={handleLoadOlderMessages}
-              onEndReachedThreshold={0.5}
+              onLayout={stickToBottom}
+              onContentSizeChange={stickToBottom}
+              onScroll={(e) => {
+                const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+                atBottomRef.current =
+                  contentOffset.y + layoutMeasurement.height >= contentSize.height - 80;
+              }}
+              scrollEventThrottle={16}
+              keyboardDismissMode="interactive"
+              keyboardShouldPersistTaps="handled"
+              onStartReached={handleLoadOlderMessages}
+              onStartReachedThreshold={0.3}
+              maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
               ListHeaderComponent={() =>
                 hasMoreChats &&
                 !isLoadingMessages &&
@@ -1219,9 +1435,10 @@ export default function ChatMessagesScreen() {
               }
             />
           )}
-        </LinearGradient>
+        </ScreenBackground>
         <ThemedView style={styles.inputContainerWrapper}>
           <ReplyPreview />
+          <EditPreview />
           <ThemedView
             style={[styles.inputContainer, { borderTopColor: colors.border }]}
           >
@@ -1325,7 +1542,11 @@ export default function ChatMessagesScreen() {
                   {isSendingMessage ? (
                     <ActivityIndicator size="small" color={colors.text} />
                   ) : (
-                    <Feather name="send" size={24} color={colors.text} />
+                    <Feather
+                      name={editingMessage ? "check" : "send"}
+                      size={24}
+                      color={colors.text}
+                    />
                   )}
                 </TouchableOpacity>
               ) : (
@@ -1409,6 +1630,8 @@ export default function ChatMessagesScreen() {
         onClose={closeLongPressModal}
         selectedMessage={selectedMessage}
         onReply={handleReply}
+        onEdit={handleEdit}
+        onReact={handleReact}
         onDeleteForMe={handleDeleteForYou}
         onUnsend={handleUnsend}
         myUserId={user?._id?.toString() || ""}
@@ -1419,6 +1642,18 @@ export default function ChatMessagesScreen() {
 }
 
 const styles = StyleSheet.create({
+  systemMessage: {
+    alignSelf: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    marginVertical: 6,
+    maxWidth: "85%",
+  },
+  systemMessageText: {
+    fontSize: 12,
+    textAlign: "center",
+    lineHeight: 17,
+  },
   safeArea: {
     flex: 1,
   },
@@ -1440,6 +1675,10 @@ const styles = StyleSheet.create({
   headerTitleContainer: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  headerTextColumn: {
+    flexShrink: 1,
+    gap: 2,
   },
   headerAvatar: {
     marginRight: 8,

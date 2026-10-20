@@ -101,7 +101,17 @@ export default function UserProfileCard({
       );
     }
 
-    return <ThemedView style={styles.cardContainer}>{content}</ThemedView>;
+    return (
+      <ThemedView
+        style={[
+          styles.cardContainer,
+          styles.plainCard,
+          { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
+        ]}
+      >
+        {content}
+      </ThemedView>
+    );
   };
 
   const renderBadge = () => {
@@ -136,6 +146,10 @@ export default function UserProfileCard({
 const styles = StyleSheet.create({
   touchableContainer: {
     position: "relative",
+  },
+  plainCard: {
+    borderWidth: 1,
+    borderRadius: 18,
   },
   cardContainer: {
     borderRadius: 8,

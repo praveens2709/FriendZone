@@ -8,6 +8,7 @@ import {
   NativeTouchEvent,
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
+import { readableTextOn } from "@/utils/theme-utils";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,6 +19,7 @@ interface MessageBubbleProps {
   message: MessageResponse;
   isMyMessage: boolean;
   isTemp: boolean;
+  myUserId: string;
   onImagePress: (uri: string) => void;
   onLongPress: (
     message: MessageResponse,
@@ -29,10 +31,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   isMyMessage,
   isTemp,
+  myUserId,
   onImagePress,
   onLongPress,
 }) => {
   const { colors } = useTheme();
+  const mineInk = readableTextOn(colors.primary, colors.buttonText);
+  const textColor = isMyMessage ? mineInk : colors.text;
 
   useEffect(() => {
     if (message.attachments) {
@@ -55,6 +60,17 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const hasAttachments = message.attachments && message.attachments.length > 0;
+
+  const reactionGroups = (message.reactions || []).reduce<
+    Record<string, { count: number; mine: boolean }>
+  >((acc, r) => {
+    const group = acc[r.emoji] || { count: 0, mine: false };
+    group.count += 1;
+    if (r.user === myUserId) group.mine = true;
+    acc[r.emoji] = group;
+    return acc;
+  }, {});
+  const reactionEntries = Object.entries(reactionGroups);
 
   return (
     <TouchableOpacity
@@ -119,11 +135,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                     <Ionicons
                       name="document"
                       size={24}
-                      color={isMyMessage ? colors.buttonText : colors.text}
+                      color={textColor}
                     />
                     <ThemedText
                       style={{
-                        color: isMyMessage ? colors.buttonText : colors.text,
+                        color: textColor,
                         flex: 1,
                         marginLeft: 8,
                       }}
@@ -141,7 +157,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           <ThemedText
             style={[
               styles.messageText,
-              { color: isMyMessage ? colors.buttonText : colors.text },
+              { color: textColor },
               hasAttachments ? { marginBottom: 0 } : {},
             ]}
           >
@@ -149,10 +165,15 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           </ThemedText>
         ) : null}
         <ThemedView style={styles.messageMeta}>
+          {message.editedAt ? (
+            <ThemedText style={[styles.messageTimestamp, { color: textColor, marginRight: 4 }]}>
+              edited
+            </ThemedText>
+          ) : null}
           <ThemedText
             style={[
               styles.messageTimestamp,
-              { color: isMyMessage ? colors.buttonText : colors.text },
+              { color: textColor },
             ]}
           >
             {message.timestamp
@@ -167,7 +188,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             <Ionicons
               name="time-outline"
               size={14}
-              color={colors.buttonText}
+              color={mineInk}
               style={styles.readIcon}
             />
           )}
@@ -175,12 +196,40 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             <Ionicons
               name={message.read ? "checkmark-done" : "checkmark"}
               size={14}
-              color={message.read ? colors.buttonText : colors.buttonText}
+              color={mineInk}
               style={styles.readIcon}
             />
           )}
         </ThemedView>
       </ThemedView>
+      {reactionEntries.length > 0 && (
+        <ThemedView
+          style={[
+            styles.reactionsRow,
+            isMyMessage ? { alignSelf: "flex-end" } : { alignSelf: "flex-start" },
+          ]}
+        >
+          {reactionEntries.map(([emoji, info]) => (
+            <ThemedView
+              key={emoji}
+              style={[
+                styles.reactionChip,
+                {
+                  backgroundColor: colors.backgroundSecondary,
+                  borderColor: info.mine ? colors.primary : colors.border,
+                },
+              ]}
+            >
+              <ThemedText style={styles.reactionChipEmoji}>{emoji}</ThemedText>
+              {info.count > 1 && (
+                <ThemedText style={[styles.reactionChipCount, { color: colors.textDim }]}>
+                  {info.count}
+                </ThemedText>
+              )}
+            </ThemedView>
+          ))}
+        </ThemedView>
+      )}
     </TouchableOpacity>
   );
 };
@@ -226,6 +275,28 @@ const styles = StyleSheet.create({
   messageTimestamp: {
     fontSize: 10,
     lineHeight: 12,
+  },
+  reactionsRow: {
+    flexDirection: "row",
+    gap: 4,
+    marginTop: -6,
+    marginHorizontal: 8,
+  },
+  reactionChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  reactionChipEmoji: {
+    fontSize: 13,
+    lineHeight: 17,
+  },
+  reactionChipCount: {
+    fontSize: 11,
   },
   readIcon: {
     marginLeft: 2,
