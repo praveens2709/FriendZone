@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "friendzone-frontend",
+    "name": "FriendZone",
     "slug": "friendzone-frontend",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -11,7 +11,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "We need your location to show nearby places."
+        "NSLocationWhenInUseUsageDescription": "We need your location to show nearby places.",
+        "ITSAppUsesNonExemptEncryption": false
       },
       "bundleIdentifier": "com.anonymous.friendzone-frontend",
       "appleTeamId": "KH6V7ACJVJ"
@@ -27,17 +28,13 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA",
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.READ_MEDIA_AUDIO",
-        "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.BLUETOOTH_ADMIN",
         "android.permission.WAKE_LOCK"
-      ]
+      ],
+      "package": "com.friendzone.app"
     },
     "web": {
       "bundler": "metro",
@@ -92,7 +89,9 @@
         "@stream-io/video-react-native-sdk",
         {
           "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera",
-          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone"
+          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone",
+          "enableScreenshare": true,
+          "appleTeamId": "KH6V7ACJVJ"
         }
       ]
     ],

@@ -3,15 +3,26 @@ import axios, {
   AxiosError,
   InternalAxiosRequestConfig,
 } from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '@/constants/const';
 import { AuthSession } from '@/types/auth-session.type';
 import AuthServices from '@/services/AuthService';
+import { getAuthSession, removeAuthSession } from '@/utils/auth-storage';
 
 const httpClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
 });
+
+let refreshPromise: Promise<string> | null = null;
+
+const refreshOnce = () => {
+  if (!refreshPromise) {
+    refreshPromise = AuthServices.refreshAccessToken().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+};
 
 httpClient.interceptors.request.use(
   async (config: AxiosRequestConfig): Promise<InternalAxiosRequestConfig> => {
@@ -19,7 +30,7 @@ httpClient.interceptors.request.use(
       return config as InternalAxiosRequestConfig;
     }
 
-    const storedSession = await AsyncStorage.getItem('AuthSession');
+    const storedSession = await getAuthSession();
     if (storedSession) {
       const session: AuthSession = JSON.parse(storedSession);
       config.headers = {
@@ -30,10 +41,7 @@ httpClient.interceptors.request.use(
 
     return config as InternalAxiosRequestConfig;
   },
-  (error: AxiosError) => {
-    console.error('Request Interceptor Error:', error);
-    return Promise.reject(error);
-  }
+  (error: AxiosError) => Promise.reject(error)
 );
 
 httpClient.interceptors.response.use(
@@ -46,18 +54,13 @@ httpClient.interceptors.response.use(
       error.response?.status === 401 &&
       errorData?.message === 'Not authorized, token failed';
 
-    if (isTokenExpired && !originalRequest._retry) {
+    if (isTokenExpired && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      console.log('[Interceptor] Token expired. Attempting refresh...');
-
       try {
-        const newAccessToken = await AuthServices.refreshAccessToken();
-
-        console.log('[Interceptor] New access token:', newAccessToken);
+        const newAccessToken = await refreshOnce();
 
         originalRequest.timeout = 15000;
-
         originalRequest.headers = {
           ...originalRequest.headers,
           Authorization: `Bearer ${newAccessToken}`,
@@ -65,8 +68,7 @@ httpClient.interceptors.response.use(
 
         return httpClient(originalRequest);
       } catch (refreshError) {
-        console.error('[Interceptor] Token refresh failed:', refreshError);
-        await AsyncStorage.removeItem('AuthSession');
+        await removeAuthSession();
         return Promise.reject(refreshError);
       }
     }

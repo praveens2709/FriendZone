@@ -10,20 +10,60 @@
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		32A06991223B60F56C71923D /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6937D3556E2E5D2996257BC2 /* ExpoModulesProvider.swift */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
+		4834CF95EB8A46D08C6B05A8 /* Atomic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AFD418E70542019948A154 /* Atomic.swift */; };
+		6A1F25C0DF654135954F43DD /* broadcast.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 35874AE6961F4E1DA52CA61C /* broadcast.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		6D81B3F161104F0993017D93 /* SocketConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2761AB1BF3234ECB8DF6881B /* SocketConnection.swift */; };
+		8EB44A13CC804142B302D5E0 /* SampleHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A2E91B81FD6450A8CB1E22B /* SampleHandler.swift */; };
 		9858664A20928E93418EA5B3 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = EE053159064C4B7E67C6B26C /* PrivacyInfo.xcprivacy */; };
 		A3E4A3B9EFD92E0FA826F3B9 /* libPods-friendzonefrontend.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 060290FCF4B8C0286C5BED8D /* libPods-friendzonefrontend.a */; };
+		A4A846B1BBED44FA90D283CA /* ReplayKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 35449E04D7D84787AB11B7FF /* ReplayKit.framework */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
+		D6A9FE4C685F454BA8E38DEC /* SampleUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F5EBF347AF45BEB0741F3F /* SampleUploader.swift */; };
+		EC851443E43E4955836AD87D /* DarwinNotificationCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6112B01D6BA54E8B93B63E5D /* DarwinNotificationCenter.swift */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		270D4FEE225F4E0C9CEACAD9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FBDC0AFB94264106BF8DF64A;
+			remoteInfo = broadcast;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		77A2D163B16B40958DD81BF6 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				6A1F25C0DF654135954F43DD /* broadcast.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		00C108EC0712BAF2FD00964C /* Pods-friendzonefrontend.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-friendzonefrontend.debug.xcconfig"; path = "Target Support Files/Pods-friendzonefrontend/Pods-friendzonefrontend.debug.xcconfig"; sourceTree = "<group>"; };
 		060290FCF4B8C0286C5BED8D /* libPods-friendzonefrontend.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-friendzonefrontend.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		0A2E91B81FD6450A8CB1E22B /* SampleHandler.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = SampleHandler.swift; path = SampleHandler.swift; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* friendzonefrontend.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = friendzonefrontend.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = friendzonefrontend/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = friendzonefrontend/Info.plist; sourceTree = "<group>"; };
+		2761AB1BF3234ECB8DF6881B /* SocketConnection.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = SocketConnection.swift; path = SocketConnection.swift; sourceTree = "<group>"; };
+		35449E04D7D84787AB11B7FF /* ReplayKit.framework */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = wrapper.framework; name = ReplayKit.framework; path = System/Library/Frameworks/ReplayKit.framework; sourceTree = SDKROOT; };
+		35874AE6961F4E1DA52CA61C /* broadcast.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = undefined; name = broadcast.appex; path = broadcast.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		40AFD418E70542019948A154 /* Atomic.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = Atomic.swift; path = Atomic.swift; sourceTree = "<group>"; };
+		6112B01D6BA54E8B93B63E5D /* DarwinNotificationCenter.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = DarwinNotificationCenter.swift; path = DarwinNotificationCenter.swift; sourceTree = "<group>"; };
 		6937D3556E2E5D2996257BC2 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-friendzonefrontend/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		7163E348A79E4AED9DD04CE2 /* broadcast.entitlements */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = text.plist.entitlements; name = broadcast.entitlements; path = broadcast.entitlements; sourceTree = "<group>"; };
 		72191B7DE952F10360F0C0A4 /* Pods-friendzonefrontend.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-friendzonefrontend.release.xcconfig"; path = "Target Support Files/Pods-friendzonefrontend/Pods-friendzonefrontend.release.xcconfig"; sourceTree = "<group>"; };
+		87E8766A31B24B448BB2E229 /* Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = Info.plist; path = Info.plist; sourceTree = "<group>"; };
+		A6F5EBF347AF45BEB0741F3F /* SampleUploader.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = SampleUploader.swift; path = SampleUploader.swift; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = friendzonefrontend/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
@@ -38,6 +78,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				A3E4A3B9EFD92E0FA826F3B9 /* libPods-friendzonefrontend.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2F7B51B2092B467BB6C44B5C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A4A846B1BBED44FA90D283CA /* ReplayKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -73,8 +121,24 @@
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 				060290FCF4B8C0286C5BED8D /* libPods-friendzonefrontend.a */,
+				35449E04D7D84787AB11B7FF /* ReplayKit.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		374E454190634B5D85F02B96 /* broadcast */ = {
+			isa = PBXGroup;
+			children = (
+				0A2E91B81FD6450A8CB1E22B /* SampleHandler.swift */,
+				87E8766A31B24B448BB2E229 /* Info.plist */,
+				7163E348A79E4AED9DD04CE2 /* broadcast.entitlements */,
+				40AFD418E70542019948A154 /* Atomic.swift */,
+				6112B01D6BA54E8B93B63E5D /* DarwinNotificationCenter.swift */,
+				A6F5EBF347AF45BEB0741F3F /* SampleUploader.swift */,
+				2761AB1BF3234ECB8DF6881B /* SocketConnection.swift */,
+			);
+			name = broadcast;
+			path = broadcast;
 			sourceTree = "<group>";
 		};
 		6E9C962CE363504EF4486C5C /* ExpoModulesProviders */ = {
@@ -101,6 +165,7 @@
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				280D06B59FB166DD268A6D6F /* Pods */,
 				6E9C962CE363504EF4486C5C /* ExpoModulesProviders */,
+				374E454190634B5D85F02B96 /* broadcast */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -111,6 +176,7 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* friendzonefrontend.app */,
+				35874AE6961F4E1DA52CA61C /* broadcast.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -147,15 +213,34 @@
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
 				E1C41F82888D99CCD8F73F85 /* [CP] Embed Pods Frameworks */,
+				77A2D163B16B40958DD81BF6 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				6741A9BF199241839E92F91C /* PBXTargetDependency */,
 			);
 			name = friendzonefrontend;
 			productName = friendzonefrontend;
 			productReference = 13B07F961A680F5B00A75B9A /* friendzonefrontend.app */;
 			productType = "com.apple.product-type.application";
+		};
+		FBDC0AFB94264106BF8DF64A /* broadcast */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F3F0A7A6F4164DBEB5EDFD68 /* Build configuration list for PBXNativeTarget "broadcast" */;
+			buildPhases = (
+				9A18112D0DA24E8A8556BE45 /* Sources */,
+				2F7B51B2092B467BB6C44B5C /* Frameworks */,
+				B13D062A4E044AAEA3C099D6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = broadcast;
+			productName = broadcast;
+			productReference = 35874AE6961F4E1DA52CA61C /* broadcast.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -163,11 +248,17 @@
 		83CBB9F71A601CBA00E9B192 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
+				LastSwiftUpdateCheck = 1340;
 				LastUpgradeCheck = 1130;
 				TargetAttributes = {
 					13B07F861A680F5B00A75B9A = {
 						DevelopmentTeam = KH6V7ACJVJ;
 						LastSwiftMigration = 1250;
+						ProvisioningStyle = Automatic;
+					};
+					FBDC0AFB94264106BF8DF64A = {
+						CreatedOnToolsVersion = 13.4.1;
+						DevelopmentTeam = KH6V7ACJVJ;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -186,6 +277,7 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* friendzonefrontend */,
+				FBDC0AFB94264106BF8DF64A /* broadcast */,
 			);
 		};
 /* End PBXProject section */
@@ -199,6 +291,13 @@
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
 				9858664A20928E93418EA5B3 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B13D062A4E044AAEA3C099D6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -350,13 +449,34 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9A18112D0DA24E8A8556BE45 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8EB44A13CC804142B302D5E0 /* SampleHandler.swift in Sources */,
+				4834CF95EB8A46D08C6B05A8 /* Atomic.swift in Sources */,
+				EC851443E43E4955836AD87D /* DarwinNotificationCenter.swift in Sources */,
+				D6A9FE4C685F454BA8E38DEC /* SampleUploader.swift in Sources */,
+				6D81B3F161104F0993017D93 /* SocketConnection.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		6741A9BF199241839E92F91C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = FBDC0AFB94264106BF8DF64A /* broadcast */;
+			targetProxy = 270D4FEE225F4E0C9CEACAD9 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 00C108EC0712BAF2FD00964C /* Pods-friendzonefrontend.debug.xcconfig */;
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = friendzonefrontend/friendzonefrontend.entitlements;
@@ -383,7 +503,7 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.anonymous.friendzone-frontend";
-				PRODUCT_NAME = friendzonefrontend;
+				PRODUCT_NAME = FriendZone;
 				SWIFT_OBJC_BRIDGING_HEADER = "friendzonefrontend/friendzonefrontend-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -396,6 +516,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 72191B7DE952F10360F0C0A4 /* Pods-friendzonefrontend.release.xcconfig */;
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = friendzonefrontend/friendzonefrontend.entitlements;
@@ -417,13 +538,54 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.anonymous.friendzone-frontend";
-				PRODUCT_NAME = friendzonefrontend;
+				PRODUCT_NAME = FriendZone;
 				SWIFT_OBJC_BRIDGING_HEADER = "friendzonefrontend/friendzonefrontend-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Release;
+		};
+		3E16325ED98845CE990400F1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_ENTITLEMENTS = broadcast/broadcast.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = KH6V7ACJVJ;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = broadcast/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = broadcast;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.anonymous.friendzone-frontend.broadcast";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
 		};
 		83CBBA201A601CBA00E9B192 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -543,6 +705,47 @@
 			};
 			name = Release;
 		};
+		950CB014340B48029A2A4555 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_ENTITLEMENTS = broadcast/broadcast.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = KH6V7ACJVJ;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = broadcast/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = broadcast;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				MTL_FAST_MATH = YES;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.anonymous.friendzone-frontend.broadcast";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -560,6 +763,15 @@
 			buildConfigurations = (
 				83CBBA201A601CBA00E9B192 /* Debug */,
 				83CBBA211A601CBA00E9B192 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F3F0A7A6F4164DBEB5EDFD68 /* Build configuration list for PBXNativeTarget "broadcast" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3E16325ED98845CE990400F1 /* Debug */,
+				950CB014340B48029A2A4555 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
