@@ -26,7 +26,12 @@ const postSchema = new Schema({
   saves: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   shares: { type: Number, default: 0 },
   comments: [commentSchema],
+  deletedAt: { type: Date, default: null },
+  archived: { type: Boolean, default: false },
+  archivedAt: { type: Date },
   createdAt: { type: Date, default: Date.now },
 });
+
+postSchema.index({ user: 1, createdAt: -1 });
 
 export default mongoose.model('Post', postSchema);
