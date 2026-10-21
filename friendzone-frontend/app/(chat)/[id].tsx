@@ -109,6 +109,9 @@ export default function ChatMessagesScreen() {
 
   const [messageText, setMessageText] = useState("");
   const [currentMessages, setCurrentMessages] = useState<MessageResponse[]>([]);
+  const messagesRef = useRef<MessageResponse[]>([]);
+  messagesRef.current = currentMessages;
+  const chatTypeRef = useRef<"private" | "group">("private");
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [page, setPage] = useState(1);
@@ -119,6 +122,7 @@ export default function ChatMessagesScreen() {
   );
   const [chatIsLockedIn, setChatIsLockedIn] = useState(isLockedIn === "true");
   const [chatType, setChatType] = useState<"private" | "group">("private");
+  chatTypeRef.current = chatType;
   const [liveName, setLiveName] = useState(chatName);
   const [liveAvatar, setLiveAvatar] = useState(chatAvatar);
   const [otherVibe, setOtherVibe] = useState<{ kind: string; note?: string } | null>(null);
@@ -885,6 +889,11 @@ export default function ChatMessagesScreen() {
           prev.map((msg) => (msg.id === messageId ? { ...msg, reactions } : msg))
         );
       };
+      const handleBlockChanged = ({ userId, blocked }: { userId: string; blocked: boolean }) => {
+        if (!blocked || chatTypeRef.current !== "private") return;
+        if (messagesRef.current.some((message) => message.sender === userId)) router.back();
+      };
+      socket.on("blockChanged", handleBlockChanged);
       socket.on("messageEdited", handleMessageEdited);
       socket.on("messageReacted", handleMessageReacted);
       socket.on("message", handleNewMessage);
@@ -896,6 +905,7 @@ export default function ChatMessagesScreen() {
       socket.on("groupUpdated", handleGroupUpdated);
       socket.on("messageDeletedForUser", handleMessageDeletedForUser);
       return () => {
+        socket.off("blockChanged", handleBlockChanged);
         socket.off("messageEdited", handleMessageEdited);
         socket.off("messageReacted", handleMessageReacted);
         socket.off("message", handleNewMessage);

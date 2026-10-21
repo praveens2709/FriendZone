@@ -137,7 +137,7 @@ export default function CircleScreen() {
   useEffect(() => {
     if (!socket) return;
     const refresh = () => load();
-    const events = ["vibeChanged", "knockStatusChanged", "newKnockRequest", "meetingCreated", "meetingUpdated"];
+    const events = ["vibeChanged", "knockStatusChanged", "newKnockRequest", "meetingCreated", "meetingUpdated", "wordleChanged", "blockChanged"];
     events.forEach((event) => socket.on(event, refresh));
     return () => {
       events.forEach((event) => socket.off(event, refresh));

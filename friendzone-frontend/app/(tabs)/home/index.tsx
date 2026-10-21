@@ -214,6 +214,10 @@ export default function HomeScreen() {
       setPosts((prevPosts) => prevPosts.filter((p) => p._id !== postId));
     };
     const handlePostRestored = () => fetchPosts(true);
+    const handleBlockChanged = ({ userId, blocked }: { userId: string; blocked: boolean }) => {
+      if (blocked) setPosts((prevPosts) => prevPosts.filter((p) => p.user?._id !== userId));
+      else fetchPosts(true);
+    };
     const handleProfileUpdated = (data: {
       userId: string;
       firstName: string;
@@ -245,6 +249,7 @@ export default function HomeScreen() {
     socket.on("newPost", handleNewPost);
     socket.on("postRemoved", handlePostRemoved);
     socket.on("postRestored", handlePostRestored);
+    socket.on("blockChanged", handleBlockChanged);
     socket.on("userProfileUpdated", handleProfileUpdated);
     const handleKnockChange = () => fetchPosts(true);
     socket.on("knockStatusChanged", handleKnockChange);
@@ -258,6 +263,7 @@ export default function HomeScreen() {
       socket.off("newPost", handleNewPost);
       socket.off("postRemoved", handlePostRemoved);
       socket.off("postRestored", handlePostRestored);
+      socket.off("blockChanged", handleBlockChanged);
       socket.off("userProfileUpdated", handleProfileUpdated);
       socket.off("knockStatusChanged", handleKnockChange);
     };

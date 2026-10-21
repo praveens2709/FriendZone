@@ -243,19 +243,26 @@ function UserProfileContent() {
       if (data.userId === userId) fetchUserProfile();
     };
     const onPostChange = () => fetchUserPosts();
+    const onBlockChanged = ({ userId: otherId, blocked }: { userId: string; blocked: boolean }) => {
+      if (otherId !== userId) return;
+      if (blocked) router.back();
+      else fetchUserProfile();
+    };
     socket.on("knockStatusChanged", onKnockChange);
     socket.on("userProfileUpdated", onProfileUpdated);
     socket.on("postRemoved", onPostChange);
     socket.on("postRestored", onPostChange);
     socket.on("newPost", onPostChange);
+    socket.on("blockChanged", onBlockChanged);
     return () => {
       socket.off("knockStatusChanged", onKnockChange);
       socket.off("userProfileUpdated", onProfileUpdated);
       socket.off("postRemoved", onPostChange);
       socket.off("postRestored", onPostChange);
       socket.off("newPost", onPostChange);
+      socket.off("blockChanged", onBlockChanged);
     };
-  }, [socket, userId, fetchUserProfile, fetchUserPosts]);
+  }, [socket, userId, router, fetchUserProfile, fetchUserPosts]);
 
   const handlePressPost = useCallback(
     (item: PostItem) => {

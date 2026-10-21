@@ -1,6 +1,6 @@
 import * as wordleService from '../services/wordleService.js';
 import User from '../models/User.js';
-import { getLockedInIds } from '../services/privacyService.js';
+import { getLockedInIds, emitToUsers } from '../services/privacyService.js';
 
 const fail = (res, error, message) => {
   console.error(`Wordle error (${message}):`, error.message);
@@ -22,6 +22,13 @@ export const submitGuess = async (req, res) => {
 
     if (!result.isValid) {
       return res.status(400).json({ success: false, isValid: false, message: 'Not in word list' });
+    }
+
+    if (result.finished) {
+      const circleIds = await getLockedInIds(req.user.id);
+      emitToUsers(req.app.get('socketio'), [...circleIds, req.user.id.toString()], 'wordleChanged', {
+        userId: req.user.id.toString(),
+      });
     }
 
     res.json({ success: true, ...result });

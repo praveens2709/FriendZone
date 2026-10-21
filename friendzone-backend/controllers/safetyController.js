@@ -47,6 +47,10 @@ export const blockUser = async (req, res) => {
     if (io) {
       io.to(`notifications-${blockerId}`).emit('knockStatusChanged', { userId: blockerId });
       io.to(`notifications-${userId}`).emit('knockStatusChanged', { userId });
+      io.to(`notifications-${blockerId}`).emit('blockChanged', { userId, blocked: true });
+      io.to(`notifications-${userId}`).emit('blockChanged', { userId: blockerId, blocked: true });
+      io.to(`notifications-${blockerId}`).emit('storiesChanged');
+      io.to(`notifications-${userId}`).emit('storiesChanged');
     }
 
     res.json({ success: true, message: 'User blocked.' });
@@ -65,6 +69,11 @@ export const unblockUser = async (req, res) => {
 
   try {
     await Block.deleteOne({ blocker: req.user.id, blocked: userId });
+    const io = req.app.get('socketio');
+    if (io && isObjectId(userId)) {
+      io.to(`notifications-${req.user.id}`).emit('blockChanged', { userId, blocked: false });
+      io.to(`notifications-${userId}`).emit('blockChanged', { userId: req.user.id.toString(), blocked: false });
+    }
     res.json({ success: true, message: 'User unblocked.' });
   } catch (error) {
     console.error('Error unblocking user:', error.message);

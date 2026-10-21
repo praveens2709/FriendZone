@@ -288,6 +288,17 @@ export default function ChatsScreen() {
         );
       };
 
+      const handleBlockChanged = ({ userId, blocked }: { userId: string; blocked: boolean }) => {
+        if (blocked) {
+          setChats((prevChats) =>
+            prevChats.filter((chat) => !(chat.type === "private" && chat.otherParticipantId === userId))
+          );
+        } else {
+          fetchChats(1);
+        }
+      };
+
+      socket.on("blockChanged", handleBlockChanged);
       socket.on("userProfileUpdated", handleProfileUpdated);
       socket.on("newChat", handleNewChatOrConfirmation);
       socket.on("chatCreatedConfirmation", handleNewChatOrConfirmation);
@@ -299,6 +310,7 @@ export default function ChatsScreen() {
       socket.on("chatsDeletedConfirmation", handleChatsDeletedConfirmation);
 
       return () => {
+        socket.off("blockChanged", handleBlockChanged);
         socket.off("userProfileUpdated", handleProfileUpdated);
         socket.off("newChat", handleNewChatOrConfirmation);
         socket.off("chatCreatedConfirmation", handleNewChatOrConfirmation);

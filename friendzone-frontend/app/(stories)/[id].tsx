@@ -7,6 +7,7 @@ import StoryViewer from "@/components/StoryViewer";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import ThemedModal from "@/components/ThemedModal";
 import { useTheme } from "@/context/ThemeContext";
+import { useSocket } from "@/context/SocketContext";
 import StoryService from "@/services/StoryService";
 import { StoryViewerEntry, UserStory } from "@/types/story.type";
 
@@ -14,6 +15,7 @@ export default function StoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { colors } = useTheme();
+  const { socket } = useSocket();
 
   const [groups, setGroups] = useState<UserStory[] | null>(null);
   const [userIndex, setUserIndex] = useState(-1);
@@ -30,6 +32,42 @@ export default function StoryScreen() {
       })
       .catch(() => router.back());
   }, [id, router]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const onViewed = ({
+      storyId,
+      viewCount,
+      viewer,
+    }: {
+      storyId: string;
+      viewCount: number;
+      viewer: StoryViewerEntry;
+    }) => {
+      setGroups((prev) =>
+        prev
+          ? prev.map((group) => ({
+              ...group,
+              stories: group.stories.map((story) =>
+                story.id === storyId ? { ...story, viewCount } : story
+              ),
+            }))
+          : prev
+      );
+      setViewers((prev) =>
+        prev && !prev.some((entry) => entry.id === viewer.id) ? [viewer, ...prev] : prev
+      );
+    };
+    const onBlockChanged = ({ userId, blocked }: { userId: string; blocked: boolean }) => {
+      if (blocked && groups && groups[userIndex]?.id === userId) router.back();
+    };
+    socket.on("storyViewed", onViewed);
+    socket.on("blockChanged", onBlockChanged);
+    return () => {
+      socket.off("storyViewed", onViewed);
+      socket.off("blockChanged", onBlockChanged);
+    };
+  }, [socket, groups, userIndex, router]);
 
   const handleView = useCallback((storyId: string) => {
     if (viewedRef.current.has(storyId)) return;

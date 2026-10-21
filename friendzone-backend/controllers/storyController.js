@@ -165,10 +165,31 @@ export const viewStory = async (req, res) => {
       }
     }
 
-    await Story.updateOne(
+    const viewedAt = new Date();
+    const update = await Story.updateOne(
       { _id: id, 'viewers.user': { $ne: viewerId } },
-      { $push: { viewers: { user: viewerId, at: new Date() } } }
+      { $push: { viewers: { user: viewerId, at: viewedAt } } }
     );
+
+    if (update.modifiedCount > 0) {
+      const [viewer, fresh] = await Promise.all([
+        User.findById(viewerId).select(USER_FIELDS).lean(),
+        Story.findById(id).select('viewers').lean(),
+      ]);
+      const io = req.app.get('socketio');
+      if (io && viewer) {
+        io.to(`notifications-${story.user}`).emit('storyViewed', {
+          storyId: id,
+          viewCount: fresh?.viewers?.length ?? 0,
+          viewer: {
+            id: viewer._id.toString(),
+            name: `${viewer.firstName} ${viewer.lastName || ''}`.trim(),
+            profileImage: viewer.profileImage || null,
+            at: viewedAt,
+          },
+        });
+      }
+    }
     res.json({ success: true });
   } catch (error) {
     console.error('Error viewing story:', error.message);
