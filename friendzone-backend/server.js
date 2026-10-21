@@ -29,6 +29,7 @@ import User from "./models/User.js";
 import { verifyAccessToken } from "./utils/jwt.js";
 import { isObjectId } from "./utils/validate.js";
 import { UPLOADS_DIR } from "./services/cloudinaryService.js";
+import compression from "compression";
 import { apiLimiter } from "./middleware/rateLimit.js";
 import { securityHeaders } from "./middleware/securityHeaders.js";
 
@@ -51,7 +52,10 @@ const allowedOrigins = (process.env.CORS_ORIGINS || "")
 const corsOrigin = allowedOrigins.length ? allowedOrigins : false;
 
 const app = express();
+app.use(compression({ threshold: 1024 }));
 const server = http.createServer(app);
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000;
 const io = new Server(server, {
   cors: {
     origin: corsOrigin,

@@ -3,7 +3,7 @@ import Message from "../models/Message.js";
 import User from "../models/User.js";
 import Knock from "../models/Knock.js";
 import { uploadImageToCloudinary } from "../services/cloudinaryService.js";
-import { getBlockedIds, isBlockedBetween } from "../services/privacyService.js";
+import { getBlockedIds, isBlockedBetween, getFeedRelationIds } from "../services/privacyService.js";
 import { isObjectId, toIdList, cleanString } from "../utils/validate.js";
 import { getActiveVibes } from "../services/identityService.js";
 
@@ -155,31 +155,34 @@ export const getUserChats = async (req, res) => {
   const skip = (page - 1) * limit;
 
   try {
-    const chats = await Chat.find({
-      participants: userId,
-      deletedBy: { $ne: userId },
-    })
-      .populate({
-        path: "participants",
-        select: "firstName lastName profileImage isPrivate",
+    const [chats, totalChats, relations] = await Promise.all([
+      Chat.find({
+        participants: userId,
+        deletedBy: { $ne: userId },
       })
-      .populate({
-        path: "lastMessage",
-        select: "text sender readBy createdAt attachments deletedBy",
-        populate: {
-          path: "sender",
-          select: "firstName lastName",
-        },
-      })
-      .sort({ lastMessageAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
-
-    const totalChats = await Chat.countDocuments({
-      participants: userId,
-      deletedBy: { $ne: userId },
-    });
+        .populate({
+          path: "participants",
+          select: "firstName lastName profileImage isPrivate",
+        })
+        .populate({
+          path: "lastMessage",
+          select: "text sender readBy createdAt attachments deletedBy",
+          populate: {
+            path: "sender",
+            select: "firstName lastName",
+          },
+        })
+        .sort({ lastMessageAt: -1, _id: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Chat.countDocuments({
+        participants: userId,
+        deletedBy: { $ne: userId },
+      }),
+      getFeedRelationIds(userId),
+    ]);
+    const lockedInPeers = new Set(relations.lockedInIds);
 
     const formattedChats = await Promise.all(
       chats.map(async (chat) => {
@@ -255,14 +258,7 @@ export const getUserChats = async (req, res) => {
         let firstMessageByKnockerId = null;
 
         if (chat.type === "private" && otherParticipant) {
-          const knock = await Knock.findOne({
-            $or: [
-              { knocker: userId, knocked: otherParticipant._id },
-              { knocker: otherParticipant._id, knocked: userId },
-            ],
-            status: "lockedIn",
-          });
-          if (knock) {
+          if (lockedInPeers.has(otherParticipant._id.toString())) {
             isLockedIn = true;
           } else {
             isChatRestricted = chat.isRestricted && otherParticipant.isPrivate;
@@ -329,32 +325,55 @@ export const getChatMessages = async (req, res) => {
         .json({ message: "Chat not found or unauthorized" });
     }
 
-    const messages = await Message.find({
-      chat: chatId,
-      deletedBy: { $ne: userId },
-    })
-      .populate("sender", "firstName lastName profileImage")
-      .populate({
-        path: "replyTo",
-        select: "text sender attachments",
-        populate: {
-          path: "sender",
-          select: "firstName lastName",
-        },
+    const [messages, totalMessages, relations] = await Promise.all([
+      Message.find({
+        chat: chatId,
+        deletedBy: { $ne: userId },
       })
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
+        .populate({
+          path: "replyTo",
+          select: "text sender attachments",
+        })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Message.countDocuments({
+        chat: chatId,
+        deletedBy: { $ne: userId },
+      }),
+      getFeedRelationIds(userId),
+    ]);
+
+    const peopleById = new Map(chat.participants.map((p) => [p._id.toString(), p]));
+    const unknownIds = new Set();
+    for (const message of messages) {
+      if (!peopleById.has(String(message.sender))) unknownIds.add(String(message.sender));
+      if (message.replyTo?.sender && !peopleById.has(String(message.replyTo.sender))) {
+        unknownIds.add(String(message.replyTo.sender));
+      }
+    }
+    if (unknownIds.size) {
+      const others = await User.find({ _id: { $in: [...unknownIds] } })
+        .select("firstName lastName profileImage")
+        .lean();
+      others.forEach((person) => peopleById.set(person._id.toString(), person));
+    }
+    for (const message of messages) {
+      message.sender = peopleById.get(String(message.sender)) || null;
+      if (message.replyTo) {
+        message.replyTo = {
+          ...message.replyTo,
+          sender: message.replyTo.sender
+            ? peopleById.get(String(message.replyTo.sender)) || null
+            : null,
+        };
+      }
+    }
 
     messages.reverse();
 
-    const totalMessages = await Message.countDocuments({
-      chat: chatId,
-      deletedBy: { $ne: userId },
-    });
-
-    await markMessagesAsRead({ chatId, userId });
+    const markRead = page === 1 ? markMessagesAsRead({ chatId, userId }) : null;
 
     const otherParticipant =
       chat.type === "private"
@@ -413,14 +432,7 @@ export const getChatMessages = async (req, res) => {
     let firstMessageByKnockerId = null;
 
     if (chat.type === "private" && otherParticipant) {
-      const knock = await Knock.findOne({
-        $or: [
-          { knocker: userId, knocked: otherParticipant._id },
-          { knocker: otherParticipant._id, knocked: userId },
-        ],
-        status: "lockedIn",
-      });
-      if (knock) {
+      if (relations.lockedInIds.includes(otherParticipant._id.toString())) {
         isLockedIn = true;
       } else {
         isChatRestricted = chat.isRestricted && otherParticipant.isPrivate;
@@ -436,6 +448,8 @@ export const getChatMessages = async (req, res) => {
       const vibes = await getActiveVibes([otherParticipant._id.toString()]);
       otherVibe = vibes.get(otherParticipant._id.toString()) || null;
     }
+
+    if (markRead) await markRead;
 
     res.json({
       otherVibe,

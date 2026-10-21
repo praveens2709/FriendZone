@@ -12,6 +12,7 @@ import {
   canViewUser,
   getAudienceIds,
   getBlockedIds,
+  getFeedRelationIds,
   getViewableUserIds,
   emitToUsers,
   isBlockedBetween,
@@ -179,25 +180,10 @@ export const getFeedPosts = async (req, res) => {
   const { limit, skip } = parsePagination(req.query);
 
   try {
-    const [knockingKnocks, lockedInKnocks, blocked] = await Promise.all([
-      Knock.find({ knocker: userId, status: 'onesidedlock' }).select('knocked').lean(),
-      Knock.find({
-        $or: [
-          { knocker: userId, status: 'lockedIn' },
-          { knocked: userId, status: 'lockedIn' },
-        ],
-      })
-        .select('knocker knocked')
-        .lean(),
+    const [{ knockingIds, lockedInIds }, blocked] = await Promise.all([
+      getFeedRelationIds(userId),
       getBlockedIds(userId),
     ]);
-
-    const knockingIds = knockingKnocks.map((knock) => knock.knocked.toString());
-    const lockedInIds = lockedInKnocks.map((knock) =>
-      knock.knocker.toString() === userId.toString()
-        ? knock.knocked.toString()
-        : knock.knocker.toString()
-    );
 
     const relevantUserIds = [...new Set([...knockingIds, ...lockedInIds])].filter(
       (id) => !blocked.has(id)
@@ -208,7 +194,8 @@ export const getFeedPosts = async (req, res) => {
       .skip(skip)
       .limit(limit)
       .populate('user', USER_FIELDS)
-      .populate('comments.user', USER_FIELDS);
+      .populate('comments.user', USER_FIELDS)
+      .lean();
 
     res.status(200).json(await decoratePosts(posts, userId));
   } catch (error) {

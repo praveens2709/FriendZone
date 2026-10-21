@@ -1,3 +1,5 @@
+import { verifyAccessToken } from '../utils/jwt.js';
+
 const buckets = new Map();
 
 setInterval(() => {
@@ -31,7 +33,19 @@ export const rateLimit = ({ windowMs, max, keyFn, name }) => (req, res, next) =>
 const emailKey = (req) =>
   `${req.ip}:${String(req.body?.email || '').toLowerCase().trim()}`;
 
-export const apiLimiter = rateLimit({ name: 'api', windowMs: 60 * 1000, max: 300 });
+const userOrIpKey = (req) => {
+  const header = req.headers.authorization;
+  if (header && header.startsWith('Bearer ')) {
+    try {
+      return `user:${verifyAccessToken(header.slice(7)).id}`;
+    } catch {
+      return `ip:${req.ip}`;
+    }
+  }
+  return `ip:${req.ip}`;
+};
+
+export const apiLimiter = rateLimit({ name: 'api', windowMs: 60 * 1000, max: 300, keyFn: userOrIpKey });
 
 export const loginLimiter = rateLimit({
   name: 'login',

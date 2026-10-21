@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { clearOnWrite, relationCache } from '../services/cacheInvalidation.js';
 
 const blockSchema = new mongoose.Schema(
   {
@@ -10,5 +11,7 @@ const blockSchema = new mongoose.Schema(
 
 blockSchema.index({ blocker: 1, blocked: 1 }, { unique: true });
 blockSchema.index({ blocked: 1 });
+
+clearOnWrite(blockSchema, relationCache);
 
 export default mongoose.model('Block', blockSchema);

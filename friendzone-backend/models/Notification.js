@@ -21,4 +21,8 @@ const notificationSchema = new mongoose.Schema({
   metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
 }, { timestamps: true });
 
+notificationSchema.index({ recipient: 1, createdAt: -1 });
+notificationSchema.index({ recipient: 1, isRead: 1 });
+notificationSchema.index({ relatedEntityType: 1, relatedEntityId: 1 });
+
 export default mongoose.model('Notification', notificationSchema);

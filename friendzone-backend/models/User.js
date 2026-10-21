@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { clearOnWrite, authCache } from "../services/cacheInvalidation.js";
 
 const userSchema = new mongoose.Schema(
   {
@@ -76,5 +77,7 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.index({ firstName: 1, lastName: 1 });
+
+clearOnWrite(userSchema, authCache);
 
 export default mongoose.model("User", userSchema);

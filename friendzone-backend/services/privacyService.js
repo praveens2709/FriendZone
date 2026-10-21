@@ -1,8 +1,13 @@
 import Block from '../models/Block.js';
 import Knock from '../models/Knock.js';
 import User from '../models/User.js';
+import { relationCache } from './cacheInvalidation.js';
 
 export const getBlockedIds = async (userId) => {
+  const key = `blocked:${userId}`;
+  const cached = relationCache.get(key);
+  if (cached) return new Set(cached);
+
   const blocks = await Block.find({
     $or: [{ blocker: userId }, { blocked: userId }],
   })
@@ -15,7 +20,33 @@ export const getBlockedIds = async (userId) => {
       block.blocker.toString() === userId.toString() ? block.blocked : block.blocker;
     ids.add(other.toString());
   }
-  return ids;
+  relationCache.set(key, ids);
+  return new Set(ids);
+};
+
+export const getFeedRelationIds = async (userId) => {
+  const key = `feedRelations:${userId}`;
+  const cached = relationCache.get(key);
+  if (cached) return { knockingIds: [...cached.knockingIds], lockedInIds: [...cached.lockedInIds] };
+
+  const [knockingKnocks, lockedInKnocks] = await Promise.all([
+    Knock.find({ knocker: userId, status: 'onesidedlock' }).select('knocked').lean(),
+    Knock.find({
+      $or: [
+        { knocker: userId, status: 'lockedIn' },
+        { knocked: userId, status: 'lockedIn' },
+      ],
+    })
+      .select('knocker knocked')
+      .lean(),
+  ]);
+
+  const knockingIds = knockingKnocks.map((knock) => knock.knocked.toString());
+  const lockedInIds = lockedInKnocks.map((knock) =>
+    knock.knocker.toString() === userId.toString() ? knock.knocked.toString() : knock.knocker.toString()
+  );
+  relationCache.set(key, { knockingIds, lockedInIds });
+  return { knockingIds: [...knockingIds], lockedInIds: [...lockedInIds] };
 };
 
 export const isBlockedBetween = async (a, b) => {
@@ -111,11 +142,17 @@ export const getAudienceIds = async (authorId) => {
 };
 
 export const getLockedInIds = async (userId) => {
-  const knocks = await Knock.find({ knocker: userId, status: 'lockedIn' })
-    .select('knocked')
-    .lean();
-  const blocked = await getBlockedIds(userId);
-  return knocks.map((k) => k.knocked.toString()).filter((id) => !blocked.has(id));
+  const key = `lockedIn:${userId}`;
+  const cached = relationCache.get(key);
+  if (cached) return [...cached];
+
+  const [knocks, blocked] = await Promise.all([
+    Knock.find({ knocker: userId, status: 'lockedIn' }).select('knocked').lean(),
+    getBlockedIds(userId),
+  ]);
+  const ids = knocks.map((k) => k.knocked.toString()).filter((id) => !blocked.has(id));
+  relationCache.set(key, ids);
+  return [...ids];
 };
 
 export const emitToUsers = (io, userIds, event, payload) => {

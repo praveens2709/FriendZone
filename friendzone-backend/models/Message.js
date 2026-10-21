@@ -69,4 +69,7 @@ messageSchema.pre('validate', function(next) {
   next();
 });
 
+messageSchema.index({ chat: 1, createdAt: -1 });
+messageSchema.index({ chat: 1, sender: 1, readBy: 1 });
+
 export default mongoose.model('Message', messageSchema);

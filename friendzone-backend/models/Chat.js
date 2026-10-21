@@ -94,5 +94,6 @@ chatSchema.pre('save', async function(next) {
 
 chatSchema.index({ participants: 1, type: 1 });
 chatSchema.index({ "unreadCounts.user": 1 });
+chatSchema.index({ participants: 1, lastMessageAt: -1, _id: -1 });
 
 export default mongoose.model('Chat', chatSchema);
