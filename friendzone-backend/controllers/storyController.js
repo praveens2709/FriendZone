@@ -1,7 +1,8 @@
 import Story from '../models/Story.js';
 import User from '../models/User.js';
+import Post from '../models/Post.js';
 import { uploadImageToCloudinary, deleteImageFromCloudinary } from '../services/cloudinaryService.js';
-import { emitToUsers, getLockedInIds } from '../services/privacyService.js';
+import { canViewUser, emitToUsers, getAudienceIds, getVisibleAuthorIds } from '../services/privacyService.js';
 import { cleanString, isObjectId } from '../utils/validate.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -19,6 +20,19 @@ const serialize = (story, viewerId) => {
     textColor: story.textColor,
     textX: story.textX ?? 0.5,
     textY: story.textY ?? 0.5,
+    post: story.type === 'post' && story.post?.image
+      ? {
+          id: story.post.postId?.toString() || null,
+          image: story.post.image,
+          authorName: story.post.authorName || '',
+          authorAvatar: story.post.authorAvatar || null,
+          caption: story.post.caption || '',
+        }
+      : null,
+    backdrop: story.backdrop || '',
+    cardX: story.cardX ?? 0.5,
+    cardY: story.cardY ?? 0.5,
+    cardScale: story.cardScale ?? 1,
     duration: story.duration,
     audience: story.audience,
     createdAt: story.createdAt,
@@ -59,6 +73,48 @@ export const createStory = async (req, res) => {
           ? Math.min(Math.max(parseInt(req.body?.duration, 10) || 10000, 2000), 30000)
           : 5000,
       });
+    } else if (type === 'post') {
+      const postId = req.body?.postId;
+      const post = isObjectId(String(postId))
+        ? await Post.findById(postId).populate('user', `${USER_FIELDS} isPrivate`)
+        : null;
+      const isOwnPost = post && post.user._id.toString() === userId.toString();
+      if (!post || post.deletedAt || (post.archived && !isOwnPost) || !(await canViewUser(userId, post.user._id))) {
+        return res.status(404).json({ message: 'That post is no longer available.' });
+      }
+      if (post.user.isPrivate && !isOwnPost) {
+        return res.status(403).json({ message: "Posts from private accounts can't be added to a story." });
+      }
+      let gradient = [];
+      try {
+        const parsed = typeof req.body.gradient === 'string' ? JSON.parse(req.body.gradient) : req.body.gradient;
+        gradient = Array.isArray(parsed) ? parsed.filter((c) => COLOR.test(c)).slice(0, 3) : [];
+      } catch {
+        gradient = [];
+      }
+      const num = (value, min, max, fallback) => {
+        const n = parseFloat(value);
+        return Number.isFinite(n) ? Math.min(Math.max(n, min), max) : fallback;
+      };
+      Object.assign(data, {
+        type: 'post',
+        post: {
+          postId: post._id,
+          image: post.images?.[0]?.url,
+          authorName: `${post.user.firstName} ${post.user.lastName || ''}`.trim(),
+          authorAvatar: post.user.profileImage || '',
+          caption: (post.caption || '').slice(0, 200),
+        },
+        gradient: gradient.length >= 2 ? gradient : ['#1F1F1F', '#3A3A3A'],
+        text,
+        textX: num(req.body?.textX, 0.05, 0.95, 0.5),
+        textY: num(req.body?.textY, 0.08, 0.92, 0.5),
+        backdrop: ['moon', 'sunny', 'water', 'leaf', 'heart', 'rocket'].includes(req.body?.backdrop) ? req.body.backdrop : '',
+        cardX: num(req.body?.cardX, 0, 1, 0.5),
+        cardY: num(req.body?.cardY, 0, 1, 0.5),
+        cardScale: num(req.body?.cardScale, 0.4, 3, 1),
+        duration: 6000,
+      });
     } else {
       if (type !== 'text' || !text) {
         return res.status(400).json({ message: 'Add a photo, a video or some text.' });
@@ -81,8 +137,8 @@ export const createStory = async (req, res) => {
 
     const story = await Story.create(data);
 
-    const circle = await getLockedInIds(userId);
-    emitToUsers(req.app.get('socketio'), circle, 'storiesChanged', { userId });
+    const watchers = await getAudienceIds(userId);
+    emitToUsers(req.app.get('socketio'), watchers, 'storiesChanged', { userId });
 
     res.status(201).json(serialize(story, userId));
   } catch (error) {
@@ -95,8 +151,8 @@ export const getStories = async (req, res) => {
   const viewerId = req.user.id;
 
   try {
-    const friendIds = await getLockedInIds(viewerId);
-    const authorIds = [viewerId, ...friendIds];
+    const visibleIds = await getVisibleAuthorIds(viewerId);
+    const authorIds = [viewerId, ...visibleIds];
 
     const [stories, authors] = await Promise.all([
       Story.find({ user: { $in: authorIds }, expiresAt: { $gt: new Date() } })
@@ -155,8 +211,8 @@ export const viewStory = async (req, res) => {
     if (!story) return res.status(404).json({ message: 'Story not found.' });
     if (story.user.toString() === viewerId) return res.json({ success: true });
 
-    const friendIds = new Set(await getLockedInIds(viewerId));
-    if (!friendIds.has(story.user.toString())) return res.status(404).json({ message: 'Story not found.' });
+    const visibleIds = new Set(await getVisibleAuthorIds(viewerId));
+    if (!visibleIds.has(story.user.toString())) return res.status(404).json({ message: 'Story not found.' });
 
     if (story.audience === 'close') {
       const author = await User.findById(story.user).select('closeFriends').lean();
@@ -231,8 +287,8 @@ export const deleteStory = async (req, res) => {
     if (!story) return res.status(404).json({ message: 'Story not found.' });
     if (story.publicId) deleteImageFromCloudinary(story.publicId, story.resourceType || 'image');
 
-    const circle = await getLockedInIds(req.user.id);
-    emitToUsers(req.app.get('socketio'), circle, 'storiesChanged', { userId: req.user.id });
+    const watchers = await getAudienceIds(req.user.id);
+    emitToUsers(req.app.get('socketio'), watchers, 'storiesChanged', { userId: req.user.id });
 
     res.json({ success: true });
   } catch (error) {

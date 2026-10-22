@@ -48,6 +48,11 @@ const messageSchema = new mongoose.Schema({
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     emoji: { type: String, required: true, maxlength: 16 },
   }],
+  sharedPost: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Post',
+    default: null,
+  },
   editedAt: {
     type: Date,
     default: null,

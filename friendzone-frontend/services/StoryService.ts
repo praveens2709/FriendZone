@@ -38,6 +38,30 @@ class StoryService {
     return response.data;
   }
 
+  static async postSharedPost(
+    postId: string,
+    audience: Audience,
+    gradient: string[],
+    card: { x: number; y: number; scale: number },
+    backdrop: string,
+    overlay?: { text: string; textX: number; textY: number }
+  ): Promise<StoryContent> {
+    const response = await httpClient.post("stories", {
+      type: "post",
+      postId,
+      audience,
+      gradient,
+      backdrop,
+      cardX: card.x,
+      cardY: card.y,
+      cardScale: card.scale,
+      ...(overlay?.text.trim()
+        ? { text: overlay.text.trim(), textX: overlay.textX, textY: overlay.textY }
+        : {}),
+    });
+    return response.data;
+  }
+
   static async postMedia(
     uri: string,
     mediaType: "image" | "video",

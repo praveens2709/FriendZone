@@ -38,6 +38,20 @@ export interface Attachment {
   duration?: number;
 }
 
+export interface SharedPostPreview {
+  id?: string;
+  unavailable?: boolean;
+  user?: {
+    id: string;
+    firstName: string;
+    lastName?: string;
+    profileImage: string | null;
+  };
+  image?: string | null;
+  imageCount?: number;
+  caption?: string;
+}
+
 export interface ReplyToMessage {
   id: string;
   text?: string;
@@ -78,6 +92,7 @@ export interface MessageResponse {
   replyTo?: ReplyToMessage | null;
   reactions?: MessageReaction[];
   editedAt?: string | null;
+  sharedPost?: SharedPostPreview | null;
 }
 
 export interface MessageReaction {
@@ -113,6 +128,7 @@ interface RawApiMessage {
   replyTo?: ReplyToMessage | null;
   reactions?: MessageReaction[];
   editedAt?: string | null;
+  sharedPost?: SharedPostPreview | null;
 }
 
 interface RawApiGetMessagesResponse {
@@ -219,6 +235,7 @@ class ChatService {
             replyTo: msg.replyTo || null,
             reactions: msg.reactions || [],
             editedAt: msg.editedAt || null,
+            sharedPost: msg.sharedPost || null,
           };
         }
       );

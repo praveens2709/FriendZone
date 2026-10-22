@@ -152,13 +152,13 @@ class PostService {
     }
   }
 
-  static async sharePostToChat(postId: string, chatId: string, token: string): Promise<void> {
-    try {
-      await _post(`posts/${postId}/share-to-chat`, { chatId }, token);
-    } catch (error) {
-      console.error("Error while sharing post to chat:", error);
-      throw error;
-    }
+  static async sharePostToChat(
+    postId: string,
+    chatId: string,
+    token: string,
+    message?: string
+  ): Promise<void> {
+    await _post(`posts/${postId}/share-to-chat`, { chatId, message }, token);
   }
 }
 

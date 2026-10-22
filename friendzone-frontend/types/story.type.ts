@@ -1,6 +1,14 @@
+export type StoryPostSnapshot = {
+  id: string | null;
+  image: string;
+  authorName: string;
+  authorAvatar: string | null;
+  caption?: string;
+};
+
 export type StoryContent = {
   id: string;
-  type: 'image' | 'video' | 'text';
+  type: 'image' | 'video' | 'text' | 'post';
   url?: string | null;
   text?: string;
   duration?: number;
@@ -8,6 +16,11 @@ export type StoryContent = {
   gradient?: string[];
   textX?: number;
   textY?: number;
+  post?: StoryPostSnapshot | null;
+  backdrop?: string;
+  cardX?: number;
+  cardY?: number;
+  cardScale?: number;
   audience?: 'circle' | 'close';
   viewed?: boolean;
   viewCount?: number;

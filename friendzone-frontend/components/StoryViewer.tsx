@@ -1,4 +1,7 @@
 import StoryTextOverlay from "@/components/StoryTextOverlay";
+import StoryPostCard from "@/components/StoryPostCard";
+import ArtBackground from "@/components/ui/ArtBackground";
+import { ArtPalette } from "@/constants/artPalettes";
 import React, { useEffect, useRef, useState } from "react";
 import {
   StyleSheet,
@@ -38,8 +41,41 @@ type Props = {
   onView?: (storyId: string) => void;
   onDelete?: (storyId: string) => void;
   onShowViewers?: (storyId: string) => void;
+  onOpenPost?: (postId: string) => void;
   holdProgress?: boolean;
 };
+
+const toPalette = (gradient?: string[]): ArtPalette => {
+  const g = gradient && gradient.length >= 2 ? gradient : ["#1F1F1F", "#3A3A3A"];
+  return [g[0], g[1] ?? g[0], g[2] ?? g[1] ?? g[0]];
+};
+
+function ViewPostLabel({ top, left, onPress }: { top: number; left: number; onPress: () => void }) {
+  const pop = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(pop, { toValue: 1, friction: 5, tension: 160, useNativeDriver: true }).start();
+  }, [pop]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.viewPostWrap,
+        {
+          top,
+          left,
+          opacity: pop.interpolate({ inputRange: [0, 0.4], outputRange: [0, 1], extrapolate: "clamp" }),
+          transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }],
+        },
+      ]}
+    >
+      <Pressable onPress={onPress} style={styles.viewPost}>
+        <Text style={styles.viewPostText}>View post</Text>
+        <Ionicons name="chevron-forward" size={16} color="#111" />
+      </Pressable>
+    </Animated.View>
+  );
+}
 
 export default function StoryViewer({
   user,
@@ -50,17 +86,21 @@ export default function StoryViewer({
   onView,
   onDelete,
   onShowViewers,
+  onOpenPost,
   holdProgress = false,
 }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [labelOpen, setLabelOpen] = useState(false);
+  const cardPulse = useRef(new Animated.Value(1)).current;
+  const [canvas, setCanvas] = useState({ width, height });
   const progress = useRef(new Animated.Value(0)).current;
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   const videoRef = useRef<Video>(null);
 
   const story = stories[currentIndex];
   const isTimed = story?.type !== "video";
-  const paused = isPaused || holdProgress;
+  const paused = isPaused || holdProgress || labelOpen;
 
   const startProgress = (duration: number) => {
     progress.setValue(0);
@@ -100,6 +140,10 @@ export default function StoryViewer({
   };
 
   const handlePress = (evt: any) => {
+    if (labelOpen) {
+      setLabelOpen(false);
+      return;
+    }
     const x = evt.nativeEvent.locationX;
     if (x < width / 3) {
       handlePrev();
@@ -110,6 +154,7 @@ export default function StoryViewer({
 
   useEffect(() => {
     if (story) onView?.(story.id);
+    setLabelOpen(false);
   }, [story?.id]);
 
   useEffect(() => {
@@ -158,6 +203,10 @@ export default function StoryViewer({
     <ThemedView style={styles.container}>
       <Pressable
         style={styles.mediaContainer}
+        onLayout={(e) => {
+          const { width: w, height: h } = e.nativeEvent.layout;
+          if (w > 0 && h > 0) setCanvas({ width: w, height: h });
+        }}
         onPress={handlePress}
         onLongPress={() => {
           setIsPaused(true);
@@ -181,6 +230,36 @@ export default function StoryViewer({
           >
             <Text style={[styles.storyText, { color: story.textColor || "#FFFFFF" }]}>{story.text}</Text>
           </LinearGradient>
+        ) : story.type === "post" && story.post ? (
+          <View style={[styles.media, styles.postStory]}>
+            <ArtBackground
+              palette={toPalette(story.gradient)}
+              glyph={(story.backdrop as keyof typeof Ionicons.glyphMap) || undefined}
+              watermark={280}
+            />
+            <Pressable
+              onPress={() => {
+                if (!labelOpen) {
+                  cardPulse.setValue(1);
+                  Animated.sequence([
+                    Animated.timing(cardPulse, { toValue: 0.7, duration: 110, useNativeDriver: true }),
+                    Animated.timing(cardPulse, { toValue: 1, duration: 180, useNativeDriver: true }),
+                  ]).start();
+                }
+                setLabelOpen((open) => !open);
+              }}
+              style={{
+                transform: [
+                  { translateX: ((story.cardX ?? 0.5) - 0.5) * canvas.width },
+                  { translateY: ((story.cardY ?? 0.5) - 0.5) * canvas.height },
+                ],
+              }}
+            >
+              <Animated.View style={{ opacity: cardPulse }}>
+                <StoryPostCard post={story.post} width={canvas.width * 0.78} scale={story.cardScale ?? 1} />
+              </Animated.View>
+            </Pressable>
+          </View>
         ) : story.type === "image" ? (
           <Image source={{ uri: story.url! }} style={styles.media} resizeMode="cover" />
         ) : (
@@ -203,6 +282,14 @@ export default function StoryViewer({
           y={story.textY ?? 0.5}
           containerWidth={width}
           containerHeight={height}
+        />
+      )}
+
+      {labelOpen && story.type === "post" && story.post?.id && (
+        <ViewPostLabel
+          top={(story.cardY ?? 0.5) * canvas.height - 19}
+          left={(story.cardX ?? 0.5) * canvas.width - 62}
+          onPress={() => onOpenPost?.(story.post!.id as string)}
         />
       )}
 
@@ -296,6 +383,19 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: "hidden",
   },
+  viewPostWrap: { position: "absolute", zIndex: 6, width: 124 },
+  viewPost: {
+    width: 124,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingVertical: 9,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+  },
+  viewPostText: { color: "#111", fontSize: 14, fontWeight: "800" },
+  postStory: { justifyContent: "center", alignItems: "center" },
   textStory: {
     alignItems: "center",
     justifyContent: "center",

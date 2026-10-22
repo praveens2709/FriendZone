@@ -49,6 +49,14 @@ export const getFeedRelationIds = async (userId) => {
   return { knockingIds: [...knockingIds], lockedInIds: [...lockedInIds] };
 };
 
+export const getVisibleAuthorIds = async (viewerId) => {
+  const [{ knockingIds, lockedInIds }, blocked] = await Promise.all([
+    getFeedRelationIds(viewerId),
+    getBlockedIds(viewerId),
+  ]);
+  return [...new Set([...knockingIds, ...lockedInIds])].filter((id) => !blocked.has(id));
+};
+
 export const isBlockedBetween = async (a, b) => {
   const block = await Block.exists({
     $or: [

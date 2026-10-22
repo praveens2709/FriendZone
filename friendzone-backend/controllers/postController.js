@@ -4,7 +4,6 @@ import { createNotification, removePostNotifications } from './notificationContr
 import User from '../models/User.js';
 import Knock from '../models/Knock.js';
 import Chat from '../models/Chat.js';
-import Message from '../models/Message.js';
 import { uploadImageToCloudinary, deleteImageFromCloudinary } from '../services/cloudinaryService.js';
 import { imageUpload } from '../middleware/upload.js';
 import { uploadLimiter } from '../middleware/rateLimit.js';
@@ -15,11 +14,11 @@ import {
   getFeedRelationIds,
   getViewableUserIds,
   emitToUsers,
-  isBlockedBetween,
 } from '../services/privacyService.js';
 import { cleanString, isObjectId } from '../utils/validate.js';
 import { decoratePosts } from '../services/identityService.js';
 import sharp from 'sharp';
+import { saveMessage } from './chatController.js';
 
 const USER_FIELDS = 'firstName lastName profileImage';
 const MAX_FEED_LIMIT = 100;
@@ -399,70 +398,27 @@ export const sharePost = async (req, res) => {
 export const sharePostToChat = async (req, res) => {
   const { postId } = req.params;
   const { chatId } = req.body || {};
-  const senderId = req.user.id;
+  const note = cleanString(req.body?.message, 500);
 
   if (!isObjectId(chatId)) {
     return res.status(400).json({ message: 'Invalid chat.' });
   }
 
   try {
-    const io = req.app.get('socketio');
-
     const post = await loadViewablePost(req, res, postId);
     if (!post) return;
-    await post.populate('user', 'firstName profileImage');
 
-    const chat = await Chat.findById(chatId);
-    if (!chat || !chat.participants.some((p) => p.toString() === senderId.toString())) {
-      return res.status(404).json({ message: 'Chat not found.' });
-    }
+    const io = req.app.get('socketio');
+    const userSocketMap = req.app.get('userSocketMap');
+    const common = { chatId, senderId: req.user.id, io, userSocketMap };
 
-    if (chat.type === 'private') {
-      const other = chat.participants.find((p) => p.toString() !== senderId.toString());
-      if (other && (await isBlockedBetween(senderId, other))) {
-        return res.status(403).json({ message: 'You cannot message this user.' });
-      }
-    }
+    const saved = await saveMessage({ ...common, text: 'Shared a post', sharedPostId: post._id });
+    if (!saved) return res.status(404).json({ message: 'Chat not found.' });
+    if (saved.error) return res.status(403).json({ message: saved.error });
 
-    const newMessage = new Message({
-      chat: chat._id,
-      sender: senderId,
-      text: `Shared a post from ${post.user.firstName}`,
-      readBy: [senderId],
-    });
+    if (note) await saveMessage({ ...common, text: note });
 
-    await newMessage.save();
-
-    chat.lastMessage = newMessage._id;
-    chat.lastMessageAt = newMessage.createdAt;
-    chat.participants.forEach((participantId) => {
-      if (participantId.toString() === senderId.toString()) return;
-      const entry = chat.unreadCounts.find(
-        (uc) => uc.user.toString() === participantId.toString()
-      );
-      if (entry) entry.count += 1;
-      else chat.unreadCounts.push({ user: participantId, count: 1 });
-    });
-    await chat.save();
-
-    if (io) {
-      io.to(chatId).emit('newChatMessage', {
-        chatId,
-        message: {
-          ...newMessage.toObject(),
-          content: {
-            type: 'post',
-            post: {
-              id: post._id,
-              user: post.user,
-              images: post.images,
-              caption: post.caption,
-              createdAt: post.createdAt,
-            },
-          },
-        },
-      });
-    }
+    await Post.updateOne({ _id: post._id }, { $inc: { shares: 1 } });
 
     res.status(200).json({ success: true, message: 'Post shared to chat successfully.' });
   } catch (error) {

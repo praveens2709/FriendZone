@@ -2,13 +2,32 @@ import Chat from "../models/Chat.js";
 import Message from "../models/Message.js";
 import User from "../models/User.js";
 import Knock from "../models/Knock.js";
+import Post from "../models/Post.js";
 import { uploadImageToCloudinary } from "../services/cloudinaryService.js";
-import { getBlockedIds, isBlockedBetween, getFeedRelationIds } from "../services/privacyService.js";
+import { getBlockedIds, isBlockedBetween, getFeedRelationIds, canViewUser } from "../services/privacyService.js";
 import { isObjectId, toIdList, cleanString } from "../utils/validate.js";
 import { getActiveVibes } from "../services/identityService.js";
 
 const MAX_MESSAGE_LENGTH = 4000;
 const MAX_GROUP_MEMBERS = 50;
+
+export const formatSharedPost = (post) => {
+  if (!post || post.deletedAt || post.archived || !post.user) {
+    return { unavailable: true };
+  }
+  return {
+    id: post._id.toString(),
+    user: {
+      id: post.user._id.toString(),
+      firstName: post.user.firstName,
+      lastName: post.user.lastName,
+      profileImage: post.user.profileImage || null,
+    },
+    image: post.images?.[0]?.url || null,
+    imageCount: post.images?.length || 0,
+    caption: (post.caption || "").slice(0, 140),
+  };
+};
 
 export const formatLastMessageContentForPreview = (message) => {
   if (!message) {
@@ -37,7 +56,7 @@ export const formatLastMessageContentForPreview = (message) => {
     return { content: "Attachment", type };
   }
 
-  return { content: message.text || "No messages yet", type: "text" };
+  return { content: message.text || "No messages yet", type: message.type === "system" ? "system" : "text" };
 };
 
 export const createGroupChat = async (req, res, io, userSocketMap) => {
@@ -166,7 +185,7 @@ export const getUserChats = async (req, res) => {
         })
         .populate({
           path: "lastMessage",
-          select: "text sender readBy createdAt attachments deletedBy",
+          select: "text type sender readBy createdAt attachments deletedBy",
           populate: {
             path: "sender",
             select: "firstName lastName",
@@ -359,6 +378,25 @@ export const getChatMessages = async (req, res) => {
         .lean();
       others.forEach((person) => peopleById.set(person._id.toString(), person));
     }
+    const sharedPostIds = messages.filter((m) => m.sharedPost).map((m) => m.sharedPost);
+    const sharedPostMap = new Map();
+    if (sharedPostIds.length) {
+      const sharedDocs = await Post.find({ _id: { $in: sharedPostIds } })
+        .populate("user", "firstName lastName profileImage")
+        .lean();
+      const authorAccess = new Map();
+      for (const doc of sharedDocs) {
+        const authorId = String(doc.user?._id || "");
+        if (!authorId) continue;
+        if (!authorAccess.has(authorId)) {
+          authorAccess.set(authorId, await canViewUser(userId, authorId));
+        }
+        sharedPostMap.set(
+          String(doc._id),
+          authorAccess.get(authorId) ? formatSharedPost(doc) : { unavailable: true }
+        );
+      }
+    }
     for (const message of messages) {
       message.sender = peopleById.get(String(message.sender)) || null;
       if (message.replyTo) {
@@ -405,6 +443,9 @@ export const getChatMessages = async (req, res) => {
         type: msg.type || "user",
         text: msg.text,
         attachments: msg.attachments,
+        sharedPost: msg.sharedPost
+          ? sharedPostMap.get(String(msg.sharedPost)) || { unavailable: true }
+          : null,
         timestamp: msg.createdAt?.toISOString() || new Date().toISOString(),
         read: readStatus,
         isTemp: false,
@@ -504,7 +545,7 @@ export const createChat = async (req, res, io, userSocketMap) => {
       })
       .populate({
         path: "lastMessage",
-        select: "text sender createdAt attachments readBy deletedBy",
+        select: "text type sender createdAt attachments readBy deletedBy",
         populate: {
           path: "sender",
           select: "firstName lastName",
@@ -808,6 +849,7 @@ export const saveMessage = async ({
   attachments,
   replyToId,
   clientTempId,
+  sharedPostId,
   io,
   userSocketMap,
 }) => {
@@ -917,6 +959,7 @@ export const saveMessage = async ({
       text: text || "",
       attachments: attachments || [],
       replyTo: replyToId || null,
+      sharedPost: sharedPostId || null,
       readBy: [senderId],
     });
 
@@ -961,6 +1004,14 @@ export const saveMessage = async ({
       })
       .lean();
 
+    const sharedPost = sharedPostId
+      ? formatSharedPost(
+          await Post.findById(sharedPostId)
+            .populate("user", "firstName lastName profileImage")
+            .lean()
+        )
+      : null;
+
     const messageForSocket = {
       id: populatedMessage._id.toString(),
       chat: populatedMessage.chat.toString(),
@@ -975,6 +1026,7 @@ export const saveMessage = async ({
       firstMessageByKnockerId: chat.firstMessageByKnockerId?.toString() || null,
       isLockedIn: chat.isLockedIn || false,
       clientTempId: clientTempId,
+      sharedPost,
       reactions: [],
       editedAt: null,
       replyTo: populatedMessage.replyTo
@@ -1221,7 +1273,7 @@ export const markMessagesAsReadRest = async (req, res, io, userSocketMap) => {
         .populate("participants", "firstName lastName profileImage")
         .populate({
           path: "lastMessage",
-          select: "text sender createdAt attachments readBy deletedBy",
+          select: "text type sender createdAt attachments readBy deletedBy",
           populate: {
             path: "sender",
             select: "firstName lastName",
@@ -1469,7 +1521,7 @@ export const deleteMessage = async (req, res, io, userSocketMap) => {
         .populate("participants", "firstName lastName profileImage")
         .populate({
           path: "lastMessage",
-          select: "text sender createdAt attachments readBy deletedBy",
+          select: "text type sender createdAt attachments readBy deletedBy",
           populate: { path: "sender", select: "firstName lastName" },
         })
         .lean();

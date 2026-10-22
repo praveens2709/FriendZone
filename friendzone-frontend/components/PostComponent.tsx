@@ -10,16 +10,14 @@ import {
   View,
   TouchableOpacity,
   Dimensions,
-  Image,
-  FlatList,
   Platform,
   ActivityIndicator,
   TouchableWithoutFeedback,
-  TextInput,
   Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
+import { readableTextOn } from "@/utils/theme-utils";
 import { renderSheetBackdrop } from "@/components/ui/SheetBackdrop";
 import SafetyService, { ReportReason } from "@/services/SafetyService";
 import PostService from "@/services/PostService";
@@ -29,13 +27,17 @@ import {
   Entypo,
   Feather,
   FontAwesome,
+  Ionicons,
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
+import { tapFeedback } from "@/utils/haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import Animated, {
   useSharedValue,
   withTiming,
+  withSpring,
+  withDelay,
   Easing,
   useAnimatedStyle,
 } from "react-native-reanimated";
@@ -46,7 +48,6 @@ import {
   BottomSheetFlatList,
   BottomSheetTextInput,
 } from "@gorhom/bottom-sheet";
-import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { Post, Comment } from "@/types/post.type";
 import { useAuth } from "@/context/AuthContext";
@@ -54,17 +55,12 @@ import { useSocket } from "@/context/SocketContext";
 import {
   formatPostTimestamp,
   formatCommentTimestamp,
-  getUserStatusLabel,
 } from "@/constants/Functions";
 import { User } from "@/types/user.type";
-import KnockService, { KnockRequest } from "@/services/knockService";
-import ChatService from "@/services/ChatService";
-import { DisplayUser } from "@/types/chat.type";
-import UserProfileCard from "@/components/UserProfileCard";
+import SharePostSheet from "@/components/SharePostSheet";
 import UserAvatar from "./UserAvatar";
 
 const { width, height } = Dimensions.get("window");
-const POST_WIDTH = Dimensions.get("window").width - 28;
 
 interface PostComponentProps {
   post: Post;
@@ -130,6 +126,7 @@ const CommentInput = React.memo(
 );
 
 import { emitPostRemoved } from "@/utils/postEvents";
+import PostImageCarousel from "@/components/PostImageCarousel";
 
 const PostComponent = ({
   post,
@@ -194,7 +191,6 @@ const PostComponent = ({
   const [commentText, setCommentText] = useState("");
   const [isCommentSending, setIsCommentSending] = useState(false);
 
-  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [showFullCaption, setShowFullCaption] = useState(false);
 
   const soundRef = useRef<Audio.Sound | null>(null);
@@ -214,182 +210,12 @@ const PostComponent = ({
 
   const snapPointsComments = useMemo(() => [height * 0.55], []);
   const snapPointsOptions = useMemo(() => [height * 0.46], []);
-  const snapPointsShare = useMemo(() => ["70%"], []);
-
+  
   const hasMultipleInfo = !!post.song && !!post.location;
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [usersToShareWith, setUsersToShareWith] = useState<DisplayUser[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [sharingToChatId, setSharingToChatId] = useState<string | null>(null);
-  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const getRelationAndStatus = useCallback(
-    (
-      targetUserId: string,
-      knockers: KnockRequest[],
-      knocked: KnockRequest[],
-      currentUserId: string
-    ) => {
-      const knockedByMe = knocked.find(
-        (k) => k.knockedId === targetUserId && k.knockerId === currentUserId
-      );
-      const knockedMe = knockers.find(
-        (k) => k.knockerId === targetUserId && k.knockedId === currentUserId
-      );
-
-      let relation: DisplayUser["relationToMe"] = "stranger";
-      let status: DisplayUser["status"] = undefined;
-
-      if (knockedByMe && knockedMe) {
-        relation = "lockedIn";
-        status = "lockedIn";
-      } else if (knockedByMe) {
-        relation = "knocked";
-        status = knockedByMe.status as DisplayUser["status"];
-      } else if (knockedMe) {
-        relation = "knocker";
-        status = knockedMe.status as DisplayUser["status"];
-      }
-
-      return { relation, status };
-    },
-    []
-  );
-
-  const fetchInitialUsersForShare = useCallback(async () => {
-    if (!accessToken || !user?._id) return;
-    setIsSearching(true);
-    try {
-      const [knockersResponse, knockedResponse] = await Promise.all([
-        KnockService.getKnockers(accessToken),
-        KnockService.getKnocked(accessToken),
-      ]);
-
-      const uniqueUsersMap = new Map<string, DisplayUser>();
-
-      const allRelevantKnocks = [...knockedResponse, ...knockersResponse];
-      allRelevantKnocks.forEach((k) => {
-        const targetUserId = k.user.id;
-        if (targetUserId === user._id) return;
-        const { relation, status } = getRelationAndStatus(
-          targetUserId,
-          knockersResponse,
-          knockedResponse,
-          user._id
-        );
-
-        if (status === "lockedIn" || status === "onesidedlock") {
-          uniqueUsersMap.set(targetUserId, {
-            id: targetUserId,
-            username: k.user.username,
-            avatar: k.user.avatar,
-            status: status,
-            relationToMe: relation,
-            isCreatingChat: false,
-          });
-        }
-      });
-
-      const sortedUsers = Array.from(uniqueUsersMap.values()).filter(
-        (u) => u.status === "lockedIn" || u.status === "onesidedlock"
-      );
-      setUsersToShareWith(sortedUsers);
-    } catch (error) {
-      console.error("Failed to fetch users for share:", error);
-    } finally {
-      setIsSearching(false);
-    }
-  }, [accessToken, user?._id, getRelationAndStatus]);
-
-  const handleSearchForShare = useCallback(
-    async (text: string) => {
-      if (!accessToken || !user?._id) return;
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-      if (text.length === 0) {
-        setIsSearching(false);
-        fetchInitialUsersForShare();
-        return;
-      }
-      setIsSearching(true);
-      searchTimeoutRef.current = setTimeout(async () => {
-        try {
-          const [searchResults, knockersResponse, knockedResponse] =
-            await Promise.all([
-              KnockService.searchUsers(accessToken, text),
-              KnockService.getKnockers(accessToken),
-              KnockService.getKnocked(accessToken),
-            ]);
-
-          const processedSearchResults: DisplayUser[] = searchResults
-            .filter((u) => u._id !== user._id)
-            .map((u) => {
-              const { relation, status } = getRelationAndStatus(
-                u._id,
-                knockersResponse,
-                knockedResponse,
-                user._id
-              );
-              return {
-                id: u._id,
-                username: `${u.firstName} ${u.lastName || ""}`.trim(),
-                avatar: u.profileImage,
-                relationToMe: relation,
-                status: status,
-                isCreatingChat: false,
-              };
-            })
-            .filter(
-              (u) => u.status === "lockedIn" || u.status === "onesidedlock"
-            );
-
-          setUsersToShareWith(processedSearchResults);
-        } catch (error) {
-          console.error("Error searching users:", error);
-        } finally {
-          setIsSearching(false);
-        }
-      }, 500);
-    },
-    [accessToken, user?._id, fetchInitialUsersForShare, getRelationAndStatus]
-  );
-
   const handlePresentShareModal = useCallback(() => {
-    if (!accessToken)
-      return;
-    setSearchQuery("");
-    fetchInitialUsersForShare();
     shareModalRef.current?.present();
-  }, [accessToken, fetchInitialUsersForShare]);
-
-  const handleShareToUser = useCallback(
-    async (recipientId: string) => {
-      if (!accessToken) return;
-      setSharingToChatId(recipientId);
-      try {
-        const chatResponse = await ChatService.createChat(
-          accessToken,
-          recipientId
-        );
-        await PostService.sharePostToChat(
-          post._id,
-          chatResponse.chatId,
-          accessToken
-        );
-
-        shareModalRef.current?.dismiss();
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch (error) {
-        console.error("Failed to share post:", error);
-
-      } finally {
-        setSharingToChatId(null);
-      }
-    },
-    [accessToken, post._id]
-  );
+  }, []);
 
   useEffect(() => {
     if (hasMultipleInfo) {
@@ -412,38 +238,46 @@ const PostComponent = ({
   }, [hasMultipleInfo]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const release = async () => {
+      const current = soundRef.current;
+      soundRef.current = null;
+      if (!current) return;
+      try {
+        await current.unloadAsync();
+      } catch {}
+    };
+
     const playSound = async () => {
       if (!post.song) return;
-      if (soundRef.current) {
-        await soundRef.current.unloadAsync();
-      }
+      await release();
+      if (cancelled) return;
       try {
+        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
         const { sound } = await Audio.Sound.createAsync(
           { uri: post.song.previewUrl },
           { shouldPlay: true, isLooping: true }
         );
+        if (cancelled) {
+          try {
+            await sound.unloadAsync();
+          } catch {}
+          return;
+        }
         soundRef.current = sound;
-      } catch (e) {
-        console.error("Error creating sound:", e);
-      }
-    };
-
-    const stopSound = async () => {
-      if (soundRef.current) {
-        await soundRef.current.pauseAsync();
-        await soundRef.current.unloadAsync();
-        soundRef.current = null;
-      }
+      } catch {}
     };
 
     if (isActive && isPlayingThisPost) {
       playSound();
     } else {
-      stopSound();
+      release();
     }
 
     return () => {
-      stopSound();
+      cancelled = true;
+      release();
     };
   }, [isActive, isPlayingThisPost, post.song]);
 
@@ -471,27 +305,30 @@ const PostComponent = ({
     };
   });
 
+  const heartScale = useSharedValue(0);
+  const heartOpacity = useSharedValue(0);
+  const heartStyle = useAnimatedStyle(() => ({
+    opacity: heartOpacity.value,
+    transform: [{ scale: heartScale.value }],
+  }));
+
   const handleDoublePress = useCallback(() => {
     const now = Date.now();
     const isDoublePress = lastTap.current && now - lastTap.current < 300;
 
     if (isDoublePress) {
+      heartScale.value = 0;
+      heartOpacity.value = 1;
+      heartScale.value = withSpring(1, { damping: 10, stiffness: 220 });
+      heartOpacity.value = withDelay(450, withTiming(0, { duration: 250 }));
       if (!isLiked) {
         handleLikePress();
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
       lastTap.current = null;
     } else {
       lastTap.current = now;
     }
   }, [isLiked]);
-
-  const onMomentumScrollEnd = useCallback((event: any) => {
-    const newIndex = Math.floor(
-      event.nativeEvent.contentOffset.x / POST_WIDTH + 0.5
-    );
-    setActiveImageIndex(newIndex);
-  }, []);
 
   const toggleSound = useCallback(async () => {
     if (!post.song) return;
@@ -514,6 +351,7 @@ const PostComponent = ({
 
   const handleLikePress = useCallback(async () => {
     if (!accessToken) return;
+    tapFeedback();
     try {
       const response = await PostService.toggleLike(post._id, accessToken);
       setIsLiked(response.liked);
@@ -575,30 +413,6 @@ const PostComponent = ({
       </ThemedView>
     </ThemedView>
   );
-
-  const renderUserItem = ({ item }: { item: DisplayUser }) => {
-    const description =
-      item.status && item.relationToMe
-        ? getUserStatusLabel(item.status, item.relationToMe)
-        : "Stranger";
-
-    return (
-      <UserProfileCard
-        userId={item.id}
-        username={item.username}
-        avatar={item.avatar}
-        description={description}
-        onPress={() => handleShareToUser(item.id)}
-        rightActionComponent={
-          sharingToChatId === item.id ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : (
-            <Feather name="send" size={24} color={colors.primary} />
-          )
-        }
-      />
-    );
-  };
 
   const handleArchivePost = async () => {
     optionsModalRef.current?.dismiss();
@@ -783,29 +597,10 @@ const PostComponent = ({
       </ThemedView>
       <TouchableWithoutFeedback onPress={handleDoublePress}>
         <ThemedView style={styles.postImageContainer}>
-          <FlatList
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            data={post.images}
-            renderItem={({ item }) => (
-              <Image source={{ uri: item.url }} style={styles.postImage} />
-            )}
-            keyExtractor={(item) => item.public_id}
-            onMomentumScrollEnd={onMomentumScrollEnd}
-          />
-          {post.images.length > 1 && (
-            <ThemedView
-              style={[
-                styles.slideCounter,
-                { backgroundColor: colors.overlayLight },
-              ]}
-            >
-              <ThemedText style={styles.slideCounterText}>
-                {activeImageIndex + 1}/{post.images.length}
-              </ThemedText>
-            </ThemedView>
-          )}
+          <PostImageCarousel images={post.images} />
+          <Animated.View pointerEvents="none" style={[styles.heartBurst, heartStyle]}>
+            <Ionicons name="heart" size={96} color="#F03E3E" />
+          </Animated.View>
           {post.song && (
             <MotiView
               from={{ opacity: 0 }}
@@ -820,7 +615,7 @@ const PostComponent = ({
                 <MaterialCommunityIcons
                   name={isMuted ? "volume-mute" : "volume-high"}
                   size={20}
-                  color={colors.text}
+                  color={readableTextOn(colors.primary, colors.buttonText)}
                 />
               </TouchableOpacity>
             </MotiView>
@@ -1005,91 +800,7 @@ const PostComponent = ({
           )}
         </ThemedView>
       </BottomSheetModal>
-      <BottomSheetModal
-        ref={shareModalRef}
-        index={0}
-        snapPoints={snapPointsShare}
-        enableDynamicSizing={false}
-        enablePanDownToClose={true}
-        backdropComponent={renderSheetBackdrop}
-        handleIndicatorStyle={{ backgroundColor: colors.textDim }}
-        backgroundStyle={{ backgroundColor: colors.backgroundSecondary }}
-        keyboardBehavior="interactive"
-        keyboardBlurBehavior="restore"
-      >
-        <ThemedView style={{ flex: 1 }}>
-          <ThemedView
-            style={[styles.modalHeader, { borderBottomColor: colors.border }]}
-          >
-            <ThemedText style={styles.modalTitle}>Share Post</ThemedText>
-          </ThemedView>
-          <ThemedView
-            style={[
-              styles.searchContainer,
-              {
-                backgroundColor: colors.backgroundSecondary,
-                borderColor: colors.border,
-              },
-            ]}
-          >
-            <Feather
-              name="search"
-              size={20}
-              color={colors.textDim}
-              style={styles.searchIcon}
-            />
-            <TextInput
-              style={[
-                styles.searchInput,
-                {
-                  color: colors.text,
-                  backgroundColor: colors.backgroundSecondary,
-                },
-              ]}
-              placeholder="Search by name"
-              placeholderTextColor={colors.textDim}
-              value={searchQuery}
-              onChangeText={(text) => {
-                setSearchQuery(text);
-                handleSearchForShare(text);
-              }}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            {isSearching && (
-              <ActivityIndicator
-                size="small"
-                color={colors.primary}
-                style={styles.searchLoading}
-              />
-            )}
-          </ThemedView>
-          <BottomSheetFlatList
-            data={usersToShareWith}
-            renderItem={renderUserItem}
-            keyExtractor={(item: DisplayUser) => item.id}
-            contentContainerStyle={styles.listContent}
-            ItemSeparatorComponent={() => (
-              <ThemedView
-                style={[styles.separator, { backgroundColor: colors.border }]}
-              />
-            )}
-            ListEmptyComponent={() => (
-              <ThemedView style={styles.emptyListContainer}>
-                <ThemedText
-                  style={{
-                    fontSize: 16,
-                    textAlign: "center",
-                    color: colors.textDim,
-                  }}
-                >
-                  No LockedIn or Knocking users to share with.
-                </ThemedText>
-              </ThemedView>
-            )}
-          />
-        </ThemedView>
-      </BottomSheetModal>
+      <SharePostSheet ref={shareModalRef} post={post} />
     </ThemedView>
   );
 };
@@ -1200,27 +911,22 @@ const styles = StyleSheet.create({
     padding: 5,
   },
   postImageContainer: {
-    width: POST_WIDTH,
-    height: POST_WIDTH,
+    width: "100%",
+    aspectRatio: 1,
     position: "relative",
   },
-  postImage: {
-    width: POST_WIDTH,
-    height: POST_WIDTH,
-  },
-  slideCounter: {
+  heartBurst: {
     position: "absolute",
-    top: 15,
-    right: 15,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  slideCounterText: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#fff",
+  postImage: {
+    width: "100%",
+    height: "100%",
   },
   soundIconContainer: {
     position: "absolute",

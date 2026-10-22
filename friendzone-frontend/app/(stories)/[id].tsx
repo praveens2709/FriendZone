@@ -123,6 +123,7 @@ export default function StoryScreen() {
         onView={handleView}
         onDelete={handleDelete}
         onShowViewers={handleShowViewers}
+        onOpenPost={(postId) => router.push({ pathname: "/posts/[postId]", params: { postId } })}
         onNextUser={() => {
           if (userIndex < groups.length - 1) setUserIndex(userIndex + 1);
           else router.back();

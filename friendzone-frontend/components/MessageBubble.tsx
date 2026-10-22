@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import {
   StyleSheet,
   Image,
@@ -14,6 +14,8 @@ import { ThemedText } from "@/components/ThemedText";
 import { Ionicons } from "@expo/vector-icons";
 import { MessageResponse } from "@/services/ChatService";
 import AudioPlayer from "@/components/AudioPlayer";
+import UserAvatar from "@/components/UserAvatar";
+import { useRouter } from "expo-router";
 
 interface MessageBubbleProps {
   message: MessageResponse;
@@ -39,17 +41,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const mineInk = readableTextOn(colors.primary, colors.buttonText);
   const textColor = isMyMessage ? mineInk : colors.text;
 
-  useEffect(() => {
-    if (message.attachments) {
-      message.attachments.forEach((att, index) => {
-        console.log(`Attachment ${index} info:`, {
-          url: att.url,
-          type: att.type,
-          fileName: att.fileName,
-        });
-      });
-    }
-  }, [message]);
+  const router = useRouter();
+  const sharedPost = message.sharedPost || null;
 
   const handlePressAttachment = async (url: string) => {
     try {
@@ -153,7 +146,61 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             })}
           </ThemedView>
         )}
-        {message.text ? (
+        {sharedPost && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            disabled={sharedPost.unavailable}
+            onPress={() =>
+              router.push({ pathname: "/posts/[postId]", params: { postId: sharedPost.id as string } })
+            }
+            onLongPress={(event) => onLongPress(message, event)}
+            style={[
+              styles.sharedCard,
+              {
+                backgroundColor: isMyMessage ? "rgba(255,255,255,0.12)" : colors.backgroundSecondary,
+                borderColor: isMyMessage ? "rgba(255,255,255,0.25)" : colors.border,
+              },
+            ]}
+          >
+            {sharedPost.unavailable || !sharedPost.user ? (
+              <ThemedView style={styles.sharedUnavailable}>
+                <Ionicons name="image-outline" size={22} color={textColor} />
+                <ThemedText style={{ color: textColor, fontSize: 13 }}>
+                  This post is unavailable
+                </ThemedText>
+              </ThemedView>
+            ) : (
+              <>
+                <ThemedView style={styles.sharedHeader}>
+                  <UserAvatar imageUri={sharedPost.user.profileImage || undefined} size={24} />
+                  <ThemedText
+                    style={[styles.sharedName, { color: isMyMessage ? mineInk : colors.text }]}
+                    numberOfLines={1}
+                  >
+                    {sharedPost.user.firstName} {sharedPost.user.lastName || ""}
+                  </ThemedText>
+                </ThemedView>
+                {!!sharedPost.image && (
+                  <Image source={{ uri: sharedPost.image }} style={styles.sharedImage} />
+                )}
+                {(sharedPost.imageCount || 0) > 1 && (
+                  <ThemedView style={styles.sharedCount}>
+                    <Ionicons name="copy-outline" size={12} color="#fff" />
+                  </ThemedView>
+                )}
+                {!!sharedPost.caption && (
+                  <ThemedText
+                    style={[styles.sharedCaption, { color: isMyMessage ? mineInk : colors.text }]}
+                    numberOfLines={2}
+                  >
+                    {sharedPost.caption}
+                  </ThemedText>
+                )}
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+        {message.text && !sharedPost ? (
           <ThemedText
             style={[
               styles.messageText,
@@ -235,6 +282,39 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 };
 
 const styles = StyleSheet.create({
+  sharedCard: {
+    width: 230,
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: "hidden",
+    marginBottom: 4,
+  },
+  sharedHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: "transparent",
+  },
+  sharedName: { flex: 1, fontSize: 14, fontWeight: "700", lineHeight: 18 },
+  sharedImage: { width: "100%", aspectRatio: 1 },
+  sharedCount: {
+    position: "absolute",
+    top: 46,
+    right: 8,
+    padding: 5,
+    borderRadius: 10,
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  sharedCaption: { fontSize: 13, lineHeight: 18, paddingHorizontal: 10, paddingVertical: 8 },
+  sharedUnavailable: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 14,
+    backgroundColor: "transparent",
+  },
   messageBubbleContainer: {
     maxWidth: "80%",
     marginVertical: 5,

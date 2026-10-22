@@ -11,6 +11,7 @@ export default function StoriesLayout() {
       <Stack.Screen
         name="camera"
       />
+      <Stack.Screen name="post-story" />
       <Stack.Screen name="[id]" />
     </Stack>
   );

@@ -1,3 +1,5 @@
+import { personalizeSystemText } from "@/utils/systemText";
+import { tapFeedback } from "@/utils/haptics";
 import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
@@ -81,6 +83,18 @@ const AnimatedTypingText: React.FC = () => {
       Typing...
     </RNAnimated.Text>
   );
+};
+
+const systemMessageIcon = (text?: string): keyof typeof Ionicons.glyphMap => {
+  const value = (text || "").toLowerCase();
+  if (value.includes("video call")) return "videocam";
+  if (value.includes("audio call") || value.includes("call")) return "call";
+  if (value.includes("photo")) return "image";
+  if (value.includes("renamed")) return "create";
+  if (value.includes("left")) return "exit";
+  if (value.includes("added") || value.includes("created")) return "person-add";
+  if (value.includes("removed")) return "person-remove";
+  return "information-circle";
 };
 
 export default function ChatMessagesScreen() {
@@ -726,6 +740,7 @@ export default function ChatMessagesScreen() {
             replyTo: message.replyTo || null,
             reactions: message.reactions || [],
             editedAt: message.editedAt || null,
+            sharedPost: message.sharedPost || null,
           };
           setCurrentMessages((prevMessages) => {
             let updatedMessages = [...prevMessages];
@@ -969,6 +984,7 @@ export default function ChatMessagesScreen() {
   };
 
   const handleSendMessage = async () => {
+    tapFeedback();
     if (editingMessage) {
       await submitEdit();
       return;
@@ -1240,9 +1256,20 @@ export default function ChatMessagesScreen() {
           </ThemedView>
         )}
         {item.type === "system" ? (
-          <ThemedView style={styles.systemMessage}>
+          <ThemedView
+            style={[
+              styles.systemMessage,
+              styles.systemPill,
+              { backgroundColor: colors.buttonBackgroundSecondary },
+            ]}
+          >
+            <Ionicons
+              name={systemMessageIcon(item.text)}
+              size={14}
+              color={/missed/i.test(item.text || "") ? colors.red : colors.textDim}
+            />
             <ThemedText style={[styles.systemMessageText, { color: colors.textDim }]}>
-              {item.text}
+              {personalizeSystemText(item.text, item.sender, user?._id, user?.firstName)}
             </ThemedText>
           </ThemedView>
         ) : (
@@ -1658,6 +1685,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     marginVertical: 6,
     maxWidth: "85%",
+  },
+  systemPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 14,
   },
   systemMessageText: {
     fontSize: 12,
