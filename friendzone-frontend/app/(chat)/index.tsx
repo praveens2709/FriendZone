@@ -1,3 +1,6 @@
+import { personalizeSystemText } from "@/utils/systemText";
+import EmptyState from "@/components/EmptyState";
+import { ChatListSkeleton } from "@/components/Skeleton";
 import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
@@ -529,10 +532,14 @@ export default function ChatsScreen() {
             </ThemedText>
           </ThemedView>
         );
-      default:
+      default: {
+        const shownContent =
+          lastMessage.type === "system"
+            ? personalizeSystemText(lastMessage.content, lastMessage.senderId, user?._id, user?.firstName)
+            : lastMessage.content;
         return (
           <ThemedView style={styles.chatLastMessageContainer}>
-            {isMyMessage && sentReadStatus}
+            {isMyMessage && lastMessage.type !== "system" && sentReadStatus}
             <ThemedText
               numberOfLines={1}
               style={[
@@ -545,10 +552,11 @@ export default function ChatsScreen() {
                   },
               ]}
             >
-              {lastMessage.content}
+              {shownContent}
             </ThemedText>
           </ThemedView>
         );
+      }
     }
   };
 
@@ -646,12 +654,7 @@ export default function ChatsScreen() {
               </TouchableOpacity>
             }
           />
-          <ThemedView style={styles.initialLoadingContainer}>
-            <ActivityIndicator size="small" color={colors.text} />
-            <ThemedText style={{ color: colors.textDim }}>
-              Loading chats...
-            </ThemedText>
-          </ThemedView>
+          <ChatListSkeleton />
         </ThemedSafeArea>
       </ScreenBackground>
     );
@@ -740,17 +743,14 @@ export default function ChatsScreen() {
             />
           )}
           ListEmptyComponent={() => (
-            <ThemedView style={styles.emptyListContainer}>
-              <ThemedText
-                style={{
-                  fontSize: 16,
-                  textAlign: "center",
-                  color: colors.textDim,
-                }}
-              >
-                No chats found. Start a new conversation!
-              </ThemedText>
-            </ThemedView>
+            <EmptyState
+              icon="chatbubbles-outline"
+              art="call"
+              title="No chats yet"
+              message="Start a conversation with someone in your circle."
+              actionLabel="New chat"
+              onAction={() => router.push("/(chat)/new")}
+            />
           )}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}

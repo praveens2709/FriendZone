@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { StyleSheet, View, Text, TouchableOpacity, Dimensions, ActivityIndicator } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { StyleSheet, View, Text, TouchableOpacity, Dimensions, ActivityIndicator, Animated } from "react-native";
 import ThemedModal from "@/components/ThemedModal";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
@@ -23,6 +23,49 @@ const KEY_RANK: Record<KeyStatus, number> = {
   absent: 1,
   present: 2,
   correct: 3,
+};
+
+const FlipTile = ({
+  evaluation,
+  delay,
+  renderFace,
+}: {
+  evaluation?: TileEvaluation;
+  delay: number;
+  renderFace: (shown: TileEvaluation | null) => React.ReactNode;
+}) => {
+  const flip = useRef(new Animated.Value(0)).current;
+  const [shown, setShown] = useState<TileEvaluation | null>(evaluation ?? null);
+  const previous = useRef<TileEvaluation | undefined>(evaluation);
+
+  useEffect(() => {
+    const before = previous.current;
+    previous.current = evaluation;
+    if (evaluation && !before) {
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(flip, { toValue: 1, duration: 170, useNativeDriver: true }),
+      ]).start(() => {
+        setShown(evaluation);
+        Animated.timing(flip, { toValue: 0, duration: 170, useNativeDriver: true }).start();
+      });
+    } else {
+      setShown(evaluation ?? null);
+    }
+  }, [evaluation, delay, flip]);
+
+  return (
+    <Animated.View
+      style={{
+        transform: [
+          { perspective: 600 },
+          { rotateX: flip.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "90deg"] }) },
+        ],
+      }}
+    >
+      {renderFace(shown)}
+    </Animated.View>
+  );
 };
 
 const EMPTY_GUESSES = ['', '', '', '', '', ''];
@@ -200,7 +243,7 @@ const WordleGameModal: React.FC<WordleGameModalProps> = ({ visible, onClose }) =
 
       setTimeout(() => {
         setShowResult(true);
-      }, 1000);
+      }, 1700);
     } else {
       setCurrentGuessIndex(currentGuessIndex + 1);
       setCurrentGuess('');
@@ -219,8 +262,13 @@ const WordleGameModal: React.FC<WordleGameModalProps> = ({ visible, onClose }) =
     }
   };
 
-  const getTileStyle = (letter: string, guessIndex: number, letterIndex: number) => {
-    const evaluation = evaluations[guessIndex]?.[letterIndex];
+  const getTileStyle = (
+    letter: string,
+    guessIndex: number,
+    letterIndex: number,
+    shown?: TileEvaluation | null
+  ) => {
+    const evaluation = shown !== undefined ? shown ?? undefined : evaluations[guessIndex]?.[letterIndex];
 
     if (!evaluation) {
       if (guessIndex === currentGuessIndex && !gameOver && letterIndex < currentGuess.length) {
@@ -259,13 +307,17 @@ const WordleGameModal: React.FC<WordleGameModalProps> = ({ visible, onClose }) =
   };
 
   const renderTile = (letter: string, guessIndex: number, letterIndex: number) => {
-    const tileStyle = getTileStyle(letter, guessIndex, letterIndex);
-    const textColor = evaluations[guessIndex]?.[letterIndex] ? 'white' : colors.text;
-
     return (
-      <View key={letterIndex} style={[styles.tile, tileStyle]}>
-        <Text style={[styles.tileText, { color: textColor }]}>{letter}</Text>
-      </View>
+      <FlipTile
+        key={letterIndex}
+        evaluation={evaluations[guessIndex]?.[letterIndex]}
+        delay={letterIndex * 200}
+        renderFace={(shown) => (
+          <View style={[styles.tile, getTileStyle(letter, guessIndex, letterIndex, shown)]}>
+            <Text style={[styles.tileText, { color: shown ? 'white' : colors.text }]}>{letter}</Text>
+          </View>
+        )}
+      />
     );
   };
 

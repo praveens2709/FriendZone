@@ -1,4 +1,3 @@
-import { readableTextOn } from "@/utils/theme-utils";
 import { useTabBarSpace } from "@/hooks/useTabBarSpace";
 import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useEffect, useState, useCallback, useRef } from "react";
@@ -30,6 +29,10 @@ import { Post } from "@/types/post.type";
 import { useFocusEffect } from "@react-navigation/native";
 import StreakEndedModal from "@/components/modals/StreakEndedModal";
 import WordleGameModal from "@/components/modals/WordleGameModal";
+import UploadProgressBar from "@/components/UploadProgressBar";
+import EmptyState from "@/components/EmptyState";
+import { PostSkeleton } from "@/components/Skeleton";
+import { useUploadStore } from "@/store/uploadStore";
 
 interface ViewableItem extends ViewToken {
   item: Post;
@@ -54,6 +57,7 @@ export default function HomeScreen() {
   );
 
   const [showWordleGame, setShowWordleGame] = useState(false);
+  const uploadsDone = useUploadStore((state) => state.doneCount);
 
   const viewabilityConfig = {
     itemVisiblePercentThreshold: 50,
@@ -131,6 +135,10 @@ export default function HomeScreen() {
       setLoadingMore(false);
     }
   }, [accessToken, hasMorePosts, postsLoading]);
+
+  useEffect(() => {
+    if (uploadsDone > 0) fetchPosts(true);
+  }, [uploadsDone, fetchPosts]);
 
   const firstFocusRef = useRef(true);
 
@@ -318,6 +326,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           }
         />
+        <UploadProgressBar />
         <FlatList
           data={posts}
           renderItem={({ item }) => (
@@ -353,26 +362,20 @@ export default function HomeScreen() {
             </ThemedView>
           }
           ListEmptyComponent={
-            postsLoading ? null : (
-              <ThemedView style={styles.emptyFeed}>
-                <Ionicons name="people-outline" size={44} color={colors.textDim} />
-                <ThemedText style={[styles.emptyFeedTitle, { color: colors.text }]}>
-                  Your feed is quiet
-                </ThemedText>
-                <ThemedText style={[styles.emptyFeedText, { color: colors.textDim }]}>
-                  Posts from the people you've locked in with show up here.
-                </ThemedText>
-                <TouchableOpacity
-                  onPress={() => router.push("/(tabs)/circle")}
-                  style={[styles.emptyFeedButton, { backgroundColor: colors.primary }]}
-                >
-                  <ThemedText
-                    style={{ color: readableTextOn(colors.primary, colors.buttonText), fontWeight: "700" }}
-                  >
-                    Find your people
-                  </ThemedText>
-                </TouchableOpacity>
+            postsLoading ? (
+              <ThemedView>
+                <PostSkeleton />
+                <PostSkeleton />
               </ThemedView>
+            ) : (
+              <EmptyState
+                icon="people-outline"
+                art="party"
+                title="Your feed is quiet"
+                message="Posts from the people you've locked in with show up here."
+                actionLabel="Find your people"
+                onAction={() => router.push("/(tabs)/circle")}
+              />
             )
           }
           onViewableItemsChanged={onViewableItemsChanged}

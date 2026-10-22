@@ -1,3 +1,5 @@
+import EmptyState from "@/components/EmptyState";
+import { NotificationListSkeleton } from "@/components/Skeleton";
 import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
@@ -6,6 +8,7 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  View,
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemedView } from "@/components/ThemedView";
@@ -42,6 +45,23 @@ const buildKnockRequestDisplay = (requests: KnockRequest[]) => {
       ? "No new knocks yet."
       : `${count} new knock${count > 1 ? "s" : ""}`;
   return { count, avatar1Uri, avatar2Uri, message };
+};
+
+type TypeBadge = { icon: keyof typeof Ionicons.glyphMap; color: string };
+
+const notificationTypeBadge = (
+  type: string,
+  relatedEntityType: string | null | undefined,
+  primary: string
+): TypeBadge | null => {
+  if (type === "post_like") return { icon: "heart", color: "#F03E3E" };
+  if (type === "post_comment") return { icon: "chatbubble", color: "#4C6EF5" };
+  if (type === "meeting_invite" || relatedEntityType === "Meeting") return { icon: "calendar", color: "#F08C00" };
+  if (type === "knock_accepted") return { icon: "lock-closed", color: primary };
+  if (type === "knock" || type === "knock_request") return { icon: "hand-left", color: primary };
+  if (type === "game_invite" || type === "game_activity") return { icon: "game-controller", color: "#7048E8" };
+  if (type === "message") return { icon: "chatbubble-ellipses", color: "#4C6EF5" };
+  return null;
 };
 
 export default function NotificationsScreen() {
@@ -767,6 +787,7 @@ export default function NotificationsScreen() {
         item.content?.includes("accepted your knock request."));
 
     const isMeetingInvite = item.type === "meeting_invite";
+    const typeBadge = notificationTypeBadge(item.type, item.relatedEntityType, colors.primary);
 
     return (
       <TouchableOpacity
@@ -780,11 +801,19 @@ export default function NotificationsScreen() {
         onPress={onPressNotificationItem}
         disabled={isLoadingAction}
       >
-        <UserAvatar
-          imageUri={sender.avatar}
-          size={45}
-          style={styles.notificationAvatar}
-        />
+        <View style={styles.notificationAvatar}>
+          <UserAvatar imageUri={sender.avatar} size={45} />
+          {typeBadge && (
+            <View
+              style={[
+                styles.typeBadge,
+                { backgroundColor: typeBadge.color, borderColor: colors.backgroundSecondary },
+              ]}
+            >
+              <Ionicons name={typeBadge.icon} size={11} color="#fff" />
+            </View>
+          )}
+        </View>
         <ThemedView style={styles.notificationContent}>
           <ThemedView style={styles.notificationMessageWrapper}>
             {message}
@@ -827,12 +856,7 @@ export default function NotificationsScreen() {
         />
 
         {loading && page === 1 && !refreshing ? (
-          <ThemedView style={styles.initialLoadingContainer}>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <ThemedText style={{ color: colors.textDim }}>
-              Loading notifications...
-            </ThemedText>
-          </ThemedView>
+          <NotificationListSkeleton />
         ) : (
           <>
             {isProfilePrivate && (
@@ -919,17 +943,12 @@ export default function NotificationsScreen() {
               ListEmptyComponent={() =>
                 Object.keys(groupedNotifications).length === 0 &&
                   (!isProfilePrivate || privateKnockRequestsCount === 0) ? (
-                  <ThemedView style={styles.emptyListContainer}>
-                    <ThemedText
-                      style={{
-                        fontSize: 16,
-                        color: colors.textDim,
-                        textAlign: "center",
-                      }}
-                    >
-                      No notifications yet.
-                    </ThemedText>
-                  </ThemedView>
+                  <EmptyState
+                    icon="notifications-outline"
+                    art="movie"
+                    title="You're all caught up"
+                    message="Knocks, likes, comments and plan updates show up here."
+                  />
                 ) : null
               }
               onEndReached={handleLoadMore}
@@ -1056,6 +1075,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderRadius: 18,
     borderWidth: 1,
+  },
+  typeBadge: {
+    position: "absolute",
+    right: -3,
+    bottom: -3,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
   },
   notificationAvatar: {
     marginRight: 12,
