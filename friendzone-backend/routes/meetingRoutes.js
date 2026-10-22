@@ -27,6 +27,8 @@ export default function meetingRoutes(io, userSocketMap) {
 
     router.patch('/:meetingId/status', meetingController.updateMeetingStatus);
 
+    router.patch('/:meetingId', (req, res) => meetingController.updateMeeting(req, res, io));
+
     router.post('/:meetingId/respond', (req, res) => meetingController.respondToInvitation(req, res, io));
 
     router.delete('/:meetingId', (req, res) => meetingController.deleteMeeting(req, res, io));

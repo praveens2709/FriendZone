@@ -68,6 +68,20 @@ class MeetingService {
         }
     }
 
+    static async updateMeeting(
+        meetingId: string,
+        data: {
+            title?: string;
+            description?: string;
+            location?: string;
+            startTime?: string;
+            endTime?: string;
+        },
+        token: string
+    ): Promise<Meeting> {
+        return await _patch<Meeting>(`meetings/${meetingId}`, data, token);
+    }
+
     static async updateMeetingStatus(
         meetingId: string,
         status: "live" | "completed",

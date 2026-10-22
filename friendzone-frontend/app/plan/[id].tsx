@@ -18,7 +18,7 @@ import { ThemedView } from "@/components/ThemedView";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Button from "@/components/Button";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams, type Href } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 import { useSocket } from "@/context/SocketContext";
 import MeetingService from "@/services/MeetingService";
@@ -26,6 +26,7 @@ import { Meeting } from "@/types/meeting.type";
 import { format } from "date-fns";
 import UserAvatar from "@/components/UserAvatar";
 import UserProfileCard from "@/components/UserProfileCard";
+import PlanBanner from "@/components/meetings/PlanBanner";
 
 export default function MeetingDetailsScreen() {
     const { colors } = useTheme();
@@ -218,6 +219,15 @@ export default function MeetingDetailsScreen() {
                     rightContent1={
                         <View style={{ flexDirection: 'row', gap: 10 }}>
                             {isHost && (meeting.status === 'upcoming' || meeting.status === 'live') && (
+                                <TouchableOpacity
+                                    onPress={() =>
+                                        router.push(`/plan/edit?editId=${meeting._id}` as Href)
+                                    }
+                                >
+                                    <Ionicons name="create-outline" size={24} color={colors.text} />
+                                </TouchableOpacity>
+                            )}
+                            {isHost && (meeting.status === 'upcoming' || meeting.status === 'live') && (
                                 <TouchableOpacity onPress={() => setShowInviteModal(true)}>
                                     <Ionicons name="person-add-outline" size={24} color={colors.text} />
                                 </TouchableOpacity>
@@ -227,24 +237,7 @@ export default function MeetingDetailsScreen() {
                 />
 
                 <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
-                    <View style={styles.statusRow}>
-                        <View style={[
-                            styles.statusBadge,
-                            {
-                                backgroundColor: meeting.status === "live" ? "#EF4444" :
-                                    meeting.status === "upcoming" ? colors.primary : colors.border
-                            }
-                        ]}>
-                            <MaterialCommunityIcons name={isInPerson ? "map-marker" : "video"} size={14} color="white" />
-                            <ThemedText style={styles.statusText}>
-                                {meeting.status.toUpperCase()}
-                            </ThemedText>
-                        </View>
-                    </View>
-
-                    <ThemedText style={[styles.title, { color: colors.text }]}>
-                        {meeting.title}
-                    </ThemedText>
+                    <PlanBanner meeting={meeting} />
 
                     {meeting.description && (
                         <ThemedText style={[styles.description, { color: colors.textDim }]}>

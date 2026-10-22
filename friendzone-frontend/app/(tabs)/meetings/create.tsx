@@ -44,7 +44,12 @@ export default function CreateMeetingScreen() {
     const [loading, setLoading] = useState(false);
 
     const [showInviteModal, setShowInviteModal] = useState(false);
-    const { invitee } = useLocalSearchParams<{ invitee?: string }>();
+    const { invitee, editId } = useLocalSearchParams<{ invitee?: string; editId?: string }>();
+    const isEditing = !!editId;
+    const [editStatus, setEditStatus] = useState<"upcoming" | "live" | null>(null);
+    const [endTime, setEndTime] = useState(addHours(new Date(), 3));
+    const [showEndPicker, setShowEndPicker] = useState(false);
+    const [loadingPlan, setLoadingPlan] = useState(isEditing);
     const [selectedInviteeIds, setSelectedInviteeIds] = useState<Set<string>>(
         new Set(invitee ? [String(invitee)] : [])
     );
@@ -72,6 +77,26 @@ export default function CreateMeetingScreen() {
             )
             .catch(() => undefined);
     }, [invitee, accessToken]);
+
+    useEffect(() => {
+        if (!editId || !accessToken) return;
+        MeetingService.getMeetingById(String(editId), accessToken)
+            .then((plan) => {
+                if (plan.host._id !== user?._id || (plan.status !== "upcoming" && plan.status !== "live")) {
+                    router.back();
+                    return;
+                }
+                setTitle(plan.title);
+                setDescription(plan.description || "");
+                setKind(plan.kind === "video" ? "video" : "in_person");
+                setLocation(plan.location || "");
+                setStartTime(new Date(plan.startTime));
+                setEndTime(plan.endTime ? new Date(plan.endTime) : addHours(new Date(plan.startTime), 2));
+                setEditStatus(plan.status);
+            })
+            .catch(() => setSubmitError("Couldn't load this plan."))
+            .finally(() => setLoadingPlan(false));
+    }, [editId, accessToken, user?._id, router]);
 
     const removeInvitee = (id: string) => {
         setSelectedInviteeIds(prev => {
@@ -112,8 +137,18 @@ export default function CreateMeetingScreen() {
             hasError = true;
         }
 
-        if (startTime < new Date()) {
+        if (!isEditing && startTime < new Date()) {
             setTimeError("Start time cannot be in the past");
+            hasError = true;
+        }
+
+        if (isEditing && endTime <= startTime) {
+            setTimeError("End time must be after the start");
+            hasError = true;
+        }
+
+        if (isEditing && editStatus === "live" && endTime <= new Date()) {
+            setTimeError("End time must be in the future");
             hasError = true;
         }
 
@@ -126,6 +161,21 @@ export default function CreateMeetingScreen() {
 
         setLoading(true);
         try {
+            if (isEditing) {
+                await MeetingService.updateMeeting(
+                    String(editId),
+                    {
+                        title: title.trim(),
+                        description: description.trim(),
+                        location: kind === "in_person" ? location.trim() : undefined,
+                        startTime: editStatus === "upcoming" ? startTime.toISOString() : undefined,
+                        endTime: endTime.toISOString(),
+                    },
+                    accessToken
+                );
+                router.back();
+                return;
+            }
             await MeetingService.createMeeting({
                 title: title.trim(),
                 kind,
@@ -155,14 +205,14 @@ export default function CreateMeetingScreen() {
         <ScreenBackground style={styles.container}>
             <ThemedSafeArea style={styles.safeArea} edges={["top", "left", "right"]}>
                 <CommonHeader
-                    title="Make a plan"
+                    title={isEditing ? "Edit plan" : "Make a plan"}
                     leftContent={<BackButton color={colors.text} />}
                 />
 
                 <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
                     <ThemedView style={styles.formSection}>
                         <ThemedText style={[styles.label, { color: colors.textDim }]}>HOW ARE YOU HANGING OUT?</ThemedText>
-                        <View style={styles.kindRow}>
+                        <View style={[styles.kindRow, isEditing && { opacity: 0.5 }]} pointerEvents={isEditing ? "none" : "auto"}>
                             {([
                                 { value: "in_person", label: "In person", icon: "location-outline" },
                                 { value: "video", label: "Video call", icon: "videocam-outline" },
@@ -238,6 +288,7 @@ export default function CreateMeetingScreen() {
                         />
                     </ThemedView>
 
+                    {(!isEditing || editStatus === "upcoming") && (
                     <ThemedView style={styles.formSection}>
                         <ThemedText style={[styles.label, { color: colors.textDim }]}>WHEN</ThemedText>
                         <TouchableOpacity
@@ -261,9 +312,42 @@ export default function CreateMeetingScreen() {
                                 minimumDate={new Date()}
                             />
                         )}
-                        {timeError ? <ThemedText style={styles.errorText}>{timeError}</ThemedText> : null}
+                        {timeError && !isEditing ? <ThemedText style={styles.errorText}>{timeError}</ThemedText> : null}
                     </ThemedView>
+                    )}
 
+                    {isEditing && (
+                        <ThemedView style={styles.formSection}>
+                            <ThemedText style={[styles.label, { color: colors.textDim }]}>ENDS</ThemedText>
+                            <TouchableOpacity
+                                style={[styles.dateButton, { backgroundColor: colors.buttonBackgroundSecondary, borderColor: timeError ? '#EF4444' : colors.border }]}
+                                onPress={() => {
+                                    setShowEndPicker(true);
+                                    if (timeError) setTimeError("");
+                                }}
+                            >
+                                <ThemedText style={{ color: colors.text }}>
+                                    {format(endTime, "MMM d, yyyy 'at' h:mm a")}
+                                </ThemedText>
+                                <Ionicons name="time-outline" size={20} color={colors.textDim} />
+                            </TouchableOpacity>
+                            {showEndPicker && (
+                                <DateTimePicker
+                                    value={endTime}
+                                    mode="datetime"
+                                    display={Platform.OS === "ios" ? "spinner" : "default"}
+                                    onChange={(_event: any, selectedDate?: Date) => {
+                                        setShowEndPicker(Platform.OS === "ios");
+                                        if (selectedDate) setEndTime(selectedDate);
+                                    }}
+                                    minimumDate={new Date()}
+                                />
+                            )}
+                            {timeError ? <ThemedText style={styles.errorText}>{timeError}</ThemedText> : null}
+                        </ThemedView>
+                    )}
+
+                    {!isEditing && (
                     <ThemedView style={styles.formSection}>
                         <ThemedText style={[styles.label, { color: colors.textDim }]}>
                             WHO'S INVITED {selectedInviteeIds.size > 0 && `(${selectedInviteeIds.size})`}
@@ -296,15 +380,16 @@ export default function CreateMeetingScreen() {
                                 : "Only the people you add will see this plan."}
                         </ThemedText>
                     </ThemedView>
+                    )}
 
                 </ScrollView>
 
-                <View style={[styles.footer, { paddingBottom: tabSpace - 4, borderTopColor: colors.border }]}>
+                <View style={[styles.footer, { paddingBottom: isEditing ? 28 : tabSpace - 4, borderTopColor: colors.border }]}>
                     {submitError ? <ThemedText style={[styles.errorText, { textAlign: 'center', marginBottom: 10 }]}>{submitError}</ThemedText> : null}
                     <Button
-                        title={loading ? "Scheduling..." : "Schedule Plan"}
+                        title={isEditing ? (loading ? "Saving..." : "Save changes") : loading ? "Scheduling..." : "Schedule Plan"}
                         onPress={handleCreate}
-                        disabled={loading}
+                        disabled={loading || loadingPlan}
                     />
                 </View>
 

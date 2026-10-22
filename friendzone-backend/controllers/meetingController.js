@@ -422,6 +422,137 @@ export const updateMeetingStatus = async (req, res) => {
     }
 };
 
+export const updateMeeting = async (req, res, io) => {
+    try {
+        const { meetingId } = req.params;
+        const userId = req.user._id.toString();
+
+        if (!mongoose.Types.ObjectId.isValid(meetingId)) {
+            return res.status(400).json({ message: 'Invalid meeting ID' });
+        }
+
+        const meeting = await Meeting.findById(meetingId);
+        if (!meeting) {
+            return res.status(404).json({ message: 'Meeting not found' });
+        }
+        if (meeting.host.toString() !== userId) {
+            return res.status(403).json({ message: 'Only the host can edit this plan' });
+        }
+        if (meeting.status !== 'upcoming' && meeting.status !== 'live') {
+            return res.status(400).json({ message: 'Only upcoming or live plans can be edited' });
+        }
+
+        const body = req.body || {};
+        const changes = [];
+
+        if (body.title !== undefined) {
+            const title = cleanString(body.title, 100);
+            if (!title) {
+                return res.status(400).json({ message: 'Give your plan a name' });
+            }
+            if (title !== meeting.title) changes.push('title');
+            meeting.title = title;
+        }
+
+        if (body.description !== undefined) {
+            meeting.description = cleanString(body.description, 500);
+        }
+
+        if (body.location !== undefined && meeting.kind === 'in_person') {
+            const location = cleanString(body.location, 200);
+            if (!location) {
+                return res.status(400).json({ message: 'A place is required for in-person plans' });
+            }
+            if (location !== meeting.location) changes.push('place');
+            meeting.location = location;
+        }
+
+        const now = new Date();
+        let start = meeting.startTime;
+        let end = meeting.endTime || new Date(start.getTime() + 2 * 60 * 60 * 1000);
+
+        if (body.startTime !== undefined && meeting.status === 'upcoming') {
+            const nextStart = new Date(body.startTime);
+            if (Number.isNaN(nextStart.getTime())) {
+                return res.status(400).json({ message: 'Invalid start time' });
+            }
+            if (nextStart < now) {
+                return res.status(400).json({ message: 'Start time cannot be in the past' });
+            }
+            if (nextStart.getTime() !== start.getTime()) {
+                if (body.endTime === undefined) {
+                    end = new Date(nextStart.getTime() + (end.getTime() - start.getTime()));
+                }
+                changes.push('time');
+                start = nextStart;
+            }
+        }
+
+        if (body.endTime !== undefined) {
+            const nextEnd = new Date(body.endTime);
+            if (Number.isNaN(nextEnd.getTime())) {
+                return res.status(400).json({ message: 'Invalid end time' });
+            }
+            end = nextEnd;
+        }
+
+        if (end <= start) {
+            return res.status(400).json({ message: 'End time must be after start time' });
+        }
+        if (meeting.status === 'live' && end <= now) {
+            return res.status(400).json({ message: 'End time must be in the future' });
+        }
+
+        meeting.startTime = start;
+        meeting.endTime = end;
+        await meeting.save();
+
+        const formattedTime = start.toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+        });
+
+        await Notification.updateMany(
+            { relatedEntityId: meeting._id, relatedEntityType: 'Meeting', type: 'meeting_invite' },
+            {
+                $set: {
+                    content: `invited you to "${meeting.title}" on ${formattedTime}`,
+                    'metadata.meetingTitle': meeting.title,
+                    'metadata.startTime': start.toISOString(),
+                },
+            }
+        );
+
+        if (changes.length > 0 && io) {
+            const accepted = meeting.participants
+                .filter((p) => p.status === 'accepted')
+                .map((p) => p.user.toString());
+            const what = changes.includes('time') ? `moved "${meeting.title}" to ${formattedTime}` : `updated "${meeting.title}"`;
+            for (const participantId of accepted) {
+                await createNotification({
+                    recipientId: participantId,
+                    senderId: userId,
+                    type: 'activity',
+                    content: what,
+                    relatedEntityId: meeting._id,
+                    relatedEntityType: 'Meeting',
+                    metadata: { meetingId: meeting._id.toString() },
+                    io,
+                });
+            }
+        }
+
+        await emitMeetingUpdate(io, meeting);
+        await meeting.populate(POPULATE_FIELDS);
+        res.json(meeting);
+    } catch (error) {
+        console.error('Error updating meeting:', error);
+        res.status(500).json({ message: 'Failed to update plan' });
+    }
+};
+
 export const respondToInvitation = async (req, res, io) => {
     try {
         const { meetingId } = req.params;

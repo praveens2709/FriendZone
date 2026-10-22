@@ -6,7 +6,8 @@ import UserAvatar from "@/components/UserAvatar";
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
 import { Meeting } from "@/types/meeting.type";
-import { readableTextOn } from "@/utils/theme-utils";
+import ArtBackground from "@/components/ui/ArtBackground";
+import { planCountdown, planTheme } from "@/utils/planStyle";
 
 interface MeetingCardProps {
     meeting: Meeting;
@@ -18,9 +19,10 @@ interface MeetingCardProps {
 export default function MeetingCard({ meeting, onJoin, onPress, onDelete }: MeetingCardProps) {
     const { colors } = useTheme();
     const { user } = useAuth();
-    const ink = readableTextOn(colors.primary, colors.buttonText);
 
     const start = new Date(meeting.startTime);
+    const theme = planTheme({ ...meeting });
+    const tileInk = "#FFFFFF";
     const isLive = meeting.status === "live";
     const isCompleted = meeting.status === "completed";
     const isCancelled = meeting.status === "cancelled";
@@ -59,11 +61,10 @@ export default function MeetingCard({ meeting, onJoin, onPress, onDelete }: Meet
                     },
                 ]}
             >
-                <View style={[styles.date, { backgroundColor: inactive ? colors.border : colors.primary }]}>
-                    <Text style={[styles.day, { color: inactive ? colors.text : ink }]}>{format(start, "d")}</Text>
-                    <Text style={[styles.month, { color: inactive ? colors.text : ink }]}>
-                        {format(start, "MMM").toUpperCase()}
-                    </Text>
+                <View style={styles.date}>
+                    <ArtBackground palette={theme.palette} glyph={theme.glyph} watermark={54} />
+                    <Text style={[styles.day, { color: tileInk }]}>{format(start, "d")}</Text>
+                    <Text style={[styles.month, { color: tileInk }]}>{format(start, "MMM").toUpperCase()}</Text>
                 </View>
 
                 <View style={styles.body}>
@@ -83,6 +84,11 @@ export default function MeetingCard({ meeting, onJoin, onPress, onDelete }: Meet
                         <Text style={[styles.meta, { color: colors.textDim }]}>
                             {when} · {format(start, "h:mm a")}
                         </Text>
+                        {!inactive && (
+                            <Text style={[styles.countdown, { color: isLive ? colors.red : colors.primary }]}>
+                                · {planCountdown(meeting).replace("Live · ", "")}
+                            </Text>
+                        )}
                     </View>
                     <View style={styles.line}>
                         <Ionicons
@@ -141,7 +147,8 @@ export default function MeetingCard({ meeting, onJoin, onPress, onDelete }: Meet
 
 const styles = StyleSheet.create({
     card: { flexDirection: "row", borderWidth: 1, borderRadius: 20, padding: 12, gap: 14, marginBottom: 12 },
-    date: { width: 58, borderRadius: 16, alignItems: "center", justifyContent: "center", paddingVertical: 10 },
+    date: { width: 58, borderRadius: 16, alignItems: "center", justifyContent: "center", paddingVertical: 10, overflow: "hidden" },
+    countdown: { fontSize: 12, fontWeight: "800" },
     day: { fontSize: 24, fontWeight: "900", lineHeight: 28 },
     month: { fontSize: 11, fontWeight: "800", letterSpacing: 0.8 },
     body: { flex: 1, gap: 3 },

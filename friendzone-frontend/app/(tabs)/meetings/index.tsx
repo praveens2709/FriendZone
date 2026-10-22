@@ -24,6 +24,7 @@ import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import { format } from "date-fns";
 import MeetingCard from "@/components/meetings/MeetingCard";
+import EmptyState from "@/components/EmptyState";
 import { Calendar, DateData } from "react-native-calendars";
 import { useAuth } from "@/context/AuthContext";
 import MeetingService from "@/services/MeetingService";
@@ -328,18 +329,28 @@ export default function MeetingsScreen() {
                                 />
                             }
                             ListEmptyComponent={() => (
-                                <View style={styles.emptyState}>
-                                    <Ionicons name="calendar-outline" size={48} color={colors.textDim} />
-                                    <ThemedText style={[styles.emptyText, { color: colors.textDim }]}>
-                                        {debouncedQuery || selectedDate
-                                            ? "No plans match. Try a different search or date."
+                                <EmptyState
+                                    icon={activeTab === "live" ? "radio-outline" : "calendar-outline"}
+                                    art={activeTab === "live" ? "live" : activeTab === "completed" ? "past" : "hangout"}
+                                    title={
+                                        debouncedQuery || selectedDate
+                                            ? "No plans match"
                                             : activeTab === "completed"
-                                                ? "No past plans yet."
+                                                ? "No past plans yet"
                                                 : activeTab === "live"
-                                                    ? "Nothing live right now."
-                                                    : "No upcoming plans. Tap + to get something on the calendar."}
-                                    </ThemedText>
-                                </View>
+                                                    ? "Nothing live right now"
+                                                    : "No upcoming plans"
+                                    }
+                                    message={
+                                        debouncedQuery || selectedDate
+                                            ? "Try a different search or date."
+                                            : activeTab === "upcoming"
+                                                ? "Get something on the calendar with your circle."
+                                                : undefined
+                                    }
+                                    actionLabel={activeTab === "upcoming" && !debouncedQuery && !selectedDate ? "Make a plan" : undefined}
+                                    onAction={handleCreate}
+                                />
                             )}
                         />
                     )}
