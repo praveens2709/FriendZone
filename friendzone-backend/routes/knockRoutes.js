@@ -45,6 +45,7 @@ export default (io, userSocketMap) => {
   router.get('/knocked', protect, knockController.getKnocked);
 
   router.get('/knockers-for-user/:userId', protect, knockController.getKnockersForUser);
+  router.get('/connections/:userId', protect, knockController.getConnectionsForUser);
   
   router.get('/counts/:userId', protect, knockController.getCountsForUser); 
 

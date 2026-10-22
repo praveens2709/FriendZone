@@ -5,6 +5,7 @@ import {
   Pressable,
   Animated,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/ThemedText";
 import { Ionicons } from "@expo/vector-icons";
 import { ThemedView } from "./ThemedView";
@@ -21,6 +22,7 @@ export default function StoryItem({
   router: any;
 }) {
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
+  const unseenRing = !item.isOwnStory && !item.seen && !item.empty;
 
   const handlePress = () => {
     if (item.empty) {
@@ -59,13 +61,25 @@ export default function StoryItem({
                 ? colors.border
                 : item.seen
                 ? colors.border
-                : colors.textSecondary,
+                : "transparent",
               transform: [{ scale: scaleAnim }],
             },
           ]}
         >
+          {unseenRing && (
+            <LinearGradient
+              pointerEvents="none"
+              colors={["#F9CE34", "#EE2A7B", "#6228D7"]}
+              start={{ x: 0.1, y: 1 }}
+              end={{ x: 0.9, y: 0 }}
+              style={styles.ring}
+            />
+          )}
           {item.image ? (
-            <Image source={{ uri: item.image }} style={styles.image} />
+            <Image
+              source={{ uri: item.image }}
+              style={[styles.image, unseenRing && { borderWidth: 3, borderColor: colors.background }]}
+            />
           ) : (
             <ThemedView style={[styles.image, { backgroundColor: colors.border, alignItems: "center", justifyContent: "center" }]}>
               <Ionicons name="person" size={34} color={colors.textDim} />
@@ -107,6 +121,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     position: "relative",
+  },
+  ring: {
+    position: "absolute",
+    top: -2,
+    left: -2,
+    right: -2,
+    bottom: -2,
+    borderRadius: 50,
   },
   image: {
     width: 73,

@@ -13,7 +13,6 @@ import {
   ScrollView,
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
-import { readableTextOn } from "@/utils/theme-utils";
 import { ThemedText } from "@/components/ThemedText";
 import Button from "@/components/Button";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -28,6 +27,7 @@ import { ThemedView } from "@/components/ThemedView";
 import { useAuth } from "@/context/AuthContext";
 import { useSavedPosts } from "@/context/SavedPostsContext";
 import UserAvatar from "@/components/UserAvatar";
+import { successFeedback } from "@/utils/haptics";
 import ThemedModal from "@/components/ThemedModal";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import CommonHeader from "@/components/CommonHeader";
@@ -42,6 +42,8 @@ import ThemedScrollView from "@/components/ThemedScrollView";
 import WordleGameModal from "@/components/modals/WordleGameModal";
 import QRModal from "@/components/modals/QRModal";
 import VibePickerModal from "@/components/VibePickerModal";
+import ProfileHeaderArt from "@/components/ProfileHeaderArt";
+import OnArtTheme from "@/components/OnArtTheme";
 import VibeService, { Vibe } from "@/services/VibeService";
 import { vibeOption } from "@/constants/vibes";
 import * as ImagePicker from "expo-image-picker";
@@ -175,11 +177,12 @@ export default function ProfileScreen() {
     }
   }, [accessToken]);
 
-  const handleSaveVibe = async (data: { kind: Vibe["kind"]; note: string; hours: number }) => {
+  const handleSaveVibe = async (data: { kind: Vibe["kind"]; note: string; hours: number; endsAt?: string }) => {
     if (!accessToken) return;
     try {
       setSavingVibe(true);
       setMyVibe(await VibeService.setVibe(data, accessToken));
+      successFeedback();
       setShowMoodModal(false);
     } catch {
     } finally {
@@ -316,13 +319,13 @@ export default function ProfileScreen() {
     >
       <ThemedText
         type="subtitle"
-        style={[styles.statNumber, { color: colors.text }]}
+        style={[styles.statNumber, { color: "#FFFFFF" }]}
       >
         {count}
       </ThemedText>
       <ThemedText
         type="default"
-        style={[styles.statLabel, { color: colors.textDim }]}
+        style={[styles.statLabel, { color: "rgba(255,255,255,0.82)" }]}
       >
         {label}
       </ThemedText>
@@ -383,7 +386,9 @@ export default function ProfileScreen() {
             />
           }
         >
-          <ThemedView style={styles.profileHeaderContainer}>
+          <ThemedView style={[styles.profileHeaderContainer, styles.headerArtBox]}>
+            <ProfileHeaderArt vibe={myVibe} />
+            <OnArtTheme>
             <ThemedView style={styles.profileTopRow}>
               <View style={styles.avatarSection}>
                 <TouchableOpacity
@@ -420,7 +425,7 @@ export default function ProfileScreen() {
                     <View
                       style={[
                         styles.avatarRing,
-                        { borderColor: colors.primary },
+                        { borderColor: "#FFFFFF" },
                       ]}
                     >
                       <UserAvatar
@@ -445,7 +450,7 @@ export default function ProfileScreen() {
               <ThemedView style={styles.userInfoContainer}>
                 <View style={styles.usernameRow}>
                   <ThemedText
-                    style={[styles.profileUsername, { color: colors.text }]}
+                    style={[styles.profileUsername, { color: "#FFFFFF" }]}
                   >
                     {user.firstName} {user.lastName}
                   </ThemedText>
@@ -488,7 +493,7 @@ export default function ProfileScreen() {
               {user.bio && (
                 <ThemedText
                   type="default"
-                  style={[styles.bio, { color: colors.text }]}
+                  style={[styles.bio, { color: "#FFFFFF" }]}
                 >
                   {user.bio}
                 </ThemedText>
@@ -496,7 +501,7 @@ export default function ProfileScreen() {
               {myVibe?.note ? (
                 <ThemedText
                   type="default"
-                  style={[styles.moodDescription, { color: colors.textDim }]}
+                  style={[styles.moodDescription, { color: "rgba(255,255,255,0.82)" }]}
                 >
                   {myVibe.note}
                 </ThemedText>
@@ -507,14 +512,14 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={[
                   styles.primaryActionButton,
-                  { backgroundColor: colors.primary },
+                  { backgroundColor: "#FFFFFF" },
                 ]}
                 onPress={() => router.push("/profile/edit-profile")}
               >
                 <ThemedText
                   style={[
                     styles.primaryActionButtonText,
-                    { color: readableTextOn(colors.primary, colors.buttonText) },
+                    { color: "#111111" },
                   ]}
                 >
                   Edit Profile
@@ -524,14 +529,14 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={[
                   styles.secondaryActionButton,
-                  { borderColor: colors.border },
+                  { borderColor: "rgba(255,255,255,0.6)", backgroundColor: "rgba(255,255,255,0.18)" },
                 ]}
                 onPress={() => setShowQRModal(true)}
               >
                 <ThemedText
                   style={[
                     styles.secondaryActionButtonText,
-                    { color: colors.text },
+                    { color: "#FFFFFF" },
                   ]}
                 >
                   Share Profile
@@ -542,7 +547,8 @@ export default function ProfileScreen() {
                 style={[
                   styles.secondaryActionButton,
                   {
-                    borderColor: colors.border,
+                    borderColor: "rgba(255,255,255,0.6)",
+                    backgroundColor: "rgba(255,255,255,0.18)",
                     justifyContent: "center",
                     flex: 0,
                   },
@@ -552,10 +558,11 @@ export default function ProfileScreen() {
                 <MaterialCommunityIcons
                   name="gamepad-variant-outline"
                   size={20}
-                  color={colors.text}
+                  color="#FFFFFF"
                 />
               </TouchableOpacity>
             </ThemedView>
+            </OnArtTheme>
           </ThemedView>
 
           <ThemedView style={styles.tabBarContainer}>
@@ -750,6 +757,9 @@ const styles = StyleSheet.create({
   headerButton: {
     marginLeft: 15,
     padding: 2,
+  },
+  headerArtBox: {
+    overflow: "hidden",
   },
   profileHeaderContainer: {
     paddingHorizontal: 20,

@@ -7,14 +7,15 @@ import Button from "@/components/Button";
 import { useTheme } from "@/context/ThemeContext";
 import { readableTextOn } from "@/utils/theme-utils";
 import { Vibe } from "@/services/VibeService";
-import { VIBE_DURATIONS, VIBE_OPTIONS, VibeKind } from "@/constants/vibes";
+import VibeBackground from "@/components/VibeBackground";
+import { VIBE_DURATIONS, VIBE_OPTIONS, VibeKind, nextMidnightIso } from "@/constants/vibes";
 
 interface VibePickerModalProps {
   visible: boolean;
   current: Vibe | null;
   saving: boolean;
   onClose: () => void;
-  onSave: (data: { kind: VibeKind; note: string; hours: number }) => void;
+  onSave: (data: { kind: VibeKind; note: string; hours: number; endsAt?: string }) => void;
   onClear: () => void;
 }
 
@@ -61,24 +62,22 @@ export default function VibePickerModal({
             <TouchableOpacity
               key={option.kind}
               onPress={() => setKind(option.kind)}
+              activeOpacity={0.85}
               style={[
-                styles.chip,
-                {
-                  backgroundColor: selected ? colors.primary : colors.buttonBackgroundSecondary,
-                  borderColor: selected ? colors.primary : colors.border,
-                },
+                styles.tile,
+                { borderColor: selected ? colors.primary : "transparent" },
               ]}
             >
-              <Ionicons
-                name={option.icon}
-                size={18}
-                color={selected ? onPrimary : colors.text}
-              />
-              <ThemedText
-                style={[styles.chipLabel, { color: selected ? onPrimary : colors.text }]}
-              >
+              <VibeBackground kind={option.kind} watermark={56} />
+              <Ionicons name={option.icon} size={18} color="#fff" />
+              <ThemedText style={styles.tileLabel} numberOfLines={1}>
                 {option.label}
               </ThemedText>
+              {selected && (
+                <View style={[styles.tileCheck, { backgroundColor: colors.primary }]}>
+                  <Ionicons name="checkmark" size={12} color={onPrimary} />
+                </View>
+              )}
             </TouchableOpacity>
           );
         })}
@@ -127,7 +126,16 @@ export default function VibePickerModal({
         )}
         <Button
           title={saving ? "Sharing..." : "Share vibe"}
-          onPress={() => kind && onSave({ kind, note: note.trim(), hours })}
+          onPress={() => {
+            if (!kind) return;
+            const chosen = VIBE_DURATIONS.find((d) => d.hours === hours);
+            onSave({
+              kind,
+              note: note.trim(),
+              hours,
+              endsAt: chosen && "untilMidnight" in chosen && chosen.untilMidnight ? nextMidnightIso() : undefined,
+            });
+          }}
           disabled={!kind || saving}
           style={styles.action}
         />
@@ -149,16 +157,34 @@ const styles = StyleSheet.create({
   title: { textAlign: "center", marginBottom: 4 },
   subtitle: { textAlign: "center", marginBottom: 16, fontSize: 13 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+  tile: {
+    width: "48.5%",
+    height: 68,
+    borderRadius: 16,
+    borderWidth: 2.5,
+    padding: 10,
+    justifyContent: "space-between",
+    overflow: "hidden",
   },
-  chipLabel: { fontSize: 14 },
+  tileLabel: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 18,
+    textShadowColor: "rgba(0,0,0,0.35)",
+    textShadowRadius: 3,
+    textShadowOffset: { width: 0, height: 1 },
+  },
+  tileCheck: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   input: {
     borderWidth: 1,
     borderRadius: 12,

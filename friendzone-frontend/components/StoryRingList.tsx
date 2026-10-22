@@ -53,9 +53,10 @@ export default function StoryRingList() {
 
   useEffect(() => {
     if (!socket) return;
-    socket.on("storiesChanged", load);
+    const events = ["storiesChanged", "knockStatusChanged", "knockStatusUpdated", "blockChanged"];
+    events.forEach((event) => socket.on(event, load));
     return () => {
-      socket.off("storiesChanged", load);
+      events.forEach((event) => socket.off(event, load));
     };
   }, [socket, load]);
 

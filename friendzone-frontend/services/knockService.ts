@@ -81,6 +81,14 @@ class KnockService {
     return await _delete(`knock/${knockId}/unknock`, token);
   }
 
+  static async getConnections(
+    token: string,
+    userId: string,
+    type: "knockers" | "knocking" | "lockedIn"
+  ): Promise<UserAvatar[]> {
+    return await _get(`knock/connections/${userId}`, token, { type });
+  }
+
   static async getKnockersForUser(token: string, userId: string): Promise<UserAvatar[]> {
     return await _get(`knock/knockers-for-user/${userId}`, token);
   }

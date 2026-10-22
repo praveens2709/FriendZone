@@ -10,7 +10,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useSocket } from "@/context/SocketContext";
 import VibeService, { Vibe } from "@/services/VibeService";
 import { timeLeftLabel, vibeOption } from "@/constants/vibes";
-import { readableTextOn } from "@/utils/theme-utils";
+import VibeBackground from "@/components/VibeBackground";
+import { successFeedback } from "@/utils/haptics";
 
 type StripItem =
   | { type: "mine"; vibe: Vibe | null }
@@ -53,13 +54,14 @@ export default function VibeStrip() {
     };
   }, [socket, load]);
 
-  const handleSave = async (data: { kind: Vibe["kind"]; note: string; hours: number }) => {
+  const handleSave = async (data: { kind: Vibe["kind"]; note: string; hours: number; endsAt?: string }) => {
     if (!accessToken) return;
     try {
       setSaving(true);
       const saved = await VibeService.setVibe(data, accessToken);
       setMine(saved);
       setPickerOpen(false);
+      successFeedback();
     } catch (error) {
       console.error("Error saving vibe:", error);
     } finally {
@@ -98,15 +100,17 @@ export default function VibeStrip() {
     }
 
     const option = vibeOption(vibe.kind);
-    const onPrimary = readableTextOn(colors.primary, colors.buttonText);
     return (
       <TouchableOpacity
         onPress={() => setPickerOpen(true)}
-        style={[styles.card, { backgroundColor: colors.primary, borderColor: colors.primary }]}
+        style={[styles.card, styles.artCard]}
       >
-        <Ionicons name={option.icon} size={26} color={onPrimary} />
-        <Text style={[styles.label, { color: onPrimary }]}>{option.label}</Text>
-        <Text numberOfLines={1} style={[styles.meta, { color: onPrimary }]}>
+        <VibeBackground kind={option.kind} />
+        <View style={styles.iconBadge}>
+          <Ionicons name={option.icon} size={18} color="#fff" />
+        </View>
+        <Text style={[styles.label, styles.onArt]}>{option.label}</Text>
+        <Text numberOfLines={1} style={[styles.meta, styles.onArtDim]}>
           {vibe.note || "You"} · {timeLeftLabel(vibe.expiresAt)}
         </Text>
       </TouchableOpacity>
@@ -114,7 +118,6 @@ export default function VibeStrip() {
   };
 
   const renderFriend = (vibe: Vibe) => {
-    const theirs = colors;
     const option = vibeOption(vibe.kind);
     return (
       <TouchableOpacity
@@ -122,21 +125,19 @@ export default function VibeStrip() {
           vibe.user &&
           router.push({ pathname: "/profile/UserProfile", params: { userId: vibe.user.id } })
         }
-        style={[
-          styles.card,
-          { backgroundColor: theirs.backgroundSecondary, borderColor: theirs.primary },
-        ]}
+        style={[styles.card, styles.artCard]}
       >
-        <View style={[styles.iconBadge, { backgroundColor: theirs.primary }]}>
-          <Ionicons name={option.icon} size={18} color={readableTextOn(theirs.primary, theirs.buttonText)} />
+        <VibeBackground kind={option.kind} />
+        <View style={styles.iconBadge}>
+          <Ionicons name={option.icon} size={18} color="#fff" />
         </View>
-        <Text numberOfLines={1} style={[styles.name, { color: theirs.text }]}>
+        <Text numberOfLines={1} style={[styles.name, styles.onArtDim]}>
           {vibe.user?.firstName}
         </Text>
-        <Text numberOfLines={1} style={[styles.label, { color: theirs.text }]}>
+        <Text numberOfLines={1} style={[styles.label, styles.onArt]}>
           {option.label}
         </Text>
-        <Text numberOfLines={1} style={[styles.meta, { color: theirs.textDim }]}>
+        <Text numberOfLines={1} style={[styles.meta, styles.onArtDim]}>
           {vibe.note || timeLeftLabel(vibe.expiresAt)}
         </Text>
       </TouchableOpacity>
@@ -189,6 +190,9 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     gap: 2,
   },
+  artCard: { overflow: "hidden", borderColor: "rgba(255,255,255,0.3)" },
+  onArt: { color: "#fff", textShadowColor: "rgba(0,0,0,0.35)", textShadowRadius: 3, textShadowOffset: { width: 0, height: 1 } },
+  onArtDim: { color: "rgba(255,255,255,0.9)", textShadowColor: "rgba(0,0,0,0.35)", textShadowRadius: 3, textShadowOffset: { width: 0, height: 1 } },
   addCard: { borderStyle: "dashed", justifyContent: "center", alignItems: "flex-start" },
   emptyCard: { width: 190, borderStyle: "dashed", justifyContent: "center" },
   emptyText: { fontSize: 13, lineHeight: 18 },
@@ -199,6 +203,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 6,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.5)",
   },
   name: { fontSize: 12, opacity: 0.8 },
   label: { fontSize: 15, fontWeight: "700" },

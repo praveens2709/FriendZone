@@ -31,8 +31,15 @@ export const vibeOption = (kind: string): VibeOption =>
 export const VIBE_DURATIONS = [
   { hours: 3, label: "3h" },
   { hours: 6, label: "6h" },
-  { hours: 24, label: "Today" },
+  { hours: 24, label: "Today", untilMidnight: true },
 ];
+
+export const nextMidnightIso = (): string => {
+  const now = new Date();
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+  if (midnight.getTime() - now.getTime() < 60 * 1000) midnight.setDate(midnight.getDate() + 1);
+  return midnight.toISOString();
+};
 
 export const timeLeftLabel = (expiresAt: string): string => {
   const ms = new Date(expiresAt).getTime() - Date.now();

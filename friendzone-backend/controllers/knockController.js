@@ -628,9 +628,13 @@ export const getKnockersForUser = async (req, res) => {
       return res.json([]);
     }
 
+    const viewerKnocks = await Knock.find({ knocker: req.user.id }).select('knocked').lean();
+    const viewerKnockedIds = viewerKnocks.map((k) => k.knocked);
+
     const knockers = await Knock.find({
       knocked: userId,
-      status: { $in: ['lockedIn'] }
+      status: { $in: ['lockedIn'] },
+      knocker: { $in: viewerKnockedIds, $ne: req.user.id }
     })
       .populate('knocker', 'firstName lastName profileImage')
       .sort({ createdAt: -1 })
@@ -724,6 +728,52 @@ export const getCountsForUser = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+export const getConnectionsForUser = async (req, res) => {
+  const { userId } = req.params;
+  const type = req.query.type;
+
+  if (!isObjectId(userId) || !['knockers', 'knocking', 'lockedIn'].includes(type)) {
+    return res.status(400).json({ message: 'Invalid request.' });
+  }
+
+  try {
+    if (!(await canViewUser(req.user.id, userId))) {
+      return res.status(403).json({ message: 'Knock this account to see who is connected to it.' });
+    }
+
+    const filter =
+      type === 'knockers'
+        ? { knocked: userId, status: 'onesidedlock' }
+        : type === 'knocking'
+          ? { knocker: userId, status: { $in: ['onesidedlock', 'pending'] } }
+          : { knocker: userId, status: 'lockedIn' };
+    const otherField = type === 'knockers' ? 'knocker' : 'knocked';
+
+    const [knocks, blocked] = await Promise.all([
+      Knock.find(filter)
+        .populate(otherField, 'firstName lastName profileImage')
+        .sort({ updatedAt: -1 })
+        .limit(200)
+        .lean(),
+      getBlockedIds(req.user.id),
+    ]);
+
+    res.json(
+      knocks
+        .map((k) => k[otherField])
+        .filter((person) => person && !blocked.has(person._id.toString()))
+        .map((person) => ({
+          id: person._id.toString(),
+          username: `${person.firstName} ${person.lastName || ''}`.trim(),
+          avatar: person.profileImage || null,
+        }))
+    );
+  } catch (err) {
+    console.error('Error getting connections for user:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 export const getSuggestions = async (req, res) => {
   const userId = req.user.id;
 

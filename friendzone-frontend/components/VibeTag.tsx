@@ -1,8 +1,8 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useTheme } from "@/context/ThemeContext";
 import { vibeOption } from "@/constants/vibes";
+import { vibePalette } from "@/components/VibeBackground";
 
 export default function VibeTag({
   kind,
@@ -13,16 +13,12 @@ export default function VibeTag({
   note?: string;
   compact?: boolean;
 }) {
-  const { colors } = useTheme();
   const option = vibeOption(kind);
 
   return (
-    <View style={[styles.tag, { backgroundColor: colors.primary + "1F" }]}>
-      <Ionicons name={option.icon} size={compact ? 11 : 13} color={colors.primary} />
-      <Text
-        numberOfLines={1}
-        style={[styles.text, { color: colors.text, fontSize: compact ? 11 : 12 }]}
-      >
+    <View style={[styles.tag, { backgroundColor: vibePalette(option.kind)[1] }]}>
+      <Ionicons name={option.icon} size={compact ? 11 : 13} color="#fff" />
+      <Text numberOfLines={1} style={[styles.text, { fontSize: compact ? 11 : 12 }]}>
         {option.label}
         {!compact && note ? ` · ${note}` : ""}
       </Text>
@@ -40,5 +36,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  text: { fontWeight: "700", flexShrink: 1 },
+  text: { color: "#fff", fontWeight: "700", flexShrink: 1 },
 });

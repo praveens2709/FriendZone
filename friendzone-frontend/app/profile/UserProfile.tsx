@@ -1,3 +1,4 @@
+import { tapFeedback } from "@/utils/haptics";
 import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useEffect, useState, useCallback } from "react";
 import {
@@ -8,8 +9,13 @@ import {
   TouchableOpacity,
   FlatList,
   Alert,
+  View,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
+import StoryService from "@/services/StoryService";
+import StoryAvatarRing from "@/components/StoryAvatarRing";
+import ProfileHeaderArt from "@/components/ProfileHeaderArt";
+import OnArtTheme, { onArtColors } from "@/components/OnArtTheme";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
@@ -83,9 +89,11 @@ function OptionRowItem({
 
 function UserProfileContent() {
   const { colors } = useTheme();
+  const themeColors = colors;
   const router = useRouter();
   const { accessToken, user } = useAuth();
   const { socket } = useSocket();
+  const [storyGroup, setStoryGroup] = useState<{ seen: boolean } | null>(null);
   const { userId } = useLocalSearchParams();
 
   const [userProfile, setUserProfile] = useState<User | null>(null);
@@ -236,6 +244,31 @@ function UserProfileContent() {
     fetchUserPosts();
   }, [fetchUserProfile, fetchUserPosts]);
 
+  const openConnections = (type: "knockers" | "knocking" | "lockedIn") => {
+    if (!userProfile) return;
+    router.push({
+      pathname: "/profile/user-connections",
+      params: { userId: userProfile._id, name: userProfile.firstName, type },
+    });
+  };
+
+  const loadStory = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const groups = await StoryService.getStories();
+      const found = groups.find((group) => group.id === userId);
+      setStoryGroup(found ? { seen: !!found.seen } : null);
+    } catch {
+      setStoryGroup(null);
+    }
+  }, [userId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadStory();
+    }, [loadStory])
+  );
+
   useEffect(() => {
     if (!socket) return;
     const onKnockChange = () => fetchUserProfile();
@@ -249,6 +282,7 @@ function UserProfileContent() {
       else fetchUserProfile();
     };
     socket.on("knockStatusChanged", onKnockChange);
+    socket.on("storiesChanged", loadStory);
     socket.on("userProfileUpdated", onProfileUpdated);
     socket.on("postRemoved", onPostChange);
     socket.on("postRestored", onPostChange);
@@ -256,13 +290,14 @@ function UserProfileContent() {
     socket.on("blockChanged", onBlockChanged);
     return () => {
       socket.off("knockStatusChanged", onKnockChange);
+      socket.off("storiesChanged", loadStory);
       socket.off("userProfileUpdated", onProfileUpdated);
       socket.off("postRemoved", onPostChange);
       socket.off("postRestored", onPostChange);
       socket.off("newPost", onPostChange);
       socket.off("blockChanged", onBlockChanged);
     };
-  }, [socket, userId, router, fetchUserProfile, fetchUserPosts]);
+  }, [socket, userId, router, fetchUserProfile, fetchUserPosts, loadStory]);
 
   const handlePressPost = useCallback(
     (item: PostItem) => {
@@ -333,6 +368,7 @@ function UserProfileContent() {
           },
         });
       } else if (actionType === "knock") {
+        tapFeedback();
         await KnockService.knockUser(targetUser._id, accessToken);
 
       } else if (actionType === "knockBack") {
@@ -353,6 +389,7 @@ function UserProfileContent() {
 
   const renderActionButtons = () => {
     if (!userProfile) return null;
+    const colors = onArtColors(themeColors);
 
     let primaryButtonText = "";
     let primaryButtonAction:
@@ -397,7 +434,8 @@ function UserProfileContent() {
             styles.actionButton,
             styles.primaryButton,
             {
-              borderColor: colors.border,
+              backgroundColor: "#FFFFFF",
+              borderColor: "#FFFFFF",
               opacity: primaryButtonDisabled ? 0.6 : 1,
             },
           ]}
@@ -405,10 +443,10 @@ function UserProfileContent() {
           disabled={primaryButtonDisabled}
         >
           {loadingAction === "primary" ? (
-            <ActivityIndicator size="small" color={colors.text} />
+            <ActivityIndicator size="small" color="#111111" />
           ) : (
             <ThemedText
-              style={[styles.actionButtonText, { color: colors.text }]}
+              style={[styles.actionButtonText, { color: "#111111" }]}
             >
               {primaryButtonText}
             </ThemedText>
@@ -419,7 +457,8 @@ function UserProfileContent() {
             styles.actionButton,
             styles.secondaryButton,
             {
-              borderColor: colors.border,
+              backgroundColor: "rgba(255,255,255,0.18)",
+              borderColor: "rgba(255,255,255,0.6)",
               opacity: secondaryButtonDisabled ? 0.6 : 1,
             },
           ]}
@@ -450,6 +489,7 @@ function UserProfileContent() {
 
   const renderHeaderContent = () => {
     if (!userProfile) return null;
+    const colors = onArtColors(themeColors);
 
     const filteredConnections = mutualConnections.filter(
       (conn) => conn.id !== user?._id
@@ -463,8 +503,18 @@ function UserProfileContent() {
 
     return (
       <ThemedView>
+        <View style={styles.headerArtBox}>
+        <ProfileHeaderArt vibe={userProfile.relationship?.vibe} />
+        <OnArtTheme>
         <ThemedView style={styles.profileInfoContainer}>
-          <UserAvatarComponent imageUri={userProfile.profileImage} size={80} />
+          <StoryAvatarRing
+            size={80}
+            hasStory={!!storyGroup}
+            seen={!!storyGroup?.seen}
+            onPress={() => router.push(`/(stories)/${userProfile._id}`)}
+          >
+            <UserAvatarComponent imageUri={userProfile.profileImage} size={80} />
+          </StoryAvatarRing>
           <ThemedView style={styles.userInfoAndStats}>
             <ThemedView style={styles.usernameAndStatus}>
               <ThemedText style={styles.fullName}>
@@ -486,7 +536,11 @@ function UserProfileContent() {
                   Posts
                 </ThemedText>
               </ThemedView>
-              <ThemedView style={styles.statItem}>
+              <TouchableOpacity
+                style={styles.statItem}
+                activeOpacity={0.7}
+                onPress={() => openConnections("knockers")}
+              >
                 <ThemedText style={styles.statNumber}>
                   {knockersCount}
                 </ThemedText>
@@ -495,8 +549,12 @@ function UserProfileContent() {
                 >
                   Knockers
                 </ThemedText>
-              </ThemedView>
-              <ThemedView style={styles.statItem}>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.statItem}
+                activeOpacity={0.7}
+                onPress={() => openConnections("knocking")}
+              >
                 <ThemedText style={styles.statNumber}>
                   {knockingCount}
                 </ThemedText>
@@ -505,8 +563,12 @@ function UserProfileContent() {
                 >
                   Knocking
                 </ThemedText>
-              </ThemedView>
-              <ThemedView style={styles.statItem}>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.statItem}
+                activeOpacity={0.7}
+                onPress={() => openConnections("lockedIn")}
+              >
                 <ThemedText style={styles.statNumber}>
                   {lockedInCount}
                 </ThemedText>
@@ -515,7 +577,7 @@ function UserProfileContent() {
                 >
                   LockedIn
                 </ThemedText>
-              </ThemedView>
+              </TouchableOpacity>
             </ThemedView>
           </ThemedView>
         </ThemedView>
@@ -581,11 +643,14 @@ function UserProfileContent() {
 
         {renderActionButtons()}
 
+        </OnArtTheme>
+        </View>
+
         <ThemedView
-          style={[styles.postsTabContainer, { borderTopColor: colors.border }]}
+          style={[styles.postsTabContainer, { borderTopColor: themeColors.border }]}
         >
           <TouchableOpacity style={styles.postsTabButton}>
-            <Ionicons name="grid" size={24} color={colors.text} />
+            <Ionicons name="grid" size={24} color={themeColors.text} />
           </TouchableOpacity>
         </ThemedView>
       </ThemedView>
@@ -781,6 +846,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: 10,
+  },
+  headerArtBox: {
+    marginBottom: 6,
+    overflow: "hidden",
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   profileInfoContainer: {
     flexDirection: "row",

@@ -45,6 +45,11 @@ export const setVibe = async (req, res) => {
   const { kind } = req.body || {};
   const note = cleanString(req.body?.note, 80);
   const hours = Math.min(Math.max(Number(req.body?.hours) || 24, 1), 24);
+  const requestedEnd = new Date(req.body?.endsAt);
+  const msAhead = requestedEnd.getTime() - Date.now();
+  const expiresAt = Number.isFinite(msAhead) && msAhead >= 60 * 1000 && msAhead <= 25 * 60 * 60 * 1000
+    ? requestedEnd
+    : new Date(Date.now() + hours * 60 * 60 * 1000);
 
   if (!VIBE_KINDS.includes(kind)) {
     return res.status(400).json({ message: 'Invalid vibe.' });
@@ -53,7 +58,7 @@ export const setVibe = async (req, res) => {
   try {
     const vibe = await Vibe.findOneAndUpdate(
       { user: req.user.id },
-      { kind, note, expiresAt: new Date(Date.now() + hours * 60 * 60 * 1000) },
+      { kind, note, expiresAt },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     ).populate('user', OWNER_FIELDS);
 

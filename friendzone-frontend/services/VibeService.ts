@@ -28,7 +28,7 @@ class VibeService {
   }
 
   static async setVibe(
-    data: { kind: VibeKind; note?: string; hours?: number },
+    data: { kind: VibeKind; note?: string; hours?: number; endsAt?: string },
     token: string
   ): Promise<Vibe> {
     return await _put<Vibe>("vibes", data, token);
