@@ -1,24 +1,27 @@
 import { useTabBarSpace } from "@/hooks/useTabBarSpace";
 import ScreenBackground from "@/components/ui/ScreenBackground";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
-  FlatList,
-  Image,
   ActivityIndicator,
+  Linking,
+  View,
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
 import * as ImageManipulator from "expo-image-manipulator";
+import { Image } from "expo-image";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import CommonHeader from "@/components/CommonHeader";
+import Button from "@/components/Button";
+import InlineError from "@/components/InlineError";
 import {
   Gesture,
   GestureDetector,
@@ -27,638 +30,686 @@ import {
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
+  useAnimatedScrollHandler,
+  interpolate,
+  Extrapolation,
+  runOnJS,
 } from "react-native-reanimated";
 import { MediaAsset } from "@/types/media.type";
+import { consumePostPublished } from "@/utils/postDraft";
 
 const { width } = Dimensions.get("window");
-const SPACING = 4;
-const NUM_COLUMNS = 3;
-const TILE_SIZE = (width - SPACING * (NUM_COLUMNS + 1)) / NUM_COLUMNS;
-const PREVIEW_CONTAINER_SIZE = width;
+const GAP = 2;
+const NUM_COLUMNS = 4;
+const TILE_SIZE = (width - GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
+const PREVIEW = width;
+const COLLAPSED = 96;
+const SCROLL_RANGE = PREVIEW - COLLAPSED;
+const RECENTS_HEIGHT = 52;
+const MAX_SELECTION = 10;
+const PAGE_SIZE = 80;
+const MAX_DIMENSION = 2048;
+const MAX_ZOOM = 4;
+
+type GridItem = MediaAsset | { id: "camera-button"; uri: "" };
+
+type Transform = { k: number; tx: number; ty: number };
+type Resolved = { uri: string; width: number; height: number };
+
+const AnimatedFlatList = Animated.FlatList<GridItem>;
 
 export default function PostsScreen() {
   const { colors } = useTheme();
   const { space: tabSpace } = useTabBarSpace();
   const router = useRouter();
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+
+  const [permission, setPermission] = useState<"unknown" | "granted" | "denied">("unknown");
+  const [canAskAgain, setCanAskAgain] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([]);
-  const [selectedAssets, setSelectedAssets] = useState<MediaAsset[]>([]);
+  const [selected, setSelected] = useState<MediaAsset[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [isMultiSelect, setIsMultiSelect] = useState(false);
+  const [fitMode, setFitMode] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [message, setMessage] = useState("");
+  const [previewUri, setPreviewUri] = useState<string | null>(null);
 
-  const savedScale = useSharedValue(1);
-  const savedTranslateX = useSharedValue(0);
-  const savedTranslateY = useSharedValue(0);
+  const listRef = useRef<any>(null);
+  const cursorRef = useRef<string | undefined>(undefined);
+  const hasNextRef = useRef(true);
+  const loadingMoreRef = useRef(false);
+  const resolvedRef = useRef<Map<string, Resolved>>(new Map());
+  const transformsRef = useRef<Map<string, Transform>>(new Map());
+  const activeIdRef = useRef<string | null>(null);
+  const messageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const scrollY = useSharedValue(0);
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
+  const savedScale = useSharedValue(1);
+  const savedX = useSharedValue(0);
+  const savedY = useSharedValue(0);
+  const displayW = useSharedValue(PREVIEW);
+  const displayH = useSharedValue(PREVIEW);
+  const fitSV = useSharedValue(0);
+
+  const showMessage = useCallback((text: string) => {
+    setMessage(text);
+    if (messageTimer.current) clearTimeout(messageTimer.current);
+    messageTimer.current = setTimeout(() => setMessage(""), 2500);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (messageTimer.current) clearTimeout(messageTimer.current);
+    };
+  }, []);
+
+  const saveActiveTransform = useCallback(() => {
+    const id = activeIdRef.current;
+    if (!id) return;
+    transformsRef.current.set(id, {
+      k: scale.value,
+      tx: translateX.value,
+      ty: translateY.value,
+    });
+  }, [scale, translateX, translateY]);
+
+  const applyTransform = useCallback(
+    (t: Transform) => {
+      scale.value = t.k;
+      translateX.value = t.tx;
+      translateY.value = t.ty;
+      savedScale.value = t.k;
+      savedX.value = t.tx;
+      savedY.value = t.ty;
+    },
+    [scale, translateX, translateY, savedScale, savedX, savedY]
+  );
+
+  const layoutFor = useCallback((w: number, h: number, fit: boolean) => {
+    if (!w || !h) return { dw: PREVIEW, dh: PREVIEW };
+    const ratio = w / h;
+    if (fit) {
+      return ratio >= 1
+        ? { dw: PREVIEW, dh: PREVIEW / ratio }
+        : { dw: PREVIEW * ratio, dh: PREVIEW };
+    }
+    return ratio >= 1
+      ? { dw: PREVIEW * ratio, dh: PREVIEW }
+      : { dw: PREVIEW, dh: PREVIEW / ratio };
+  }, []);
+
+  const resolveAsset = useCallback(async (asset: MediaAsset): Promise<Resolved> => {
+    const cached = resolvedRef.current.get(asset.id);
+    if (cached) return cached;
+    let uri = asset.uri;
+    let w = asset.width || 0;
+    let h = asset.height || 0;
+    if (uri.startsWith("ph://") || !uri.startsWith("file://")) {
+      try {
+        const info = await MediaLibrary.getAssetInfoAsync(asset.id);
+        uri = info.localUri || info.uri || uri;
+        w = info.width || w;
+        h = info.height || h;
+      } catch {}
+    }
+    const resolved = { uri, width: w, height: h };
+    resolvedRef.current.set(asset.id, resolved);
+    return resolved;
+  }, []);
+
+  const activate = useCallback(
+    async (asset: MediaAsset, fit = fitMode) => {
+      saveActiveTransform();
+      activeIdRef.current = asset.id;
+      setActiveId(asset.id);
+      const quick = layoutFor(asset.width || 0, asset.height || 0, fit);
+      displayW.value = quick.dw;
+      displayH.value = quick.dh;
+      applyTransform(transformsRef.current.get(asset.id) ?? { k: 1, tx: 0, ty: 0 });
+      const cached = resolvedRef.current.get(asset.id);
+      setPreviewUri(cached ? cached.uri : asset.uri);
+      const resolved = await resolveAsset(asset);
+      if (activeIdRef.current !== asset.id) return;
+      const real = layoutFor(resolved.width, resolved.height, fit);
+      displayW.value = real.dw;
+      displayH.value = real.dh;
+      setPreviewUri(resolved.uri);
+    },
+    [fitMode, saveActiveTransform, layoutFor, displayW, displayH, applyTransform, resolveAsset]
+  );
+
+  const loadPage = useCallback(
+    async (reset: boolean) => {
+      if (loadingMoreRef.current) return;
+      if (!reset && !hasNextRef.current) return;
+      loadingMoreRef.current = true;
+      try {
+        const page = await MediaLibrary.getAssetsAsync({
+          first: PAGE_SIZE,
+          after: reset ? undefined : cursorRef.current,
+          sortBy: [MediaLibrary.SortBy.creationTime],
+          mediaType: [MediaLibrary.MediaType.photo],
+        });
+        cursorRef.current = page.endCursor;
+        hasNextRef.current = page.hasNextPage;
+        const fetched: MediaAsset[] = page.assets.map((a) => ({
+          id: a.id,
+          uri: a.uri,
+          width: a.width,
+          height: a.height,
+        }));
+        if (reset) {
+          setMediaAssets(fetched);
+          if (fetched.length > 0) {
+            setSelected([fetched[0]]);
+            activate(fetched[0]);
+          }
+        } else {
+          setMediaAssets((prev) => {
+            const seen = new Set(prev.map((p) => p.id));
+            return [...prev, ...fetched.filter((f) => !seen.has(f.id))];
+          });
+        }
+      } catch {
+        showMessage("Couldn't load your photos.");
+      } finally {
+        loadingMoreRef.current = false;
+        setIsLoading(false);
+      }
+    },
+    [activate, showMessage]
+  );
 
   const requestPermissions = useCallback(async () => {
     try {
-      const cameraPermission =
-        await ImagePicker.requestCameraPermissionsAsync();
-      const mediaLibraryPermission =
-        await MediaLibrary.requestPermissionsAsync();
-
-      if (
-        cameraPermission.status === "granted" &&
-        mediaLibraryPermission.status === "granted"
-      ) {
-        setHasPermission(true);
-        await fetchMediaAssets();
+      let current = await MediaLibrary.getPermissionsAsync();
+      if (current.status !== "granted" && current.canAskAgain) {
+        current = await MediaLibrary.requestPermissionsAsync();
+      }
+      setCanAskAgain(current.canAskAgain);
+      if (current.status === "granted") {
+        setPermission("granted");
+        await loadPage(true);
       } else {
-        setHasPermission(false);
-        console.log(
-          "Permission Required",
-          "Camera and gallery permissions are needed to create a new post."
-        );
+        setPermission("denied");
+        setIsLoading(false);
       }
-      setIsLoading(false);
-    } catch (error) {
-      console.error("Failed to get permissions:", error);
-      setIsLoading(false);
-      setHasPermission(false);
-    }
-  }, []);
-
-  const fetchMediaAssets = async () => {
-    try {
-      setIsLoading(true);
-
-      const { assets } = await MediaLibrary.getAssetsAsync({
-        first: 50,
-        sortBy: [MediaLibrary.SortBy.creationTime],
-        mediaType: [MediaLibrary.MediaType.photo],
-      });
-
-      if (!assets) return;
-
-      const fetchedMedia: MediaAsset[] = [];
-
-      for (const asset of assets) {
-        try {
-          const assetInfo = await MediaLibrary.getAssetInfoAsync(asset.id);
-          const uri = assetInfo.localUri || asset.uri;
-
-          fetchedMedia.push({
-            id: asset.id,
-            uri: uri,
-            width: assetInfo.width,
-            height: assetInfo.height,
-          });
-        } catch (error) {
-          console.error("Error getting asset info for:", asset.filename, error);
-          fetchedMedia.push({
-            id: asset.id,
-            uri: asset.uri,
-            width: asset.width,
-            height: asset.height,
-          });
-        }
-      }
-
-      setMediaAssets([{ id: "camera-button", uri: "" }, ...fetchedMedia]);
-
-      if (fetchedMedia.length > 0) {
-        setSelectedAssets([fetchedMedia[0]]);
-        resetTransform();
-      }
-    } catch (error) {
-      console.error("Failed to fetch media assets:", error);
-    } finally {
+    } catch {
+      setPermission("denied");
       setIsLoading(false);
     }
-  };
+  }, [loadPage]);
 
   useEffect(() => {
     requestPermissions();
-  }, [requestPermissions]);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (consumePostPublished()) {
+        transformsRef.current.clear();
+        activeIdRef.current = null;
+        setSelected([]);
+        setActiveId(null);
+        setPreviewUri(null);
+        setIsMultiSelect(false);
+        cursorRef.current = undefined;
+        hasNextRef.current = true;
+        scrollY.value = 0;
+        listRef.current?.scrollToOffset?.({ offset: 0, animated: false });
+        loadPage(true);
+      }
+    }, [loadPage, scrollY])
+  );
+
+  const scrollToTop = useCallback(() => {
+    listRef.current?.scrollToOffset?.({ offset: 0, animated: true });
+  }, []);
 
   const handleCameraPress = async () => {
-    if (!hasPermission) {
-      requestPermissions();
-      return;
-    }
     try {
+      const camera = await ImagePicker.requestCameraPermissionsAsync();
+      if (camera.status !== "granted") {
+        showMessage("Allow camera access in Settings to take a photo.");
+        return;
+      }
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ["images"],
         allowsEditing: false,
         quality: 1,
       });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const newAsset: MediaAsset = {
-          id: result.assets[0].uri,
-          uri: result.assets[0].uri,
-          width: result.assets[0].width,
-          height: result.assets[0].height,
-        };
-        setSelectedAssets([newAsset]);
-        resetTransform();
+      if (result.canceled || !result.assets?.length) return;
+      const shot = result.assets[0];
+      const asset: MediaAsset = {
+        id: shot.uri,
+        uri: shot.uri,
+        width: shot.width,
+        height: shot.height,
+      };
+      resolvedRef.current.set(asset.id, {
+        uri: shot.uri,
+        width: shot.width,
+        height: shot.height,
+      });
+      setMediaAssets((prev) => [asset, ...prev]);
+      if (isMultiSelect && selected.length < MAX_SELECTION) {
+        setSelected((prev) => [...prev, asset]);
+      } else {
+        setSelected([asset]);
       }
-    } catch (error) {
-      console.error("Failed to open camera:", error);
+      activate(asset);
+      scrollToTop();
+    } catch {
+      showMessage("Couldn't open the camera.");
+    }
+  };
+
+  const removeAsset = (asset: MediaAsset) => {
+    const remaining = selected.filter((s) => s.id !== asset.id);
+    setSelected(remaining);
+    transformsRef.current.delete(asset.id);
+    if (activeIdRef.current !== asset.id) return;
+    activeIdRef.current = null;
+    if (remaining.length > 0) {
+      activate(remaining[remaining.length - 1]);
+    } else {
+      setActiveId(null);
+      setPreviewUri(null);
+      applyTransform({ k: 1, tx: 0, ty: 0 });
     }
   };
 
   const handleAssetPress = (asset: MediaAsset) => {
+    if (!isMultiSelect) {
+      setSelected([asset]);
+      activate(asset);
+      scrollToTop();
+      return;
+    }
+    const isSelected = selected.some((s) => s.id === asset.id);
+    if (isSelected) {
+      if (activeId !== asset.id) {
+        activate(asset);
+        return;
+      }
+      removeAsset(asset);
+      return;
+    }
+    if (selected.length >= MAX_SELECTION) {
+      showMessage(`You can select up to ${MAX_SELECTION} photos.`);
+      return;
+    }
+    setSelected([...selected, asset]);
+    activate(asset);
+  };
+
+  const toggleMultiSelect = () => {
     if (isMultiSelect) {
-      const isSelected = selectedAssets.some((sa) => sa.id === asset.id);
-      if (isSelected) {
-        setSelectedAssets(selectedAssets.filter((sa) => sa.id !== asset.id));
-      } else {
-        setSelectedAssets([...selectedAssets, asset]);
+      const keep = selected.find((s) => s.id === activeId) ?? selected[0];
+      setIsMultiSelect(false);
+      if (keep) {
+        setSelected([keep]);
+        if (keep.id !== activeId) activate(keep);
       }
     } else {
-      setSelectedAssets([asset]);
-      resetTransform();
+      setIsMultiSelect(true);
     }
   };
 
-  const renderAssetItem = ({ item }: { item: MediaAsset }) => {
+  const toggleFit = () => {
+    const next = !fitMode;
+    setFitMode(next);
+    fitSV.value = next ? 1 : 0;
+    transformsRef.current.clear();
+    const asset = selected.find((s) => s.id === activeId);
+    if (asset) {
+      activeIdRef.current = null;
+      activate(asset, next);
+    }
+  };
+
+  const buildAsset = async (asset: MediaAsset): Promise<MediaAsset> => {
+    const resolved = await resolveAsset(asset);
+    const normalized = await ImageManipulator.manipulateAsync(resolved.uri, [], {
+      compress: 1,
+      format: ImageManipulator.SaveFormat.JPEG,
+    });
+    const W = normalized.width;
+    const H = normalized.height;
+    const actions: ImageManipulator.Action[] = [];
+    let outW = W;
+    let outH = H;
+    if (!fitMode) {
+      const known = resolved.width && resolved.height ? resolved.width / resolved.height : W / H;
+      const aligned = Math.abs(known - W / H) < 0.02;
+      const t =
+        (aligned ? transformsRef.current.get(asset.id) : undefined) ?? { k: 1, tx: 0, ty: 0 };
+      const base = PREVIEW / Math.min(W, H);
+      const side = Math.min(W, H) / t.k;
+      const cx = W / 2 - t.tx / (base * t.k);
+      const cy = H / 2 - t.ty / (base * t.k);
+      const originX = Math.max(0, Math.min(W - side, cx - side / 2));
+      const originY = Math.max(0, Math.min(H - side, cy - side / 2));
+      const cropSide = Math.max(1, Math.floor(side));
+      actions.push({
+        crop: {
+          originX: Math.floor(originX),
+          originY: Math.floor(originY),
+          width: Math.min(cropSide, W - Math.floor(originX)),
+          height: Math.min(cropSide, H - Math.floor(originY)),
+        },
+      });
+      outW = cropSide;
+      outH = cropSide;
+    }
+    if (Math.max(outW, outH) > MAX_DIMENSION) {
+      actions.push({
+        resize: outW >= outH ? { width: MAX_DIMENSION } : { height: MAX_DIMENSION },
+      });
+    }
+    const result = await ImageManipulator.manipulateAsync(normalized.uri, actions, {
+      compress: 0.9,
+      format: ImageManipulator.SaveFormat.JPEG,
+    });
+    return { id: asset.id, uri: result.uri, width: result.width, height: result.height };
+  };
+
+  const handleNextPress = async () => {
+    if (!selected.length || isProcessing) return;
+    saveActiveTransform();
+    setIsProcessing(true);
+    try {
+      const built: MediaAsset[] = [];
+      for (const asset of selected) {
+        built.push(await buildAsset(asset));
+      }
+      router.push({
+        pathname: "/(tabs)/posts/edit-post",
+        params: { selectedAssets: JSON.stringify(built) },
+      });
+    } catch {
+      showMessage("Couldn't prepare your photos. Try again.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const scrollHandler = useAnimatedScrollHandler((event) => {
+    scrollY.value = event.contentOffset.y;
+  });
+
+  const windowStyle = useAnimatedStyle(() => ({
+    height: interpolate(
+      scrollY.value,
+      [0, SCROLL_RANGE],
+      [PREVIEW, COLLAPSED],
+      Extrapolation.CLAMP
+    ),
+  }));
+
+  const imageStyle = useAnimatedStyle(() => ({
+    width: displayW.value,
+    height: displayH.value,
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+  }));
+
+  const panGesture = Gesture.Pan()
+    .onStart(() => {
+      savedX.value = translateX.value;
+      savedY.value = translateY.value;
+    })
+    .onUpdate((event) => {
+      if (scrollY.value > 4 || fitSV.value === 1) return;
+      const maxX = Math.max(0, (displayW.value * scale.value - PREVIEW) / 2);
+      const maxY = Math.max(0, (displayH.value * scale.value - PREVIEW) / 2);
+      translateX.value = Math.max(-maxX, Math.min(maxX, savedX.value + event.translationX));
+      translateY.value = Math.max(-maxY, Math.min(maxY, savedY.value + event.translationY));
+    })
+    .onEnd(() => {
+      savedX.value = translateX.value;
+      savedY.value = translateY.value;
+    });
+
+  const pinchGesture = Gesture.Pinch()
+    .onStart(() => {
+      savedScale.value = scale.value;
+    })
+    .onUpdate((event) => {
+      if (scrollY.value > 4 || fitSV.value === 1) return;
+      const next = Math.max(1, Math.min(MAX_ZOOM, savedScale.value * event.scale));
+      scale.value = next;
+      const maxX = Math.max(0, (displayW.value * next - PREVIEW) / 2);
+      const maxY = Math.max(0, (displayH.value * next - PREVIEW) / 2);
+      translateX.value = Math.max(-maxX, Math.min(maxX, translateX.value));
+      translateY.value = Math.max(-maxY, Math.min(maxY, translateY.value));
+    })
+    .onEnd(() => {
+      savedScale.value = scale.value;
+      savedX.value = translateX.value;
+      savedY.value = translateY.value;
+    });
+
+  const tapGesture = Gesture.Tap().onEnd((_event, success) => {
+    if (success && scrollY.value > 4) runOnJS(scrollToTop)();
+  });
+
+  const previewGesture = Gesture.Exclusive(
+    Gesture.Simultaneous(panGesture, pinchGesture),
+    tapGesture
+  );
+
+  const renderItem = ({ item }: { item: GridItem }) => {
     if (item.id === "camera-button") {
       return (
         <TouchableOpacity
           onPress={handleCameraPress}
-          style={[
-            styles.cameraButton,
-            { backgroundColor: colors.buttonBackgroundSecondary },
-          ]}
+          activeOpacity={0.7}
+          style={[styles.tile, { backgroundColor: colors.buttonBackgroundSecondary }]}
         >
-          <MaterialCommunityIcons
-            name="camera"
-            size={44}
-            color={colors.text}
-          />
+          <MaterialCommunityIcons name="camera" size={34} color={colors.text} />
         </TouchableOpacity>
       );
     }
-
-    const isSelected = selectedAssets.some((sa) => sa.id === item.id);
-
+    const asset = item as MediaAsset;
+    const index = selected.findIndex((s) => s.id === asset.id);
+    const isSelected = index >= 0;
+    const isActive = activeId === asset.id;
     return (
       <TouchableOpacity
-        style={styles.gridItem}
-        onPress={() => handleAssetPress(item)}
+        activeOpacity={0.8}
+        style={styles.tile}
+        onPress={() => handleAssetPress(asset)}
       >
         <Image
-          source={{ uri: item.uri }}
+          source={{ uri: asset.uri }}
           style={styles.thumbnail}
-          onError={(error) =>
-            console.error("Image load error:", error.nativeEvent.error)
-          }
+          contentFit="cover"
+          recyclingKey={asset.id}
+          transition={0}
         />
-        {isSelected && (
-          <ThemedView
-            style={[styles.selectionOverlay, { borderColor: colors.border }]}
-          >
-            <MaterialCommunityIcons
-              name="check-circle"
-              size={24}
-              color={colors.text}
-              style={styles.checkIcon}
-            />
-          </ThemedView>
+        {isSelected && !isMultiSelect && (
+          <View style={[styles.selectedTint, { borderColor: colors.primary }]} />
+        )}
+        {isMultiSelect && (
+          <>
+            {isActive && <View style={[styles.selectedTint, { borderColor: colors.primary }]} />}
+            <TouchableOpacity
+              hitSlop={8}
+              activeOpacity={0.7}
+              onPress={() => (isSelected ? removeAsset(asset) : handleAssetPress(asset))}
+              style={[
+                styles.badge,
+                isSelected
+                  ? { backgroundColor: colors.primary, borderColor: colors.primary }
+                  : { backgroundColor: "rgba(0,0,0,0.25)", borderColor: "#fff" },
+              ]}
+            >
+              {isSelected && (
+                <ThemedText style={[styles.badgeText, { color: colors.buttonText }]}>
+                  {index + 1}
+                </ThemedText>
+              )}
+            </TouchableOpacity>
+          </>
         )}
       </TouchableOpacity>
     );
   };
 
-  const handleNextPress = async () => {
-    if (selectedAssets.length === 0) {
-      console.log(
-        "No Media Selected",
-        "Please select at least one photo to continue."
-      );
-      return;
-    }
+  const gridData: GridItem[] = [{ id: "camera-button", uri: "" }, ...mediaAssets];
 
-    setIsLoading(true);
-
-    const firstAsset = selectedAssets[0];
-    if (
-      !firstAsset ||
-      !firstAsset.uri ||
-      !firstAsset.width ||
-      !firstAsset.height
-    ) {
-      console.log("Error", "Could not get selected image details.");
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const finalScale = savedScale.value;
-      const finalTranslateX = savedTranslateX.value;
-      const finalTranslateY = savedTranslateY.value;
-
-      const originalWidth = firstAsset.width;
-      const originalHeight = firstAsset.height;
-      const imageAspectRatio = originalWidth / originalHeight;
-      const containerSize = PREVIEW_CONTAINER_SIZE;
-
-      let displayWidth, displayHeight;
-      if (imageAspectRatio > 1) {
-        displayWidth = containerSize;
-        displayHeight = containerSize / imageAspectRatio;
-      } else {
-        displayHeight = containerSize;
-        displayWidth = containerSize * imageAspectRatio;
-      }
-
-      const scaledDisplayWidth = displayWidth * finalScale;
-      const scaledDisplayHeight = displayHeight * finalScale;
-
-      const cropWidth =
-        (containerSize / finalScale) * (originalWidth / displayWidth);
-      const cropHeight =
-        (containerSize / finalScale) * (originalHeight / displayHeight);
-
-      const centerX = originalWidth / 2;
-      const centerY = originalHeight / 2;
-
-      const offsetX =
-        (-finalTranslateX / finalScale) * (originalWidth / displayWidth);
-      const offsetY =
-        (-finalTranslateY / finalScale) * (originalHeight / displayHeight);
-
-      const cropX = centerX + offsetX - cropWidth / 2;
-      const cropY = centerY + offsetY - cropHeight / 2;
-
-      const safeCropX = Math.max(0, Math.min(originalWidth - cropWidth, cropX));
-      const safeCropY = Math.max(
-        0,
-        Math.min(originalHeight - cropHeight, cropY)
-      );
-      const safeCropWidth = Math.min(cropWidth, originalWidth - safeCropX);
-      const safeCropHeight = Math.min(cropHeight, originalHeight - safeCropY);
-
-      const croppedResult = await ImageManipulator.manipulateAsync(
-        firstAsset.uri,
-        [
-          {
-            crop: {
-              originX: safeCropX,
-              originY: safeCropY,
-              width: safeCropWidth,
-              height: safeCropHeight,
-            },
-          },
-        ],
-        { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
-      );
-
-      const croppedAsset = {
-        id: firstAsset.id,
-        uri: croppedResult.uri,
-        width: croppedResult.width,
-        height: croppedResult.height,
-      };
-
-      router.push({
-        pathname: "/(tabs)/posts/edit-post",
-        params: { selectedAssets: JSON.stringify([croppedAsset]) },
-      });
-    } catch (error) {
-      console.error("Failed to crop image:", error);
-      try {
-        const originalAsset = {
-          id: firstAsset.id,
-          uri: firstAsset.uri,
-          width: firstAsset.width,
-          height: firstAsset.height,
-        };
-
-        router.push({
-          pathname: "/(tabs)/posts/edit-post",
-          params: { selectedAssets: JSON.stringify([originalAsset]) },
-        });
-      } catch (fallbackError) {
-        console.error("Fallback also failed:", fallbackError);
-        console.log("Error", "Failed to process the image. Please try again.");
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const resetTransform = useCallback(() => {
-    scale.value = 1;
-    translateX.value = 0;
-    translateY.value = 0;
-    savedScale.value = 1;
-    savedTranslateX.value = 0;
-    savedTranslateY.value = 0;
-  }, [
-    scale,
-    translateX,
-    translateY,
-    savedScale,
-    savedTranslateX,
-    savedTranslateY,
-  ]);
-
-  const panGesture = Gesture.Pan()
-    .onUpdate((event) => {
-      try {
-        const currentAsset = selectedAssets[0];
-        if (!currentAsset || !currentAsset.width || !currentAsset.height) {
-          console.log("No valid asset for pan gesture");
-          return;
-        }
-
-        const assetWidth = currentAsset.width;
-        const assetHeight = currentAsset.height;
-        const containerSize = PREVIEW_CONTAINER_SIZE;
-
-        if (!assetWidth || !assetHeight) {
-          console.log("Invalid dimensions:", { assetWidth, assetHeight });
-          return;
-        }
-
-        const imageAspectRatio = assetWidth / assetHeight;
-        if (isNaN(imageAspectRatio) || !isFinite(imageAspectRatio)) {
-          console.log("Invalid aspect ratio:", imageAspectRatio);
-          return;
-        }
-
-        let displayWidth, displayHeight;
-        if (imageAspectRatio > 1) {
-          displayWidth = containerSize;
-          displayHeight = containerSize / imageAspectRatio;
-        } else {
-          displayHeight = containerSize;
-          displayWidth = containerSize * imageAspectRatio;
-        }
-
-        const currentScale = scale.value;
-        if (isNaN(currentScale) || !isFinite(currentScale)) {
-          console.log("Invalid current scale:", currentScale);
-          return;
-        }
-
-        const scaledDisplayWidth = displayWidth * currentScale;
-        const scaledDisplayHeight = displayHeight * currentScale;
-
-        const maxTranslateX = Math.max(
-          0,
-          (scaledDisplayWidth - PREVIEW_CONTAINER_SIZE) / 2
-        );
-        const maxTranslateY = Math.max(
-          0,
-          (scaledDisplayHeight - PREVIEW_CONTAINER_SIZE) / 2
-        );
-
-        const newTranslateX = savedTranslateX.value + event.translationX;
-        const newTranslateY = savedTranslateY.value + event.translationY;
-
-        translateX.value = Math.max(
-          -maxTranslateX,
-          Math.min(maxTranslateX, newTranslateX)
-        );
-        translateY.value = Math.max(
-          -maxTranslateY,
-          Math.min(maxTranslateY, newTranslateY)
-        );
-      } catch (error) {
-        console.error("Error in pan gesture:", error);
-        console.error("Error details:", {
-          message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-          selectedAssets: selectedAssets.length,
-          event: event,
-        });
-      }
-    })
-    .onEnd(() => {
-      try {
-        savedTranslateX.value = translateX.value;
-        savedTranslateY.value = translateY.value;
-      } catch (error) {
-        console.error("Error in pan gesture end:", error);
-        console.error("Error details:", {
-          message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        });
-      }
-    });
-
-  const pinchGesture = Gesture.Pinch()
-    .onUpdate((event) => {
-      try {
-        const currentAsset = selectedAssets[0];
-        if (!currentAsset || !currentAsset.width || !currentAsset.height) {
-          console.log("No valid asset for pinch gesture");
-          return;
-        }
-
-        const assetWidth = currentAsset.width;
-        const assetHeight = currentAsset.height;
-        const containerSize = PREVIEW_CONTAINER_SIZE;
-
-        if (!assetWidth || !assetHeight) {
-          console.log("Invalid dimensions:", { assetWidth, assetHeight });
-          return;
-        }
-
-        const imageAspectRatio = assetWidth / assetHeight;
-        if (isNaN(imageAspectRatio) || !isFinite(imageAspectRatio)) {
-          console.log("Invalid aspect ratio:", imageAspectRatio);
-          return;
-        }
-
-        let displayWidth, displayHeight;
-        if (imageAspectRatio > 1) {
-          displayWidth = containerSize;
-          displayHeight = containerSize / imageAspectRatio;
-        } else {
-          displayHeight = containerSize;
-          displayWidth = containerSize * imageAspectRatio;
-        }
-
-        const maxScale = Math.max(
-          containerSize / displayWidth,
-          containerSize / displayHeight
-        );
-        const minScale = Math.min(
-          1,
-          Math.min(containerSize / displayWidth, containerSize / displayHeight)
-        );
-
-        if (
-          isNaN(maxScale) ||
-          isNaN(minScale) ||
-          !isFinite(maxScale) ||
-          !isFinite(minScale)
-        ) {
-          console.log("Invalid scale values:", {
-            maxScale,
-            minScale,
-            displayWidth,
-            displayHeight,
-          });
-          return;
-        }
-
-        const newScale = savedScale.value * event.scale;
-        if (isNaN(newScale) || !isFinite(newScale)) {
-          console.log("Invalid scale value:", newScale);
-          return;
-        }
-
-        const constrainedScale = Math.max(
-          minScale,
-          Math.min(maxScale, newScale)
-        );
-        if (isNaN(constrainedScale) || !isFinite(constrainedScale)) {
-          console.log("Invalid constrained scale:", constrainedScale);
-          return;
-        }
-
-        scale.value = constrainedScale;
-      } catch (error) {
-        console.error("Error in pinch gesture:", error);
-        console.error("Error details:", {
-          message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-          selectedAssets: selectedAssets.length,
-          event: event,
-        });
-      }
-    })
-    .onEnd(() => {
-      try {
-        savedScale.value = scale.value;
-      } catch (error) {
-        console.error("Error in pinch gesture end:", error);
-        console.error("Error details:", {
-          message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        });
-      }
-    });
-
-  const combinedGesture = Gesture.Simultaneous(panGesture, pinchGesture);
-
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [
-        { translateX: translateX.value },
-        { translateY: translateY.value },
-        { scale: scale.value },
-      ],
-    };
-  });
-
-  const renderContent = () => {
-    if (isLoading) {
+  const renderBody = () => {
+    if (permission === "denied") {
       return (
-        <ThemedView style={styles.centeredContainer}>
-          <ActivityIndicator size="small" color={colors.primary} />
-          <ThemedText style={[{ marginTop: 10, color: colors.textDim }]}>Loading media...</ThemedText>
-        </ThemedView>
-      );
-    }
-
-    if (!hasPermission) {
-      return (
-        <ThemedView style={styles.centeredContainer}>
-          <ThemedText style={{ textAlign: "center" }}>
-            Permission to access camera and gallery is required to create a new
-            post.
+        <ThemedView style={styles.centered}>
+          <MaterialCommunityIcons name="image-off-outline" size={44} color={colors.textDim} />
+          <ThemedText style={[styles.permissionText, { color: colors.textDim }]}>
+            Allow access to your photos to create a post.
           </ThemedText>
-          <TouchableOpacity
-            onPress={requestPermissions}
+          <Button
+            title={canAskAgain ? "Allow Access" : "Open Settings"}
+            onPress={() => (canAskAgain ? requestPermissions() : Linking.openSettings())}
             style={styles.permissionButton}
-          >
-            <ThemedText style={{ color: colors.buttonText }}>
-              Grant Permissions
-            </ThemedText>
-          </TouchableOpacity>
+          />
         </ThemedView>
       );
     }
 
-    const previewAsset =
-      selectedAssets[0] || mediaAssets.find((a) => a.id !== "camera-button");
+    if (isLoading && mediaAssets.length === 0) {
+      return (
+        <ThemedView style={styles.centered}>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </ThemedView>
+      );
+    }
 
     return (
-      <ThemedView style={{ flex: 1 }}>
-        <ThemedView
-          style={[styles.previewContainer, { backgroundColor: "#000" }]}
-        >
-          {previewAsset ? (
-            <GestureDetector gesture={combinedGesture}>
-              <Animated.Image
-                source={{ uri: previewAsset.uri }}
-                style={[styles.previewImage, animatedStyle]}
-                resizeMode="contain"
-              />
-            </GestureDetector>
-          ) : (
-            <ThemedView style={styles.previewPlaceholder}>
-              <ThemedText style={[styles.subText, { color: colors.textDim }]}>
-                Select a photo to preview
-              </ThemedText>
-            </ThemedView>
-          )}
-        </ThemedView>
-        <ThemedView style={styles.recentsHeader}>
-          <ThemedText style={styles.recentsText}>Recents</ThemedText>
-          <TouchableOpacity
-            style={[
-              styles.multiSelectButton,
-              {
-                backgroundColor: isMultiSelect
-                  ? colors.text
-                  : colors.buttonBackgroundSecondary,
-              },
-            ]}
-            onPress={() => setIsMultiSelect(!isMultiSelect)}
-          >
-            <MaterialCommunityIcons
-              name="checkbox-multiple-blank-outline"
-              size={18}
-              color={isMultiSelect ? colors.background : colors.text}
-            />
-          </TouchableOpacity>
-        </ThemedView>
-        <FlatList
-          data={mediaAssets}
-          renderItem={renderAssetItem}
+      <View style={styles.flex}>
+        <AnimatedFlatList
+          ref={listRef}
+          data={gridData}
+          renderItem={renderItem}
           keyExtractor={(item) => item.id}
           numColumns={NUM_COLUMNS}
-          contentContainerStyle={[styles.gridContainer, { paddingBottom: tabSpace }]}
+          columnWrapperStyle={{ gap: GAP }}
+          ItemSeparatorComponent={() => <View style={{ height: GAP }} />}
+          contentContainerStyle={{
+            paddingTop: PREVIEW + RECENTS_HEIGHT,
+            paddingBottom: tabSpace,
+          }}
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
+          onEndReached={() => loadPage(false)}
+          onEndReachedThreshold={0.6}
+          initialNumToRender={24}
+          windowSize={7}
+          removeClippedSubviews
+          showsVerticalScrollIndicator={false}
+          extraData={{ selected, activeId, isMultiSelect }}
         />
-      </ThemedView>
+        <View style={[styles.overlay, { backgroundColor: colors.background }]}>
+          <Animated.View style={[styles.previewWindow, windowStyle]}>
+            <GestureDetector gesture={previewGesture}>
+              <Animated.View style={imageStyle}>
+                {previewUri ? (
+                  <Image
+                    source={{ uri: previewUri }}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="fill"
+                    transition={0}
+                  />
+                ) : null}
+              </Animated.View>
+            </GestureDetector>
+            <TouchableOpacity
+              onPress={toggleFit}
+              style={styles.fitButton}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons
+                name={fitMode ? "arrow-expand-all" : "arrow-collapse-all"}
+                size={18}
+                color="#fff"
+              />
+            </TouchableOpacity>
+          </Animated.View>
+          <View style={[styles.recentsHeader, { backgroundColor: colors.background }]}>
+            <ThemedText style={styles.recentsText}>Recents</ThemedText>
+            <ThemedView style={styles.recentsRight}>
+              {isMultiSelect && (
+                <ThemedText style={[styles.countText, { color: colors.textDim }]}>
+                  {selected.length}/{MAX_SELECTION}
+                </ThemedText>
+              )}
+              <TouchableOpacity
+                style={[
+                  styles.multiSelectButton,
+                  {
+                    backgroundColor: isMultiSelect ? colors.primary : colors.buttonBackgroundSecondary,
+                  },
+                ]}
+                onPress={toggleMultiSelect}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons
+                  name="checkbox-multiple-blank-outline"
+                  size={18}
+                  color={isMultiSelect ? colors.buttonText : colors.text}
+                />
+                <ThemedText
+                  style={[
+                    styles.multiSelectLabel,
+                    { color: isMultiSelect ? colors.buttonText : colors.text },
+                  ]}
+                >
+                  Select
+                </ThemedText>
+              </TouchableOpacity>
+            </ThemedView>
+          </View>
+        </View>
+      </View>
     );
   };
 
   return (
-    <GestureHandlerRootView style={styles.root}>
-      <ScreenBackground style={styles.gradientContainer}>
+    <GestureHandlerRootView style={styles.flex}>
+      <ScreenBackground style={styles.flex}>
         <ThemedSafeArea style={styles.safeArea}>
           <CommonHeader
             title="New Post"
             rightContent1={
-              <TouchableOpacity
-                onPress={handleNextPress}
-                style={styles.nextButton}
-              >
-                <ThemedText
-                  style={[
-                    styles.nextButtonText,
-                    { color: colors.text, opacity: 0.8 },
-                  ]}
+              isProcessing ? (
+                <ActivityIndicator size="small" color={colors.text} style={styles.nextButton} />
+              ) : (
+                <TouchableOpacity
+                  onPress={handleNextPress}
+                  style={styles.nextButton}
+                  disabled={selected.length === 0}
                 >
-                  Next
-                </ThemedText>
-              </TouchableOpacity>
+                  <ThemedText
+                    style={[
+                      styles.nextButtonText,
+                      { color: colors.primary, opacity: selected.length === 0 ? 0.4 : 1 },
+                    ]}
+                  >
+                    Next
+                  </ThemedText>
+                </TouchableOpacity>
+              )
             }
             showBottomBorder={false}
           />
-          {renderContent()}
+          <InlineError message={message} style={styles.message} />
+          {renderBody()}
         </ThemedSafeArea>
       </ScreenBackground>
     </GestureHandlerRootView>
@@ -666,94 +717,80 @@ export default function PostsScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  gradientContainer: { flex: 1 },
+  flex: { flex: 1 },
   safeArea: { flex: 1, backgroundColor: "transparent" },
-  nextButton: {
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-  },
-  nextButtonText: {
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  centeredContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  permissionButton: {
-    marginTop: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    backgroundColor: "#007AFF",
-  },
-  previewContainer: {
+  nextButton: { paddingVertical: 5, paddingHorizontal: 10 },
+  nextButtonText: { fontSize: 16, fontWeight: "bold" },
+  message: { paddingHorizontal: 16, paddingBottom: 6 },
+  centered: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24, gap: 12 },
+  permissionText: { textAlign: "center", fontSize: 15 },
+  permissionButton: { width: 200 },
+  overlay: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 2 },
+  previewWindow: {
     width: "100%",
-    height: PREVIEW_CONTAINER_SIZE,
+    backgroundColor: "#000",
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
   },
-  previewImage: {
-    width: "100%",
-    height: "100%",
-  },
-  previewPlaceholder: {
-    flex: 1,
+  fitButton: {
+    position: "absolute",
+    left: 12,
+    bottom: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(0,0,0,0.55)",
     justifyContent: "center",
     alignItems: "center",
   },
-  subText: { fontSize: 16, textAlign: "center" },
   recentsHeader: {
+    height: RECENTS_HEIGHT,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 15,
-    paddingVertical: 10,
   },
-  recentsText: {
-    fontSize: 16,
-    fontWeight: "bold",
-  },
+  recentsRight: { flexDirection: "row", alignItems: "center", gap: 10 },
+  recentsText: { fontSize: 16, fontWeight: "bold" },
+  countText: { fontSize: 13, fontWeight: "600" },
   multiSelectButton: {
-    width: 32,
     height: 32,
+    paddingHorizontal: 12,
     borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  multiSelectLabel: { fontSize: 13, fontWeight: "700" },
+  tile: {
+    width: TILE_SIZE,
+    height: TILE_SIZE,
     justifyContent: "center",
     alignItems: "center",
   },
-  gridContainer: { paddingHorizontal: SPACING / 2, paddingBottom: 20 },
-  gridItem: {
-    width: TILE_SIZE,
-    height: TILE_SIZE,
-    margin: SPACING / 2,
-    position: "relative",
-  },
-  thumbnail: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 8,
-    overflow: "hidden",
-  },
-  cameraButton: {
-    width: TILE_SIZE,
-    height: TILE_SIZE,
-    margin: SPACING / 2,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  selectionOverlay: {
+  thumbnail: { width: "100%", height: "100%" },
+  selectedTint: {
     ...StyleSheet.absoluteFillObject,
+    borderWidth: 3,
+    backgroundColor: "rgba(255,255,255,0.25)",
+  },
+  badge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 3,
-    borderRadius: 8,
   },
-  checkIcon: {
-    backgroundColor: "rgba(255, 255, 255, 0.7)",
-    borderRadius: 12,
+  badgeText: {
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: "800",
+    textAlign: "center",
+    includeFontPadding: false,
   },
 });

@@ -13,6 +13,8 @@ import { useTheme } from "@/context/ThemeContext";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import { markPostPublished } from "@/utils/postDraft";
+import { useUploadStore } from "@/store/uploadStore";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import CommonHeader from "@/components/CommonHeader";
@@ -25,7 +27,6 @@ import { countWords, getAddressFromCoords } from "@/constants/Functions";
 import LocationSearch from "@/components/LocationSearch";
 import Button from "@/components/Button";
 import { MediaAsset, Track } from "@/types/media.type";
-import PostService from "@/services/PostService";
 import { useAuth } from "@/context/AuthContext";
 
 export default function CaptionScreen() {
@@ -43,7 +44,10 @@ export default function CaptionScreen() {
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
 
-  const currentLocation = useCurrentLocation();
+  const startPostUpload = useUploadStore((state) => state.startPostUpload);
+  const requestCurrentLocation = useCurrentLocation();
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState("");
 
   useEffect(() => {
     if (params.selectedAssets) {
@@ -64,42 +68,41 @@ export default function CaptionScreen() {
     if (countWords(text) <= 200) setCaption(text);
   };
 
-  const handlePost = async () => {
-    if (!accessToken || !selectedAssets.length) return;
-
+  const handlePost = () => {
+    if (!accessToken || !selectedAssets.length || isPosting) return;
     setPostError("");
     setIsPosting(true);
+    const formData = new FormData();
+    selectedAssets.forEach((asset, index) => {
+      formData.append("images", {
+        uri: asset.uri,
+        name: `image_${Date.now()}_${index}.jpg`,
+        type: "image/jpeg",
+      } as any);
+    });
+    formData.append("caption", caption);
+    if (location) formData.append("location", location);
+    if (selectedTrack) formData.append("song", JSON.stringify(selectedTrack));
+    startPostUpload(formData, selectedAssets[0].uri);
+    markPostPublished();
+    router.replace("/(tabs)/home");
+  };
+
+  const handleUseCurrentLocation = async () => {
+    setLocationError("");
+    setLocating(true);
     try {
-      const formData = new FormData();
-
-      for (const asset of selectedAssets) {
-        const uriParts = asset.uri.split(".");
-        const fileType = uriParts[uriParts.length - 1];
-        const fileName = `image_${asset.id}.${fileType}`;
-        const mimeType = `image/${fileType}`;
-
-        formData.append("images", {
-          uri: asset.uri,
-          name: fileName,
-          type: mimeType,
-        } as any);
+      const coords = await requestCurrentLocation();
+      if (!coords) {
+        setLocationError("Couldn't get your location. Check location access in Settings.");
+        return;
       }
-
-      formData.append("caption", caption);
-      if (location) {
-        formData.append("location", location);
-      }
-      if (selectedTrack) {
-        formData.append("song", JSON.stringify(selectedTrack));
-      }
-
-      await PostService.createPost(formData, accessToken);
-      router.push("/(tabs)/home");
-    } catch (error) {
-      console.error("Failed to create post:", error);
-      setPostError("Couldn't post. Check your connection and try again.");
+      const addr = await getAddressFromCoords(coords.latitude, coords.longitude);
+      setLocation(addr);
+      setSearchQuery("");
+      setShowLocationModal(false);
     } finally {
-      setIsPosting(false);
+      setLocating(false);
     }
   };
 
@@ -111,8 +114,8 @@ export default function CaptionScreen() {
         contentFit="cover"
       />
       {selectedAssets.length > 1 && (
-        <ThemedView style={styles.imageNumberBadge}>
-          <ThemedText style={styles.imageNumberText}>{index + 1}</ThemedText>
+        <ThemedView style={[styles.imageNumberBadge, { backgroundColor: colors.primary }]}>
+          <ThemedText style={[styles.imageNumberText, { color: colors.buttonText }]}>{index + 1}</ThemedText>
         </ThemedView>
       )}
     </ThemedView>
@@ -284,6 +287,7 @@ export default function CaptionScreen() {
               <ThemedView style={styles.modalHeader}>
                 <TouchableOpacity onPress={() => {
                   setSearchQuery("");
+                  setLocationError("");
                   setShowLocationModal(false);
                 }}>
                   <MaterialCommunityIcons
@@ -309,29 +313,27 @@ export default function CaptionScreen() {
                 }}
               />
 
-              {currentLocation && (
-                <Button
-                  onPress={async () => {
-                    const addr = await getAddressFromCoords(
-                      currentLocation.latitude,
-                      currentLocation.longitude
-                    );
-                    setLocation(addr);
-                    setShowLocationModal(false);
-                  }}
-                  style={styles.currentLocationButton}
-                >
-                  <MaterialCommunityIcons
-                    name="crosshairs-gps"
-                    size={20}
-                    color={colors.buttonText}
-                    style={{ marginRight: 10 }}
-                  />
-                  <ThemedText style={{ color: colors.buttonText }}>
-                    Use Current Location
-                  </ThemedText>
-                </Button>
-              )}
+              <InlineError message={locationError} style={styles.locationError} />
+              <Button
+                onPress={handleUseCurrentLocation}
+                disabled={locating}
+                style={styles.currentLocationButton}
+              >
+                {locating ? (
+                  <ActivityIndicator size="small" color={colors.buttonText} />
+                ) : (
+                  <ThemedView style={styles.currentLocationContent}>
+                    <MaterialCommunityIcons
+                      name="crosshairs-gps"
+                      size={20}
+                      color={colors.buttonText}
+                    />
+                    <ThemedText style={{ color: colors.buttonText, fontWeight: "700" }}>
+                      Use Current Location
+                    </ThemedText>
+                  </ThemedView>
+                )}
+              </Button>
             </ThemedView>
           </TouchableWithoutFeedback>
         </ThemedModal>
@@ -353,16 +355,21 @@ const styles = StyleSheet.create({
   imagePreview: { width: 80, height: 80, borderRadius: 8 },
   imageNumberBadge: {
     position: "absolute",
-    top: -5,
-    right: -5,
-    backgroundColor: "#007AFF",
-    borderRadius: 10,
-    width: 20,
-    height: 20,
+    top: 4,
+    right: 4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     justifyContent: "center",
     alignItems: "center",
   },
-  imageNumberText: { color: "white", fontSize: 12, fontWeight: "bold" },
+  imageNumberText: {
+    fontSize: 11,
+    lineHeight: 13,
+    fontWeight: "800",
+    textAlign: "center",
+    includeFontPadding: false,
+  },
   songPreviewContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -403,16 +410,9 @@ const styles = StyleSheet.create({
   },
   locationIcon: { marginRight: 10 },
   locationInput: { flex: 1, fontSize: 16 },
-  currentLocationButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginTop: 12,
-    marginBottom: 20,
-  },
+  currentLocationButton: { marginTop: 12, marginBottom: 20 },
+  currentLocationContent: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "transparent" },
+  locationError: { marginTop: 10 },
   modalContainer: {
     flex: 1,
   },

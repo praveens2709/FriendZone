@@ -28,12 +28,20 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, isMyMessage }) => {
   const positionUpdateRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasFinishedRef = useRef(false);
 
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const cancelledRef = useRef(false);
+
   useEffect(() => {
+    cancelledRef.current = false;
     preloadAudio();
 
     return () => {
-      if (sound) {
-        sound.unloadAsync();
+      cancelledRef.current = true;
+      const current = soundRef.current;
+      soundRef.current = null;
+      if (current) {
+        current.setOnPlaybackStatusUpdate(null);
+        current.unloadAsync().catch(() => {});
       }
       if (positionUpdateRef.current) {
         clearInterval(positionUpdateRef.current);
@@ -58,7 +66,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, isMyMessage }) => {
   const handleAudioFinish = async () => {
     if (hasFinishedRef.current) return;
     hasFinishedRef.current = true;
-    console.log("Audio finished playing");
     stopPositionUpdates();
     setIsPlaying(false);
 
@@ -66,9 +73,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, isMyMessage }) => {
       try {
         await sound.pauseAsync();
         await sound.setPositionAsync(0);
-      } catch (error) {
-        console.error("Error pausing/resetting audio:", error);
-      }
+      } catch {}
     }
     setPosition(0);
 
@@ -100,15 +105,20 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, isMyMessage }) => {
         }
       );
 
+      if (cancelledRef.current) {
+        newSound.setOnPlaybackStatusUpdate(null);
+        newSound.unloadAsync().catch(() => {});
+        return;
+      }
       if (status.isLoaded) {
+        soundRef.current = newSound;
         setSound(newSound);
         setDuration(status.durationMillis || 0);
         setIsLoaded(true);
       }
-    } catch (error) {
-      console.error("Error preloading audio:", error);
+    } catch {
     } finally {
-      setIsLoading(false);
+      if (!cancelledRef.current) setIsLoading(false);
     }
   };
 
@@ -149,9 +159,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, isMyMessage }) => {
               return;
             }
           }
-        } catch (error) {
-          console.error("Error getting audio status:", error);
-        }
+        } catch {}
       }
     }, 100);
   };
@@ -187,9 +195,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, isMyMessage }) => {
         setIsPlaying(true);
         startPositionUpdates();
       }
-    } catch (error) {
-      console.error("Error toggling play/pause:", error);
-    }
+    } catch {}
   };
 
   const handleProgressPress = async (event: any) => {
@@ -206,9 +212,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, isMyMessage }) => {
       hasFinishedRef.current = false;
       await sound.setPositionAsync(newPosition);
       setPosition(newPosition);
-    } catch (error) {
-      console.error("Error seeking audio:", error);
-    }
+    } catch {}
   };
 
   const progressPercentage =

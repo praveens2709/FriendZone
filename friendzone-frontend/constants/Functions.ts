@@ -8,7 +8,6 @@ import { DisplayUser } from "@/types/chat.type";
 import { format } from "date-fns";
 import { ChatPreviewResponse } from "@/services/ChatService";
 import * as Location from "expo-location";
-import { GOOGLE_MAPS_API_KEY } from "./const";
 
 export type ApiErrorInfo = { message: string; code?: string; status?: number };
 
@@ -355,34 +354,22 @@ export const getAddressFromCoords = async (lat: number, lng: number) => {
 };
 
 export const fetchPlaces = async (input: string) => {
-  if (!input || input.length < 1) return [];
+  const query = input.trim();
+  if (query.length < 2) return [];
   try {
     const response = await fetch(
-      `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
-        input
-      )}&key=${GOOGLE_MAPS_API_KEY}&language=en`
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+        query
+      )}&format=jsonv2&limit=8&accept-language=en`,
+      { headers: { Accept: "application/json" } }
     );
+    if (!response.ok) return [];
     const json = await response.json();
-    if (json.status !== "OK" && json.status !== "ZERO_RESULTS") {
-      console.error("Google Places API Error:", json.status, json.error_message);
-    }
-    return json.predictions || [];
-  } catch (error) {
-    console.error("fetchPlaces error:", error);
+    return (Array.isArray(json) ? json : [])
+      .filter((place: any) => place?.display_name)
+      .map((place: any) => ({ description: place.display_name as string }));
+  } catch {
     return [];
-  }
-};
-
-export const fetchPlaceDetails = async (placeId: string) => {
-  try {
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&key=${GOOGLE_MAPS_API_KEY}&language=en`
-    );
-    const json = await response.json();
-    return json.result || null;
-  } catch (error) {
-    console.error("fetchPlaceDetails error:", error);
-    return null;
   }
 };
 

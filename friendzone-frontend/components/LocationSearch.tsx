@@ -40,7 +40,7 @@ const LocationSearch = ({
       } else {
         setResults([]);
       }
-    }, 300);
+    }, 600);
 
     return () => {
       active = false;

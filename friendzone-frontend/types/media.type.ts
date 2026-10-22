@@ -5,6 +5,12 @@ export interface MediaAsset {
   height?: number;
 }
 
+export interface EditableAsset extends MediaAsset {
+  originalUri: string;
+  rotation: number;
+  flipped: boolean;
+}
+
 export interface Track {
   trackName: string;
   artistName: string;
