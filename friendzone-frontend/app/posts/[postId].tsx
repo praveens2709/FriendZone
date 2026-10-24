@@ -2,10 +2,10 @@ import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   StyleSheet,
-  ActivityIndicator,
   FlatList,
   Dimensions,
   ViewToken,
+  ActivityIndicator,
 } from "react-native";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";

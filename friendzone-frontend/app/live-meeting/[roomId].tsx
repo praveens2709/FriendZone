@@ -1,4 +1,5 @@
 
+import { useConfirm } from "@/components/ConfirmProvider";
 import React, { useEffect, useRef, useState } from "react";
 import {
     View,
@@ -313,6 +314,7 @@ const TopRightControls = ({
 };
 
 export default function LiveMeetingScreen() {
+  const confirm = useConfirm();
     const { roomId, isHost: isHostParam, audio, instant } = useLocalSearchParams<{
         roomId: string;
         isHost?: string;
@@ -404,12 +406,7 @@ export default function LiveMeetingScreen() {
 
     const handleEndForAll = () => {
         if (!call) return;
-        Alert.alert("End call", "End the call for everyone?", [
-            { text: "Cancel", style: "cancel" },
-            {
-                text: "End",
-                style: "destructive",
-                onPress: async () => {
+        confirm({ title: "End call", message: "End the call for everyone?", confirmLabel: "End", onConfirm: async () => {
                     try {
                         await call.endCall();
                         await MeetingService.updateMeetingStatus(roomId!, "completed", accessToken!);
@@ -417,9 +414,7 @@ export default function LiveMeetingScreen() {
                         console.error("End call failed", e);
                     }
                     await handleLeave();
-                },
-            },
-        ]);
+                } });
     };
 
     useEffect(() => {

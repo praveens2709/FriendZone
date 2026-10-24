@@ -1,3 +1,5 @@
+import { useConfirm } from "@/components/ConfirmProvider";
+import AppRefreshControl from "@/components/AppRefreshControl";
 import { readableTextOn } from "@/utils/theme-utils";
 import { useTabBarSpace } from "@/hooks/useTabBarSpace";
 import ScreenBackground from "@/components/ui/ScreenBackground";
@@ -12,7 +14,6 @@ import {
     Modal,
     Dimensions,
     ActivityIndicator,
-    RefreshControl,
     Alert,
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
@@ -38,6 +39,7 @@ type TabType = "live" | "upcoming" | "completed";
 const PAGE_SIZE = 15;
 
 export default function MeetingsScreen() {
+  const confirm = useConfirm();
     const { colors } = useTheme();
     const { space: tabSpace } = useTabBarSpace();
     const { accessToken, user } = useAuth();
@@ -174,27 +176,21 @@ export default function MeetingsScreen() {
     };
 
     const handleDelete = async (meetingId: string, status: string) => {
-        Alert.alert(
-            status === "upcoming" ? "Cancel this plan?" : "Delete this plan?",
-            status === "upcoming"
-                ? "Everyone invited will see that it's cancelled."
-                : "This removes it from your history for everyone.",
-            [
-                { text: "Keep it", style: "cancel" },
-                {
-                    text: status === "upcoming" ? "Cancel plan" : "Delete",
-                    style: "destructive",
-                    onPress: async () => {
-                        try {
-                            await MeetingService.deleteMeeting(meetingId, accessToken!);
-                            fetchFirstPage(true);
-                        } catch (error) {
-
-                        }
-                    },
-                },
-            ]
-        );
+        confirm({
+            title: status === "upcoming" ? "Cancel this plan?" : "Delete this plan?",
+            message:
+                status === "upcoming"
+                    ? "Everyone invited will see that it's cancelled."
+                    : "This removes it from your history for everyone.",
+            confirmLabel: status === "upcoming" ? "Cancel plan" : "Delete",
+            onConfirm: async () => {
+                try {
+                    await MeetingService.deleteMeeting(meetingId, accessToken!);
+                    fetchFirstPage(true);
+                } catch (error) {
+                }
+            },
+        });
     };
 
     const filteredMeetings = meetings;
@@ -322,7 +318,7 @@ export default function MeetingsScreen() {
                                 loadingMore ? <ActivityIndicator style={{ marginVertical: 16 }} color={colors.primary} /> : null
                             }
                             refreshControl={
-                                <RefreshControl
+                                <AppRefreshControl
                                     refreshing={refreshing}
                                     onRefresh={onRefresh}
                                     tintColor={colors.primary}

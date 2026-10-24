@@ -1,3 +1,4 @@
+import AppRefreshControl from "@/components/AppRefreshControl";
 import { personalizeSystemText } from "@/utils/systemText";
 import EmptyState from "@/components/EmptyState";
 import { ChatListSkeleton } from "@/components/Skeleton";
@@ -8,7 +9,6 @@ import {
   TouchableOpacity,
   FlatList,
   TextInput,
-  RefreshControl,
   ActivityIndicator,
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
@@ -755,7 +755,7 @@ export default function ChatsScreen() {
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
           refreshControl={
-            <RefreshControl
+            <AppRefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
               tintColor={colors.primary}

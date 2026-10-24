@@ -3,6 +3,7 @@ import Knock from '../models/Knock.js';
 import User from '../models/User.js';
 import Meeting from '../models/Meeting.js';
 import Post from '../models/Post.js';
+import { pushToOffline } from '../services/pushService.js';
 
 const emitUnreadNotificationCount = async (io, userId) => {
     try {
@@ -285,6 +286,16 @@ export const createNotification = async ({
         if (io) {
             io.to(`notifications-${recipientId}`).emit('newNotification', newNotification);
             emitUnreadNotificationCount(io, recipientId);
+            const route =
+                relatedEntityType === 'Meeting' && relatedEntityId ? `/plan/${relatedEntityId}`
+                : relatedEntityType === 'Post' && relatedEntityId ? `/posts/${relatedEntityId}`
+                : senderId ? `/profile/UserProfile?userId=${senderId}`
+                : '/(notifications)';
+            pushToOffline(io, [recipientId], {
+                title: fullName || 'FriendZone',
+                body: content,
+                data: { route },
+            });
         }
 
         return newNotification;

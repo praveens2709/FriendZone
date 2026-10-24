@@ -1,3 +1,4 @@
+import { useConfirm } from "@/components/ConfirmProvider";
 import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect } from "react";
 import {
@@ -6,7 +7,7 @@ import {
     ScrollView,
     TouchableOpacity,
     Alert,
-    ActivityIndicator,
+  ActivityIndicator,
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
@@ -29,6 +30,7 @@ import UserProfileCard from "@/components/UserProfileCard";
 import PlanBanner from "@/components/meetings/PlanBanner";
 
 export default function MeetingDetailsScreen() {
+  const confirm = useConfirm();
     const { colors } = useTheme();
     const insets = useSafeAreaInsets();
     const { accessToken, user } = useAuth();
@@ -129,28 +131,22 @@ export default function MeetingDetailsScreen() {
     const handleCancelMeeting = async () => {
         if (!meeting) return;
 
-        Alert.alert(
-            "Cancel Meeting",
-            "Are you sure you want to cancel this meeting?",
-            [
-                { text: "No", style: "cancel" },
-                {
-                    text: "Yes, Cancel",
-                    style: "destructive",
-                    onPress: async () => {
-                        setActionLoading(true);
-                        try {
-                            await MeetingService.deleteMeeting(meeting._id, accessToken!);
-                            router.back();
-                        } catch (error) {
-                            console.error("Error cancelling meeting:", error);
-                        } finally {
-                            setActionLoading(false);
-                        }
-                    }
+        confirm({
+            title: "Cancel this meeting?",
+            message: "Everyone invited will see that it's cancelled.",
+            confirmLabel: "Yes, cancel",
+            onConfirm: async () => {
+                setActionLoading(true);
+                try {
+                    await MeetingService.deleteMeeting(meeting._id, accessToken!);
+                    router.back();
+                } catch (error) {
+                    console.error("Error cancelling meeting:", error);
+                } finally {
+                    setActionLoading(false);
                 }
-            ]
-        );
+            },
+        });
     };
 
     const handleInviteSingleUser = async (user: InviteeUser) => {

@@ -2,7 +2,6 @@ import ScreenBackground from "@/components/ui/ScreenBackground";
 import React from "react";
 import {
   KeyboardAvoidingView,
-  Platform,
   TouchableWithoutFeedback,
   Keyboard,
   StyleSheet,
@@ -23,7 +22,7 @@ const AuthFormLayout = ({ children }: Props) => {
       <ThemedSafeArea style={{ flex: 1, backgroundColor: 'transparent' }}>
         <KeyboardAvoidingView
           style={styles.wrapper}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={"padding"}
         >
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <ThemedView style={{ flex: 1}}>{children}</ThemedView>

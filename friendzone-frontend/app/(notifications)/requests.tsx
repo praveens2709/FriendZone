@@ -1,3 +1,4 @@
+import AppRefreshControl from "@/components/AppRefreshControl";
 import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect, useCallback } from "react";
 import {
@@ -5,7 +6,6 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
-  RefreshControl,
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemedView } from "@/components/ThemedView";
@@ -207,7 +207,7 @@ export default function KnockRequestsScreen() {
               </ThemedView>
             )}
             refreshControl={
-              <RefreshControl
+              <AppRefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
                 tintColor={colors.primary}

@@ -1,7 +1,6 @@
 import React from "react";
 import {
   KeyboardAvoidingView,
-  Platform,
   Modal,
   Pressable,
   StyleSheet,
@@ -31,7 +30,7 @@ export default function ThemedModal({
     <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={styles.keyboardContainer}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={"padding"}
       >
       <Pressable style={[styles.overlay, { backgroundColor: colors.overlay }]} onPress={onClose}>
         <Pressable

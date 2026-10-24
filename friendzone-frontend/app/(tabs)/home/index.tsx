@@ -1,3 +1,4 @@
+import AppRefreshControl from "@/components/AppRefreshControl";
 import { useTabBarSpace } from "@/hooks/useTabBarSpace";
 import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useEffect, useState, useCallback, useRef } from "react";
@@ -8,7 +9,6 @@ import {
   FlatList,
   ViewToken,
   Platform,
-  RefreshControl,
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
@@ -341,7 +341,7 @@ export default function HomeScreen() {
           )}
           keyExtractor={(item) => item._id}
           refreshControl={
-            <RefreshControl
+            <AppRefreshControl
               refreshing={refreshing}
               onRefresh={() => {
                 setRefreshing(true);

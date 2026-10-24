@@ -6,6 +6,7 @@ import React, {
   useLayoutEffect,
   useCallback,
 } from "react";
+import { unregisterPush } from "@/services/pushService";
 import {
   getAuthSession,
   storeAuthSession,
@@ -55,6 +56,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const availableThemes = useThemeStore((state) => state.availableThemes);
 
   const signOut = useCallback(async () => {
+    await unregisterPush();
     await AuthServices.logout();
     await removeAuthSession();
     await removeFilterSettings();

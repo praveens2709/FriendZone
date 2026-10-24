@@ -1,3 +1,4 @@
+import AppRefreshControl from "@/components/AppRefreshControl";
 import { useTabBarSpace } from "@/hooks/useTabBarSpace";
 import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect, useCallback } from "react";
@@ -7,7 +8,6 @@ import {
   View,
   Platform,
   ActivityIndicator,
-  RefreshControl,
   Animated,
   Dimensions,
   ScrollView,
@@ -379,7 +379,7 @@ export default function ProfileScreen() {
           style={styles.scrollView}
           contentContainerStyle={{ flexGrow: 1, paddingBottom: tabSpace }}
           refreshControl={
-            <RefreshControl
+            <AppRefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
               tintColor={colors.primary}

@@ -1,3 +1,4 @@
+import AppRefreshControl from "@/components/AppRefreshControl";
 import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect, useCallback } from "react";
 import {
@@ -5,7 +6,6 @@ import {
   TextInput,
   ActivityIndicator,
   FlatList,
-  RefreshControl,
   KeyboardAvoidingView,
   Platform,
   Dimensions,
@@ -490,7 +490,7 @@ export default function GroupChatScreen() {
                 </ThemedView>
               )}
               refreshControl={
-                <RefreshControl
+                <AppRefreshControl
                   refreshing={refreshing}
                   onRefresh={onRefresh}
                   tintColor={colors.primary}

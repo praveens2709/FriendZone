@@ -1,3 +1,5 @@
+import { useConfirm } from "@/components/ConfirmProvider";
+import AppRefreshControl from "@/components/AppRefreshControl";
 import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect } from "react";
 import {
@@ -5,9 +7,8 @@ import {
     View,
     FlatList,
     TouchableOpacity,
-    ActivityIndicator,
     Alert,
-    RefreshControl,
+  ActivityIndicator,
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
@@ -39,6 +40,7 @@ type FlatRecordingItem = {
 };
 
 export default function RecordingsListScreen() {
+  const confirm = useConfirm();
     const { colors } = useTheme();
     const { accessToken, user } = useAuth();
     const router = useRouter();
@@ -167,15 +169,7 @@ export default function RecordingsListScreen() {
     };
 
     const handleDelete = () => {
-        Alert.alert(
-            "Delete Recordings",
-            `Are you sure you want to delete the ${selectedIds.size} selected recording(s)?\nThis action cannot be undone.`,
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Delete",
-                    style: "destructive",
-                    onPress: async () => {
+        confirm({ title: "Delete Recordings", message: `Are you sure you want to delete the ${selectedIds.size} selected recording(s)?\nThis action cannot be undone.`, confirmLabel: "Delete", onConfirm: async () => {
                         setIsDeleting(true);
                         try {
                             const deletionPromises = Array.from(selectedIds).map(async (comboId) => {
@@ -207,10 +201,7 @@ export default function RecordingsListScreen() {
                         } finally {
                             setIsDeleting(false);
                         }
-                    }
-                }
-            ]
-        );
+                    } });
     };
 
     return (
@@ -251,7 +242,7 @@ export default function RecordingsListScreen() {
                         keyExtractor={(item) => item.id}
                         contentContainerStyle={styles.content}
                         refreshControl={
-                            <RefreshControl
+                            <AppRefreshControl
                                 refreshing={refreshing}
                                 onRefresh={onRefresh}
                                 tintColor={colors.text}

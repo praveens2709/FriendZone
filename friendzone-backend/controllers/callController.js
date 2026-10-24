@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import { pushToOffline } from '../services/pushService.js';
 import Chat from '../models/Chat.js';
 import Meeting from '../models/Meeting.js';
 import Message from '../models/Message.js';
@@ -101,6 +102,13 @@ export const startCall = async (req, res) => {
       expiresAt: new Date(Date.now() + RING_WINDOW_MS).toISOString(),
     };
     for (const id of others) io?.to(`notifications-${id}`).emit('incomingCall', payload);
+
+    pushToOffline(io, others, {
+      title: hostName,
+      body: `Incoming ${audioOnly ? 'audio' : 'video'} call`,
+      data: { route: `/(chat)/${chat._id}` },
+      channelId: 'calls',
+    });
 
     await postCallMessage(io, chat, userId, `${host.firstName} started ${audioOnly ? 'an audio' : 'a video'} call`);
 

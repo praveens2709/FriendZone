@@ -26,6 +26,18 @@ const userSchema = new mongoose.Schema(
     tokenVersion: { type: Number, default: 0 },
     theme: { type: String, default: "light" },
 
+    pushTokens: {
+      type: [
+        {
+          token: { type: String, required: true },
+          platform: { type: String, enum: ['android', 'ios'], default: 'android' },
+          updatedAt: { type: Date, default: Date.now },
+          _id: false,
+        },
+      ],
+      select: false,
+      default: [],
+    },
     firstName: { type: String, trim: true, maxlength: 50 },
     lastName: { type: String, trim: true, maxlength: 50 },
     gender: String,

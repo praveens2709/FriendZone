@@ -5,6 +5,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
+import ConfirmModal from "@/components/ConfirmModal";
 import CommonHeader from "@/components/CommonHeader";
 import ThemedSafeArea from "@/components/ThemedSafeArea";
 import BackButton from "@/components/BackButton";
@@ -16,6 +17,7 @@ export default function BlockedAccountsScreen() {
   const { accessToken } = useAuth();
   const [blocked, setBlocked] = useState<BlockedUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pending, setPending] = useState<BlockedUser | null>(null);
 
   const load = useCallback(async () => {
     if (!accessToken) return;
@@ -64,7 +66,7 @@ export default function BlockedAccountsScreen() {
                   {`${item.firstName} ${item.lastName || ""}`.trim()}
                 </ThemedText>
                 <TouchableOpacity
-                  onPress={() => unblock(item.id)}
+                  onPress={() => setPending(item)}
                   style={[styles.button, { borderColor: colors.border }]}
                 >
                   <ThemedText>Unblock</ThemedText>
@@ -73,6 +75,18 @@ export default function BlockedAccountsScreen() {
             )}
           />
         )}
+        <ConfirmModal
+          visible={!!pending}
+          title={`Unblock ${pending?.firstName ?? ""}?`}
+          message="They'll be able to find you and send you a knock again."
+          confirmLabel="Unblock"
+          onCancel={() => setPending(null)}
+          onConfirm={() => {
+            const id = pending?.id;
+            setPending(null);
+            if (id) unblock(id);
+          }}
+        />
       </ThemedSafeArea>
     </ScreenBackground>
   );

@@ -1,3 +1,4 @@
+import AppRefreshControl from "@/components/AppRefreshControl";
 import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState, useEffect, useCallback } from "react";
 import {
@@ -5,7 +6,6 @@ import {
   FlatList,
   ActivityIndicator,
   TouchableOpacity,
-  RefreshControl,
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemedView } from "@/components/ThemedView";
@@ -189,7 +189,7 @@ export default function KnockListScreen() {
             renderItem={renderItem}
             contentContainerStyle={styles.listContent}
             refreshControl={
-              <RefreshControl
+              <AppRefreshControl
                 refreshing={loading}
                 onRefresh={refreshData}
                 tintColor={colors.primary}

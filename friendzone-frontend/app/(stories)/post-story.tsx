@@ -4,7 +4,6 @@ import {
   Image,
   KeyboardAvoidingView,
   PanResponder,
-  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -268,7 +267,7 @@ export default function PostStoryScreen() {
           </View>
           {editingOverlay && (
             <KeyboardAvoidingView
-              behavior={Platform.OS === "ios" ? "padding" : undefined}
+              behavior={"padding"}
               style={styles.editOverlay}
             >
               <TextInput

@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -100,7 +99,7 @@ export default function HelpScreen() {
     <ScreenBackground>
       <ThemedSafeArea style={styles.safe}>
         <CommonHeader title="Help" leftContent={<BackButton color={colors.text} />} />
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={"padding"}>
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <Text style={[styles.section, { color: colors.textDim }]}>COMMON QUESTIONS</Text>
             {FAQ.map((item, index) => {

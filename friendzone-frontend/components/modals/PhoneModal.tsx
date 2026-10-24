@@ -1,3 +1,4 @@
+import { useConfirm } from "@/components/ConfirmProvider";
 import React, { useEffect, useState } from "react";
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,6 +18,7 @@ interface PhoneModalProps {
 }
 
 export default function PhoneModal({ visible, onClose, phone }: PhoneModalProps) {
+  const confirm = useConfirm();
   const { colors } = useTheme();
   const { fetchProfile } = useAuth();
   const [editing, setEditing] = useState(false);
@@ -48,10 +50,7 @@ export default function PhoneModal({ visible, onClose, phone }: PhoneModalProps)
   };
 
   const confirmRemove = () =>
-    Alert.alert("Remove your number?", "You can add it again any time.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Remove", style: "destructive", onPress: () => save(null) },
-    ]);
+    confirm({ title: "Remove your number?", message: "You can add it again any time.", confirmLabel: "Remove", onConfirm: () => save(null) });
 
   return (
     <ThemedModal visible={visible} onClose={onClose} containerStyle={styles.modalContainer}>

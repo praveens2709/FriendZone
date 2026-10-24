@@ -1,16 +1,16 @@
+import AppRefreshControl from "@/components/AppRefreshControl";
 import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Keyboard,
-  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  ActivityIndicator,
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -450,7 +450,7 @@ export default function CircleScreen() {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={[styles.scrollContent, { paddingBottom: tabSpace }]}
               refreshControl={
-                <RefreshControl
+                <AppRefreshControl
                   refreshing={refreshing}
                   onRefresh={() => {
                     setRefreshing(true);

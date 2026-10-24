@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: friendzone-api
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: friendzone-backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "1"
+      - key: WORDLE_UTC_OFFSET_MINUTES
+        value: "330"
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: MONGO_URI
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_REFRESH_TOKEN
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: STREAM_API_KEY
+        sync: false
+      - key: STREAM_SECRET_KEY
+        sync: false

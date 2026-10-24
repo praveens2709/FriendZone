@@ -1,3 +1,4 @@
+import { useConfirm } from "@/components/ConfirmProvider";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Image, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -12,6 +13,7 @@ import StoryService from "@/services/StoryService";
 import { StoryViewerEntry, UserStory } from "@/types/story.type";
 
 export default function StoryScreen() {
+  const confirm = useConfirm();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { colors } = useTheme();
@@ -84,21 +86,14 @@ export default function StoryScreen() {
   };
 
   const handleDelete = (storyId: string) =>
-    Alert.alert("Delete this story?", "It will disappear for everyone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
+    confirm({ title: "Delete this story?", message: "It will disappear for everyone.", confirmLabel: "Delete", onConfirm: async () => {
           try {
             await StoryService.deleteStory(storyId);
             router.back();
           } catch {
 
           }
-        },
-      },
-    ]);
+        } });
 
   if (!groups || userIndex < 0) {
     return (

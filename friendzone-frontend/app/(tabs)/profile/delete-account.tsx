@@ -1,3 +1,4 @@
+import { useConfirm } from "@/components/ConfirmProvider";
 import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useState } from "react";
 import { Alert, StyleSheet, TextInput } from "react-native";
@@ -15,6 +16,7 @@ import SafetyService from "@/services/SafetyService";
 import { removeAuthSession } from "@/utils/auth-storage";
 
 export default function DeleteAccountScreen() {
+  const confirm = useConfirm();
   const { colors } = useTheme();
   const router = useRouter();
   const { accessToken, signOut } = useAuth();
@@ -25,15 +27,7 @@ export default function DeleteAccountScreen() {
   const confirmDelete = () => {
     if (!password || !accessToken) return;
 
-    Alert.alert(
-      "Delete your account?",
-      "Your profile, posts, messages you sent, knocks and meetings will be permanently deleted. This cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete forever",
-          style: "destructive",
-          onPress: async () => {
+    confirm({ title: "Delete your account?", message: "Your profile, posts, messages you sent, knocks and meetings will be permanently deleted. This cannot be undone.", confirmLabel: "Delete forever", onConfirm: async () => {
             try {
               setSubmitting(true);
               setDeleteError("");
@@ -46,10 +40,7 @@ export default function DeleteAccountScreen() {
             } finally {
               setSubmitting(false);
             }
-          },
-        },
-      ]
-    );
+          } });
   };
 
   return (

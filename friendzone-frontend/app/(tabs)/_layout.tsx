@@ -45,13 +45,9 @@ export default function TabLayout() {
             paddingBottom: dynamicPaddingBottom,
             paddingTop: basePaddingTop,
           },
-          Platform.select({
-            ios: {
-              position: "absolute",
-            },
-            default: {},
-          }),
+          { position: "absolute" },
         ],
+        sceneStyle: { backgroundColor: colors.background },
         tabBarActiveTintColor: colors.tabBarActive,
         tabBarInactiveTintColor: colors.tabBarInactive,
         tabBarLabelStyle: styles.tabBarLabel,

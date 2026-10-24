@@ -6,6 +6,7 @@ import { Server } from "socket.io";
 import connectDB from "./config/db.js";
 
 import authRoutes from "./routes/authRoutes.js";
+import pushRoutes from "./routes/pushRoutes.js";
 import profileRoutes from "./routes/profileRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
@@ -113,6 +114,7 @@ app.use("/api/vibes", vibeRoutes);
 app.use("/api/support", supportRoutes);
 app.use("/api/stories", storyRoutes);
 app.use("/api/calls", callRoutes);
+app.use("/api/push", pushRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ message: "Not found" });

@@ -12,8 +12,9 @@ export const connectSocket = (userId: string) => {
   const socketUrl = API_BASE_URL.replace(/\/api\/?$/, '');
   socket = io(socketUrl, {
     transports: ['websocket'],
-    reconnectionAttempts: 5,
+    reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
+    reconnectionDelayMax: 10000,
     timeout: 20000,
     auth: async (callback) => {
       const stored = await getAuthSession();

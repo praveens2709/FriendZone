@@ -1,3 +1,4 @@
+import AppRefreshControl from "@/components/AppRefreshControl";
 import EmptyState from "@/components/EmptyState";
 import { NotificationListSkeleton } from "@/components/Skeleton";
 import ScreenBackground from "@/components/ui/ScreenBackground";
@@ -7,7 +8,6 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
-  RefreshControl,
   View,
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
@@ -954,7 +954,7 @@ export default function NotificationsScreen() {
               onEndReached={handleLoadMore}
               onEndReachedThreshold={0.5}
               refreshControl={
-                <RefreshControl
+                <AppRefreshControl
                   refreshing={refreshing}
                   onRefresh={onRefresh}
                   tintColor={colors.primary}

@@ -1,6 +1,7 @@
+import AppRefreshControl from "@/components/AppRefreshControl";
 import ScreenBackground from "@/components/ui/ScreenBackground";
 import React, { useCallback, useEffect, useState } from "react";
-import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import { FlatList, StyleSheet, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
@@ -89,7 +90,7 @@ export default function UserConnectionsScreen() {
             ItemSeparatorComponent={() => <View style={[styles.separator, { backgroundColor: colors.border }]} />}
             contentContainerStyle={styles.list}
             refreshControl={
-              <RefreshControl
+              <AppRefreshControl
                 refreshing={refreshing}
                 onRefresh={() => {
                   setRefreshing(true);

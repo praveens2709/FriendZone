@@ -5,8 +5,8 @@ import {
     View,
     ScrollView,
     TouchableOpacity,
-    ActivityIndicator,
     Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
 import ThemedSafeArea from "@/components/ThemedSafeArea";

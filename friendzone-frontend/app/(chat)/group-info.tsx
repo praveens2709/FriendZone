@@ -1,3 +1,4 @@
+import { useConfirm } from "@/components/ConfirmProvider";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -33,6 +34,7 @@ interface Candidate {
 }
 
 export default function GroupInfoScreen() {
+  const confirm = useConfirm();
   const { colors } = useTheme();
   const router = useRouter();
   const { user } = useAuth();
@@ -115,22 +117,10 @@ export default function GroupInfoScreen() {
   };
 
   const removeMember = (memberId: string, name: string) =>
-    Alert.alert(`Remove ${name}?`, "They'll no longer see this group.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove",
-        style: "destructive",
-        onPress: () => info && run(() => ChatService.removeGroupMember(info.id, memberId), "Couldn't remove them"),
-      },
-    ]);
+    confirm({ title: `Remove ${name}?`, message: "They'll no longer see this group.", confirmLabel: "Remove", onConfirm: () => { if (info) run(() => ChatService.removeGroupMember(info.id, memberId), "Couldn't remove them"); } });
 
   const leave = () =>
-    Alert.alert("Leave this group?", "You won't get new messages from it.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Leave",
-        style: "destructive",
-        onPress: async () => {
+    confirm({ title: "Leave this group?", message: "You won't get new messages from it.", confirmLabel: "Leave", onConfirm: async () => {
           if (!info) return;
           try {
             setBusy(true);
@@ -140,9 +130,7 @@ export default function GroupInfoScreen() {
 
             setBusy(false);
           }
-        },
-      },
-    ]);
+        } });
 
   const openPicker = async () => {
     if (!info) return;

@@ -63,16 +63,16 @@ export default function VibePickerModal({
               key={option.kind}
               onPress={() => setKind(option.kind)}
               activeOpacity={0.85}
-              style={[
-                styles.tile,
-                { borderColor: selected ? colors.primary : "transparent" },
-              ]}
+              style={styles.tile}
             >
               <VibeBackground kind={option.kind} watermark={56} />
               <Ionicons name={option.icon} size={18} color="#fff" />
               <ThemedText style={styles.tileLabel} numberOfLines={1}>
                 {option.label}
               </ThemedText>
+              {selected && (
+                <View style={[styles.tileRing, { borderColor: colors.primary }]} pointerEvents="none" />
+              )}
               {selected && (
                 <View style={[styles.tileCheck, { backgroundColor: colors.primary }]}>
                   <Ionicons name="checkmark" size={12} color={onPrimary} />
@@ -161,10 +161,14 @@ const styles = StyleSheet.create({
     width: "48.5%",
     height: 68,
     borderRadius: 16,
-    borderWidth: 2.5,
-    padding: 10,
+    padding: 12,
     justifyContent: "space-between",
     overflow: "hidden",
+  },
+  tileRing: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 16,
+    borderWidth: 3,
   },
   tileLabel: {
     color: "#fff",

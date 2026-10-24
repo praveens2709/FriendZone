@@ -11,7 +11,6 @@ import {
   TextInput,
   PanResponder,
   KeyboardAvoidingView,
-  Platform,
 } from "react-native";
 import { Video, ResizeMode } from "expo-av";
 import StoryService from "@/services/StoryService";
@@ -295,7 +294,7 @@ export default function CameraScreen() {
 
           {editingOverlay && (
             <KeyboardAvoidingView
-              behavior={Platform.OS === "ios" ? "padding" : undefined}
+              behavior={"padding"}
               style={styles.editOverlay}
             >
               <TextInput

@@ -1,3 +1,4 @@
+import { useConfirm } from "@/components/ConfirmProvider";
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Dimensions, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,6 +17,7 @@ const SIZE = (Dimensions.get("window").width - GAP * 4) / 3;
 type DeletedPost = Post & { daysLeft: number };
 
 export default function RecentlyDeletedScreen() {
+  const confirm = useConfirm();
   const { colors } = useTheme();
   const { accessToken } = useAuth();
   const [posts, setPosts] = useState<DeletedPost[]>([]);
@@ -48,21 +50,14 @@ export default function RecentlyDeletedScreen() {
   };
 
   const forever = (post: DeletedPost) =>
-    Alert.alert("Delete forever?", "This can't be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete forever",
-        style: "destructive",
-        onPress: async () => {
+    confirm({ title: "Delete forever?", message: "This can't be undone.", confirmLabel: "Delete forever", onConfirm: async () => {
           try {
             await PostService.deletePostForever(post._id);
             drop(post._id);
           } catch {
 
           }
-        },
-      },
-    ]);
+        } });
 
   const openActions = (post: DeletedPost) =>
     Alert.alert("Deleted post", `${post.daysLeft} ${post.daysLeft === 1 ? "day" : "days"} left before it's gone for good.`, [

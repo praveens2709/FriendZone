@@ -1,6 +1,6 @@
+import { useConfirm } from "@/components/ConfirmProvider";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Dimensions,
   FlatList,
@@ -9,6 +9,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import ScreenBackground from "@/components/ui/ScreenBackground";
@@ -24,6 +25,7 @@ const GAP = 6;
 const SIZE = (Dimensions.get("window").width - GAP * 4) / 3;
 
 export default function ArchiveScreen() {
+  const confirm = useConfirm();
   const { colors } = useTheme();
   const { accessToken } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
@@ -54,21 +56,14 @@ export default function ArchiveScreen() {
   };
 
   const remove = (post: Post) => {
-    Alert.alert("Delete this post?", "It moves to Recently deleted for 30 days, then it's gone for good.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
+    confirm({ title: "Delete this post?", message: "It moves to Recently deleted for 30 days, then it's gone for good.", confirmLabel: "Delete", onConfirm: async () => {
           try {
             await PostService.deletePost(post._id);
             setPosts((current) => current.filter((p) => p._id !== post._id));
           } catch {
 
           }
-        },
-      },
-    ]);
+        } });
   };
 
   const openActions = (post: Post) =>

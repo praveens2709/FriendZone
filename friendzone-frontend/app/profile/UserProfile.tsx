@@ -31,6 +31,7 @@ import { User } from "@/types/user.type";
 import CommonHeader from "@/components/CommonHeader";
 import BackButton from "@/components/BackButton";
 import UserAvatarComponent from "@/components/UserAvatar";
+import ConfirmModal from "@/components/ConfirmModal";
 import ThemedModal from "@/components/ThemedModal";
 import Button from "@/components/Button";
 import { PostItem } from "@/components/PostGrid";
@@ -758,35 +759,14 @@ function UserProfileContent() {
           }
           contentContainerStyle={{ flexGrow: 1 }}
         />
-        <ThemedModal
+        <ConfirmModal
           visible={showUnknockConfirmModal}
-          onClose={() => setShowUnknockConfirmModal(false)}
-        >
-          <ThemedText
-            type="subtitle"
-            style={{
-              textAlign: "center",
-              marginBottom: 25,
-              color: colors.text,
-            }}
-          >
-            Are you sure you want to unknock {userProfile?.firstName}?
-          </ThemedText>
-
-          <ThemedView style={styles.modalButtons}>
-            <Button
-              title="Cancel"
-              onPress={() => setShowUnknockConfirmModal(false)}
-              style={styles.button}
-            />
-            <Button
-              title="Unknock"
-              onPress={() => userProfile && confirmUnknockAction(userProfile)}
-              style={styles.button}
-            />
-          </ThemedView>
-        </ThemedModal>
-        <ThemedModal visible={optionsStep !== null} onClose={() => setOptionsStep(null)}>
+          title={`Unknock ${userProfile?.firstName ?? ""}?`}
+          confirmLabel="Unknock"
+          onCancel={() => setShowUnknockConfirmModal(false)}
+          onConfirm={() => userProfile && confirmUnknockAction(userProfile)}
+        />
+        <ThemedModal visible={optionsStep === "menu" || optionsStep === "report"} onClose={() => setOptionsStep(null)}>
           {optionsStep === "menu" && (
             <>
               <OptionRowItem icon="flag-outline" label="Report" onPress={() => setOptionsStep("report")} />
@@ -809,21 +789,15 @@ function UserProfileContent() {
               ))}
             </>
           )}
-          {optionsStep === "block" && (
-            <>
-              <ThemedText type="subtitle" style={styles.optionsTitle}>
-                Block {userProfile?.firstName}?
-              </ThemedText>
-              <ThemedText style={[styles.optionsCopy, { color: colors.textDim }]}>
-                They won't be able to find you, message you or see your posts, and any knocks between you will be removed.
-              </ThemedText>
-              <ThemedView style={styles.modalButtons}>
-                <Button title="Cancel" onPress={() => setOptionsStep(null)} style={styles.button} />
-                <Button title="Block" onPress={handleBlock} style={styles.button} />
-              </ThemedView>
-            </>
-          )}
         </ThemedModal>
+        <ConfirmModal
+          visible={optionsStep === "block"}
+          title={`Block ${userProfile?.firstName ?? ""}?`}
+          message="They won't be able to find you, message you or see your posts, and any knocks between you will be removed."
+          confirmLabel="Block"
+          onCancel={() => setOptionsStep(null)}
+          onConfirm={handleBlock}
+        />
       </ThemedSafeArea>
     </ScreenBackground>
   );

@@ -7,13 +7,15 @@ import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 import { LoadingDialogProvider } from "@/context/LoadingContext";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { SocketProvider } from "@/context/SocketContext";
-import { StyleSheet, ActivityIndicator } from "react-native";
+import { ActivityIndicator, StyleSheet } from "react-native";
 import React from "react";
 import { ThemedView } from "@/components/ThemedView";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { SavedPostsProvider } from "@/context/SavedPostsContext";
 import TermsGate from "@/components/TermsGate";
 import IncomingCallModal from "@/components/IncomingCallModal";
+import { ConfirmProvider } from "@/components/ConfirmProvider";
+import PushRegistrar from "@/components/PushRegistrar";
 
 function RootLayoutContent() {
   const { colors } = useTheme();
@@ -41,6 +43,7 @@ function RootLayoutContent() {
       />
       <TermsGate />
       <IncomingCallModal />
+      <PushRegistrar />
     </>
   );
 }
@@ -63,7 +66,9 @@ export default function RootLayout() {
             <SocketProvider>
               <SavedPostsProvider>
                 <BottomSheetModalProvider>
-                  <RootLayoutContent />
+                  <ConfirmProvider>
+                    <RootLayoutContent />
+                  </ConfirmProvider>
                 </BottomSheetModalProvider>
               </SavedPostsProvider>
             </SocketProvider>

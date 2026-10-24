@@ -7,6 +7,7 @@ import { uploadImageToCloudinary } from "../services/cloudinaryService.js";
 import { getBlockedIds, isBlockedBetween, getFeedRelationIds, canViewUser } from "../services/privacyService.js";
 import { isObjectId, toIdList, cleanString } from "../utils/validate.js";
 import { getActiveVibes } from "../services/identityService.js";
+import { pushToOffline } from "../services/pushService.js";
 
 const MAX_MESSAGE_LENGTH = 4000;
 const MAX_GROUP_MEMBERS = 50;
@@ -1047,6 +1048,16 @@ export const saveMessage = async ({
 
     if (io) {
       io.to(chatId).emit("message", messageForSocket);
+      const recipients = chat.participants
+        .map((participant) => participant._id.toString())
+        .filter((id) => id !== senderId.toString());
+      const senderName = populatedMessage.sender.firstName || "FriendZone";
+      const previewText = formatLastMessageContentForPreview(populatedMessage).content;
+      pushToOffline(io, recipients, {
+        title: chat.type === "group" ? chat.name || "Group" : senderName,
+        body: chat.type === "group" ? `${senderName}: ${previewText}` : previewText,
+        data: { route: `/(chat)/${chatId}` },
+      });
       for (const participant of chat.participants) {
         const participantId = participant._id.toString();
         const unreadCountForParticipant =

@@ -1,3 +1,4 @@
+import { useConfirm } from "@/components/ConfirmProvider";
 import React, {
   useState,
   useEffect,
@@ -138,6 +139,7 @@ const PostComponent = ({
   onRemoved,
 }: PostComponentProps) => {
   const { colors } = useTheme();
+  const confirm = useConfirm();
   const { user, accessToken } = useAuth();
   const router = useRouter();
 
@@ -429,12 +431,7 @@ const PostComponent = ({
 
   const handleDeletePost = () => {
     optionsModalRef.current?.dismiss();
-    Alert.alert("Delete this post?", "It moves to Recently deleted for 30 days, then it's gone for good.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
+    confirm({ title: "Delete this post?", message: "It moves to Recently deleted for 30 days, then it's gone for good.", confirmLabel: "Delete", onConfirm: async () => {
           try {
             await PostService.deletePost(post._id);
             emitPostRemoved(post._id);
@@ -442,9 +439,7 @@ const PostComponent = ({
             onRemoved?.(post._id);
           } catch {
           }
-        },
-      },
-    ]);
+        } });
   };
 
   const handleAboutAccount = () => {
@@ -476,15 +471,7 @@ const PostComponent = ({
 
   const handleBlockAuthor = () => {
     optionsModalRef.current?.dismiss();
-    Alert.alert(
-      `Block ${post.user.firstName}?`,
-      "They won't be able to find you, message you or see your posts, and any knocks between you will be removed.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Block",
-          style: "destructive",
-          onPress: async () => {
+    confirm({ title: `Block ${post.user.firstName}?`, message: "They won't be able to find you, message you or see your posts, and any knocks between you will be removed.", confirmLabel: "Block", onConfirm: async () => {
             if (!accessToken) return;
             try {
               await SafetyService.blockUser(post.user._id, accessToken);
@@ -494,10 +481,7 @@ const PostComponent = ({
             } catch {
               return;
             }
-          },
-        },
-      ]
-    );
+          } });
   };
 
   if (!post.user || removed) return null;
