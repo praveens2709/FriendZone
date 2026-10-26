@@ -1,7 +1,25 @@
 import httpClient from "../configs/axios.config";
 import { StoryContent, StoryViewerEntry, UserStory } from "@/types/story.type";
+import { StoryMusic, StoryTextStyle } from "@/constants/storyText";
+import { StoryFilterKey, StoryStroke, StorySticker } from "@/constants/storyDecor";
 
 type Audience = "circle" | "close";
+
+export type StoryExtras = {
+  textStyle?: StoryTextStyle;
+  music?: StoryMusic | null;
+  stickers?: Omit<StorySticker, "id">[];
+  drawing?: StoryStroke[];
+  filter?: StoryFilterKey;
+};
+
+const extrasBody = (extras: StoryExtras | undefined, hasText: boolean) => ({
+  ...(hasText && extras?.textStyle ? { textStyle: extras.textStyle } : {}),
+  ...(extras?.music ? { music: extras.music } : {}),
+  ...(extras?.stickers?.length ? { stickers: extras.stickers } : {}),
+  ...(extras?.drawing?.length ? { drawing: extras.drawing } : {}),
+  ...(extras?.filter && extras.filter !== "none" ? { filter: extras.filter } : {}),
+});
 
 interface RawGroup {
   user: { id: string; name: string; profileImage: string | null };
@@ -26,7 +44,8 @@ class StoryService {
   static async postText(
     text: string,
     audience: Audience,
-    style: { gradient: string[]; textColor: string }
+    style: { gradient: string[]; textColor: string },
+    extras?: StoryExtras
   ): Promise<StoryContent> {
     const response = await httpClient.post("stories", {
       type: "text",
@@ -34,6 +53,7 @@ class StoryService {
       audience,
       gradient: style.gradient,
       textColor: style.textColor,
+      ...extrasBody(extras, true),
     });
     return response.data;
   }
@@ -44,7 +64,8 @@ class StoryService {
     gradient: string[],
     card: { x: number; y: number; scale: number },
     backdrop: string,
-    overlay?: { text: string; textX: number; textY: number }
+    overlay?: { text: string; textX: number; textY: number },
+    extras?: StoryExtras
   ): Promise<StoryContent> {
     const response = await httpClient.post("stories", {
       type: "post",
@@ -58,6 +79,7 @@ class StoryService {
       ...(overlay?.text.trim()
         ? { text: overlay.text.trim(), textX: overlay.textX, textY: overlay.textY }
         : {}),
+      ...extrasBody(extras, !!overlay?.text.trim()),
     });
     return response.data;
   }
@@ -67,7 +89,8 @@ class StoryService {
     mediaType: "image" | "video",
     audience: Audience,
     durationMs?: number,
-    overlay?: { text: string; textX: number; textY: number }
+    overlay?: { text: string; textX: number; textY: number },
+    extras?: StoryExtras
   ): Promise<StoryContent> {
     const rawExt = (uri.split(".").pop() || "").toLowerCase().split("?")[0];
     const ext = rawExt || (mediaType === "video" ? "mp4" : "jpg");
@@ -86,7 +109,12 @@ class StoryService {
       form.append("text", overlay.text.trim());
       form.append("textX", String(overlay.textX));
       form.append("textY", String(overlay.textY));
+      if (extras?.textStyle) form.append("textStyle", JSON.stringify(extras.textStyle));
     }
+    if (extras?.music) form.append("music", JSON.stringify(extras.music));
+    if (extras?.stickers?.length) form.append("stickers", JSON.stringify(extras.stickers));
+    if (extras?.drawing?.length) form.append("drawing", JSON.stringify(extras.drawing));
+    if (extras?.filter && extras.filter !== "none") form.append("filter", extras.filter);
 
     const response = await httpClient.post("stories", form, {
       headers: { "Content-Type": "multipart/form-data" },

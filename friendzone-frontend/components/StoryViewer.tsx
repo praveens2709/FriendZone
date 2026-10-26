@@ -1,4 +1,8 @@
 import StoryTextOverlay from "@/components/StoryTextOverlay";
+import StoryFilterOverlay from "@/components/StoryFilterOverlay";
+import StoryDrawingLayer from "@/components/StoryDrawingLayer";
+import StoryStickerLayer from "@/components/StoryStickerLayer";
+import { useStoryMusic } from "@/hooks/useStoryMusic";
 import StoryPostCard from "@/components/StoryPostCard";
 import ArtBackground from "@/components/ui/ArtBackground";
 import { ArtPalette } from "@/constants/artPalettes";
@@ -14,7 +18,7 @@ import {
 } from "react-native";
 import { Video, AVPlaybackStatus, ResizeMode } from "expo-av";
 import { StoryContent, UserStory } from "@/types/story.type";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { ThemedView } from "./ThemedView";
 import { formatDistanceToNowStrict } from "date-fns";
@@ -42,6 +46,7 @@ type Props = {
   onDelete?: (storyId: string) => void;
   onShowViewers?: (storyId: string) => void;
   onOpenPost?: (postId: string) => void;
+  onOpenProfile?: (userId: string) => void;
   holdProgress?: boolean;
 };
 
@@ -87,6 +92,7 @@ export default function StoryViewer({
   onDelete,
   onShowViewers,
   onOpenPost,
+  onOpenProfile,
   holdProgress = false,
 }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -101,6 +107,8 @@ export default function StoryViewer({
   const story = stories[currentIndex];
   const isTimed = story?.type !== "video";
   const paused = isPaused || holdProgress || labelOpen;
+
+  useStoryMusic(story?.music?.previewUrl, !paused);
 
   const startProgress = (duration: number) => {
     progress.setValue(0);
@@ -228,7 +236,9 @@ export default function StoryViewer({
             colors={((story.gradient && story.gradient.length >= 2 ? story.gradient : ["#1F1F1F", "#3A3A3A"]) as unknown) as readonly [string, string, ...string[]]}
             style={[styles.media, styles.textStory]}
           >
-            <Text style={[styles.storyText, { color: story.textColor || "#FFFFFF" }]}>{story.text}</Text>
+            {!story.textStyle && (
+              <Text style={[styles.storyText, { color: story.textColor || "#FFFFFF" }]}>{story.text}</Text>
+            )}
           </LinearGradient>
         ) : story.type === "post" && story.post ? (
           <View style={[styles.media, styles.postStory]}>
@@ -275,15 +285,30 @@ export default function StoryViewer({
         )}
       </Pressable>
 
-      {story.type !== "text" && !!story.text && (
-        <StoryTextOverlay
-          text={story.text}
-          x={story.textX ?? 0.5}
-          y={story.textY ?? 0.5}
-          containerWidth={width}
-          containerHeight={height}
+      {story.type !== "text" && <StoryFilterOverlay filter={story.filter} />}
+      {story.type !== "text" && !!story.drawing?.length && (
+        <StoryDrawingLayer strokes={story.drawing} width={canvas.width} height={canvas.height} />
+      )}
+      {story.type !== "text" && !!story.stickers?.length && (
+        <StoryStickerLayer
+          stickers={story.stickers.map((item, index) => ({ ...item, id: `${story.id}-${index}` }))}
+          width={canvas.width}
+          height={canvas.height}
+          onMentionPress={onOpenProfile}
         />
       )}
+
+      {!!story.text && (story.type !== "text" || !!story.textStyle) && (
+        <StoryTextOverlay
+          text={story.text}
+          x={story.type === "text" ? 0.5 : story.textX ?? 0.5}
+          y={story.type === "text" ? 0.5 : story.textY ?? 0.5}
+          containerWidth={canvas.width}
+          containerHeight={canvas.height}
+          textStyle={story.textStyle}
+        />
+      )}
+
 
       {labelOpen && story.type === "post" && story.post?.id && (
         <ViewPostLabel
@@ -325,9 +350,20 @@ export default function StoryViewer({
               <Ionicons name="person" size={18} color="#fff" />
             </View>
           )}
-          <View style={styles.nameAndTime}>
-            <Text style={styles.userNameText} numberOfLines={1}>{user.name}</Text>
-            <Text style={styles.timeText}>{timeAgo(story.createdAt)}</Text>
+          <View style={styles.nameBlock}>
+            <View style={styles.nameAndTime}>
+              <Text style={styles.userNameText} numberOfLines={1}>{user.name}</Text>
+              <Text style={styles.timeText}>{timeAgo(story.createdAt)}</Text>
+            </View>
+            {!!story.music && (
+              <View style={styles.musicLine}>
+                <MaterialCommunityIcons name="equalizer" size={16} color="#fff" />
+                <Text style={styles.musicText} numberOfLines={1}>
+                  {story.music.artist ? `${story.music.artist} · ` : ""}
+                  {story.music.title}
+                </Text>
+              </View>
+            )}
           </View>
           <Pressable onPress={onClose} style={styles.closeButton}>
             <Ionicons name="close" size={24} color="white" />
@@ -451,11 +487,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  nameBlock: { flex: 1, marginLeft: 8, backgroundColor: "transparent" },
+  musicLine: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
+  musicText: { flexShrink: 1, color: "#fff", fontSize: 13, fontWeight: "600" },
   nameAndTime: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "baseline",
-    marginLeft: 8,
     gap: 8,
     backgroundColor: "transparent",
   },

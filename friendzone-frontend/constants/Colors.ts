@@ -25,9 +25,12 @@ export interface AppColors {
   storyGradient2: string;
   red: string;
   overlayLight: string;
+  outline: string;
 }
 
-export const LightThemeColors: AppColors = {
+type BaseColors = Omit<AppColors, 'outline'>;
+
+export const LightThemeColors: BaseColors = {
   background: '#FFFFFF',
   text: '#000',
   textDim: '#2b2b2b',
@@ -56,7 +59,7 @@ export const LightThemeColors: AppColors = {
   overlayLight: 'rgba(0,0,0,0.1)',
 };
 
-export const DarkThemeColors: AppColors = {
+export const DarkThemeColors: BaseColors = {
   background: '#121212',
   text: '#FFFFFF',
   textDim: '#888',
@@ -85,7 +88,7 @@ export const DarkThemeColors: AppColors = {
   overlayLight: 'rgba(255,255,255,0.1)',
 };
 
-export const OreoThemeColors: AppColors = {
+export const OreoThemeColors: BaseColors = {
   background: '#2b2b2b',
   text: '#FFFFFF',
   textDim: '#FEFEFE',
@@ -114,7 +117,7 @@ export const OreoThemeColors: AppColors = {
   overlayLight: 'rgba(255,255,255,0.1)',
 };
 
-export const YinyangThemeColors: AppColors = {
+export const YinyangThemeColors: BaseColors = {
   background: '#949396',
   text: '#FFFFFF',
   textDim: '#BBBBBB',
@@ -143,7 +146,7 @@ export const YinyangThemeColors: AppColors = {
   overlayLight: 'rgba(255,255,255,0.1)',
 };
 
-export const OceanThemeColors: AppColors = {
+export const OceanThemeColors: BaseColors = {
   background: '#0288D1',
   text: '#034F84',
   textDim: '#15466A',
@@ -172,7 +175,7 @@ export const OceanThemeColors: AppColors = {
   overlayLight: 'rgba(0,0,0,0.1)',
 };
 
-export const ForestThemeColors: AppColors = {
+export const ForestThemeColors: BaseColors = {
   background: '#4CAF50',
   text: '#154F1A',
   textDim: '#70631f',
@@ -201,7 +204,7 @@ export const ForestThemeColors: AppColors = {
   overlayLight: 'rgba(0,0,0,0.1)',
 };
 
-export const MidnightThemeColors: AppColors = {
+export const MidnightThemeColors: BaseColors = {
   background: '#2d0961',
   text: '#d7bff5',
   textDim: '#C2A6FF',
@@ -230,7 +233,7 @@ export const MidnightThemeColors: AppColors = {
   overlayLight: 'rgba(255,255,255,0.1)',
 };
 
-export const CandyThemeColors: AppColors = {
+export const CandyThemeColors: BaseColors = {
   background: '#EC407A',
   text: '#FFFFFF',
   textDim: '#f0daee',
@@ -259,7 +262,7 @@ export const CandyThemeColors: AppColors = {
   overlayLight: 'rgba(0,0,0,0.1)',
 };
 
-export const EarthThemeColors: AppColors = {
+export const EarthThemeColors: BaseColors = {
   background: '#452d25',
   text: '#210e08',
   textDim: '#d6bfb0',
@@ -288,7 +291,7 @@ export const EarthThemeColors: AppColors = {
   overlayLight: 'rgba(0,0,0,0.1)',
 };
 
-export const DesertThemeColors: AppColors = {
+export const DesertThemeColors: BaseColors = {
   background: '#b37c1e',
   text: '#4E342E',
   textDim: '#4a301b',
@@ -317,7 +320,7 @@ export const DesertThemeColors: AppColors = {
   overlayLight: 'rgba(0,0,0,0.1)',
 };
 
-export const MintThemeColors: AppColors = {
+export const MintThemeColors: BaseColors = {
   background: '#00796B',
   text: '#FFFFFF',
   textDim: '#b0f5ee',
@@ -346,7 +349,7 @@ export const MintThemeColors: AppColors = {
   overlayLight: 'rgba(0,0,0,0.1)',
 };
 
-export const SteelThemeColors: AppColors = {
+export const SteelThemeColors: BaseColors = {
   background: '#607D8B',
   text: '#37474F',
   textDim: '#425a66',
@@ -375,7 +378,7 @@ export const SteelThemeColors: AppColors = {
   overlayLight: 'rgba(0,0,0,0.1)',
 };
 
-export const RoyalThemeColors: AppColors = {
+export const RoyalThemeColors: BaseColors = {
   background: '#190c5c',
   text: '#d5d7db',
   textDim: '#8479a8',
@@ -404,7 +407,7 @@ export const RoyalThemeColors: AppColors = {
   overlayLight: 'rgba(255,255,255,0.1)',
 };
 
-export const LavenderThemeColors: AppColors = {
+export const LavenderThemeColors: BaseColors = {
   background: '#AB47BC',
   text: '#FFFFFF',
   textDim: '#dbd3e6',
@@ -433,7 +436,7 @@ export const LavenderThemeColors: AppColors = {
   overlayLight: 'rgba(0,0,0,0.1)',
 };
 
-export const PlatinumThemeColors: AppColors = {
+export const PlatinumThemeColors: BaseColors = {
   background: '#BDBDBD',
   text: '#212121',
   textDim: '#858383',
@@ -462,7 +465,7 @@ export const PlatinumThemeColors: AppColors = {
   overlayLight: 'rgba(0,0,0,0.1)',
 };
 
-export const BlushThemeColors: AppColors = {
+export const BlushThemeColors: BaseColors = {
   background: '#EC407A',
   text: '#880E4F',
   textDim: '#D81B60',
@@ -491,7 +494,7 @@ export const BlushThemeColors: AppColors = {
   overlayLight: 'rgba(0,0,0,0.1)',
 };
 
-export const RosegoldThemeColors: AppColors = {
+export const RosegoldThemeColors: BaseColors = {
   background: '#B76E79',
   text: '#bf3b3b',
   textDim: '#875c5c',
@@ -520,7 +523,7 @@ export const RosegoldThemeColors: AppColors = {
   overlayLight: 'rgba(0,0,0,0.1)',
 };
 
-export const CoffeeThemeColors: AppColors = {
+export const CoffeeThemeColors: BaseColors = {
   background: '#795548',
   text: '#332522',
   textDim: '#4a3935',
@@ -549,7 +552,7 @@ export const CoffeeThemeColors: AppColors = {
   overlayLight: 'rgba(0,0,0,0.1)',
 };
 
-export const IceThemeColors: AppColors = {
+export const IceThemeColors: BaseColors = {
   background: '#03A9F4',
   text: '#01579B',
   textDim: '#0288D1',
@@ -578,7 +581,7 @@ export const IceThemeColors: AppColors = {
   overlayLight: 'rgba(0,0,0,0.1)',
 };
 
-export const SakuraThemeColors: AppColors = {
+export const SakuraThemeColors: BaseColors = {
   background: '#FF69B4',
   text: '#B03060',
   textDim: '#c24c78',
@@ -607,7 +610,7 @@ export const SakuraThemeColors: AppColors = {
   overlayLight: 'rgba(0,0,0,0.1)',
 };
 
-export const FireThemeColors: AppColors = {
+export const FireThemeColors: BaseColors = {
   background: '#FF5722',
   text: '#FFFFFF',
   textDim: '#FFFFFF',
@@ -636,7 +639,7 @@ export const FireThemeColors: AppColors = {
   overlayLight: 'rgba(0,0,0,0.1)',
 };
 
-export const MysticForestThemeColors: AppColors = {
+export const MysticForestThemeColors: BaseColors = {
   background: '#0a1a14ff',
   text: '#d0e0d0',
   textDim: '#708070',
@@ -665,7 +668,7 @@ export const MysticForestThemeColors: AppColors = {
   overlayLight: 'rgba(255,255,255,0.1)',
 };
 
-export const SeafoamThemeColors: AppColors = {
+export const SeafoamThemeColors: BaseColors = {
   background: '#08171c',
   text: '#FFFFFF',
   textDim: '#A0A0A0',
@@ -694,7 +697,7 @@ export const SeafoamThemeColors: AppColors = {
   overlayLight: 'rgba(255,255,255,0.1)',
 };
 
-export const OrchidThemeColors: AppColors = {
+export const OrchidThemeColors: BaseColors = {
   background: '#2e1028',
   text: '#FFFFFF',
   textDim: '#b5a0b7',
@@ -723,7 +726,7 @@ export const OrchidThemeColors: AppColors = {
   overlayLight: 'rgba(255,255,255,0.1)',
 };
 
-export const SkyThemeColors: AppColors = {
+export const SkyThemeColors: BaseColors = {
   background: '#00003c',
   text: '#FFFFFF',
   textDim: '#a8c6f2',
@@ -752,7 +755,7 @@ export const SkyThemeColors: AppColors = {
   overlayLight: 'rgba(255,255,255,0.1)',
 };
 
-export const AquamarineThemeColors: AppColors = {
+export const AquamarineThemeColors: BaseColors = {
   background: '#032936',
   text: '#FFFFFF',
   textDim: '#70b0b0',
@@ -781,7 +784,7 @@ export const AquamarineThemeColors: AppColors = {
   overlayLight: 'rgba(255,255,255,0.1)',
 };
 
-export const CherryBlossomThemeColors: AppColors = {
+export const CherryBlossomThemeColors: BaseColors = {
   background: '#14010f',
   text: '#FFFFFF',
   textDim: '#b5a0b7',
@@ -810,7 +813,7 @@ export const CherryBlossomThemeColors: AppColors = {
   overlayLight: 'rgba(255,255,255,0.1)',
 };
 
-export const GraphiteThemeColors: AppColors = {
+export const GraphiteThemeColors: BaseColors = {
   background: '#0d191f',
   text: '#FFFFFF',
   textDim: '#888888',
@@ -839,7 +842,7 @@ export const GraphiteThemeColors: AppColors = {
   overlayLight: 'rgba(255,255,255,0.1)',
 };
 
-export const SunsetThemeColors: AppColors = {
+export const SunsetThemeColors: BaseColors = {
   background: '#210202',
   text: '#FFFFFF',
   textDim: '#ffcdd2',
@@ -868,7 +871,76 @@ export const SunsetThemeColors: AppColors = {
   overlayLight: 'rgba(255,255,255,0.1)',
 };
 
-export const Colors = {
+const parseHex = (value: string): [number, number, number] | null => {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})(?:[0-9a-f]{2})?$/i.exec(value.trim());
+  if (!m) return null;
+  const h = m[1].length === 3 ? [...m[1]].map((c) => c + c).join('') : m[1];
+  return [0, 2, 4].map((k) => parseInt(h.slice(k, k + 2), 16)) as [number, number, number];
+};
+
+const toHex = (rgb: number[]) =>
+  '#' + rgb.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+
+const luminance = (rgb: number[]) => {
+  const [r, g, b] = rgb.map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+const contrast = (a: number[], b: number[]) => {
+  const x = luminance(a);
+  const y = luminance(b);
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+};
+
+const mix = (from: number[], to: number[], t: number) => from.map((v, i) => v + (to[i] - v) * t);
+
+const minContrast = (fg: number[], surfaces: number[][]) =>
+  Math.min(...surfaces.map((s) => contrast(fg, s)));
+
+// Softly tinted strokes (dashed empty states, outlines) and dim text vanish on some
+// themes, so derive readable versions from each theme's own colours.
+const withReadableColors = (theme: BaseColors): AppColors => {
+  const bg = parseHex(theme.background);
+  const bgSecondary = parseHex(theme.backgroundSecondary);
+  const gradientStart = parseHex(theme.gradient[0]);
+  const text = parseHex(theme.text);
+  if (!bg || !text) return { ...theme, outline: theme.border };
+
+  const screen = [bg, ...(gradientStart ? [gradientStart] : [])];
+  const cards = [...screen, ...(bgSecondary ? [bgSecondary] : [])];
+  const extremes = [text, [0, 0, 0], [255, 255, 255]];
+
+  // Smallest push of `base` toward text/black/white that reaches `target` on every surface.
+  const readable = (base: number[], surfaces: number[][], target: number) => {
+    if (minContrast(base, surfaces) >= target) return base;
+    let best = base;
+    let bestScore = minContrast(base, surfaces);
+    for (const end of extremes) {
+      for (let t = 0.05; t <= 1.0001; t += 0.05) {
+        const candidate = mix(base, end, t);
+        const score = minContrast(candidate, surfaces);
+        if (score >= target) return candidate;
+        if (score > bestScore) {
+          best = candidate;
+          bestScore = score;
+        }
+      }
+    }
+    return best;
+  };
+
+  const dim = parseHex(theme.textDim);
+  return {
+    ...theme,
+    textDim: dim ? toHex(readable(dim, cards, 4.5)) : theme.textDim,
+    outline: toHex(readable(parseHex(theme.border) ?? text, screen, 3)),
+  };
+};
+
+const themes = {
   light: LightThemeColors,
   dark: DarkThemeColors,
   oreo: OreoThemeColors,
@@ -899,3 +971,7 @@ export const Colors = {
   graphite: GraphiteThemeColors,
   sunset: SunsetThemeColors,
 };
+
+export const Colors = Object.fromEntries(
+  Object.entries(themes).map(([name, theme]) => [name, withReadableColors(theme)])
+) as { [K in keyof typeof themes]: AppColors };

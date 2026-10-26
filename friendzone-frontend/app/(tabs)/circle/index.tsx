@@ -343,7 +343,7 @@ export default function CircleScreen() {
       <View style={styles.section}>
         <SectionTitle icon="moon-outline" title="Free right now" subtitle="Friends up for something" />
         {freeNow.length === 0 ? (
-          <View style={[styles.emptyCard, { borderColor: colors.border }]}>
+          <View style={[styles.emptyCard, { borderColor: colors.outline }]}>
             <Ionicons name="moon-outline" size={28} color={colors.textDim} />
             <ThemedText style={[styles.emptyText, { color: colors.textDim }]}>
               Nobody's marked free yet. Set your own vibe on Home so friends can plan around you.
@@ -368,7 +368,7 @@ export default function CircleScreen() {
           action={{ label: "See all", onPress: () => router.push("/meetings") }}
         />
         {plans.length === 0 ? (
-          <View style={[styles.emptyCard, { borderColor: colors.border }]}>
+          <View style={[styles.emptyCard, { borderColor: colors.outline }]}>
             <Ionicons name="calendar-outline" size={28} color={colors.textDim} />
             <ThemedText style={[styles.emptyText, { color: colors.textDim }]}>
               Nothing planned this week. Pick a friend and get something on the calendar.

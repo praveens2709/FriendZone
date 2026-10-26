@@ -354,10 +354,10 @@ export default function CreateMeetingScreen() {
                         </ThemedText>
 
                         <TouchableOpacity
-                            style={[styles.inviteButton, { borderColor: colors.primary }]}
+                            style={[styles.inviteButton, { borderColor: colors.outline }]}
                             onPress={() => setShowInviteModal(true)}
                         >
-                            <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
+                            <Ionicons name="add-circle-outline" size={24} color={colors.text} />
                             <ThemedText style={{ color: colors.primary, fontWeight: '600' }}>Add People</ThemedText>
                         </TouchableOpacity>
                         {Array.from(selectedInviteeIds).map((id) => {

@@ -188,7 +188,14 @@ export const getFeedPosts = async (req, res) => {
       (id) => !blocked.has(id)
     );
 
-    const posts = await Post.find({ user: { $in: relevantUserIds }, archived: { $ne: true }, deletedAt: null })
+    const feedSince = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const posts = await Post.find({
+      user: { $in: relevantUserIds },
+      archived: { $ne: true },
+      deletedAt: null,
+      createdAt: { $gte: feedSince },
+    })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)

@@ -1,3 +1,6 @@
+import type { StoryMusic, StoryTextStyle } from '@/constants/storyText';
+import type { StoryFilterKey, StorySticker, StoryStroke } from '@/constants/storyDecor';
+
 export type StoryPostSnapshot = {
   id: string | null;
   image: string;
@@ -16,6 +19,11 @@ export type StoryContent = {
   gradient?: string[];
   textX?: number;
   textY?: number;
+  textStyle?: StoryTextStyle | null;
+  music?: StoryMusic | null;
+  stickers?: Omit<StorySticker, 'id'>[];
+  drawing?: StoryStroke[];
+  filter?: StoryFilterKey;
   post?: StoryPostSnapshot | null;
   backdrop?: string;
   cardX?: number;

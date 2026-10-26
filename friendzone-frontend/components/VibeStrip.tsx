@@ -90,9 +90,9 @@ export default function VibeStrip() {
       return (
         <TouchableOpacity
           onPress={() => setPickerOpen(true)}
-          style={[styles.card, styles.addCard, { borderColor: colors.primary }]}
+          style={[styles.card, styles.addCard, { borderColor: colors.outline }]}
         >
-          <Ionicons name="add-circle-outline" size={28} color={colors.primary} />
+          <Ionicons name="add-circle-outline" size={28} color={colors.text} />
           <Text style={[styles.label, { color: colors.text }]}>Set your vibe</Text>
           <Text style={[styles.meta, { color: colors.textDim }]}>Circle only</Text>
         </TouchableOpacity>
@@ -158,7 +158,7 @@ export default function VibeStrip() {
           if (item.type === "mine") return renderMine(item.vibe);
           if (item.type === "friend") return renderFriend(item.vibe);
           return (
-            <View style={[styles.card, styles.emptyCard, { borderColor: colors.border }]}>
+            <View style={[styles.card, styles.emptyCard, { borderColor: colors.outline }]}>
               <ThemedText style={[styles.emptyText, { color: colors.textDim }]}>
                 Lock in with friends to see what their vibe is today.
               </ThemedText>

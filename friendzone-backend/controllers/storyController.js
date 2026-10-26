@@ -2,12 +2,95 @@ import Story from '../models/Story.js';
 import User from '../models/User.js';
 import Post from '../models/Post.js';
 import { uploadImageToCloudinary, deleteImageFromCloudinary } from '../services/cloudinaryService.js';
-import { canViewUser, emitToUsers, getAudienceIds, getVisibleAuthorIds } from '../services/privacyService.js';
+import { canViewUser, emitToUsers, getAudienceIds, getVisibleAuthorIds, isBlockedBetween } from '../services/privacyService.js';
+import * as NotificationController from './notificationController.js';
 import { cleanString, isObjectId } from '../utils/validate.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const USER_FIELDS = 'firstName lastName profileImage';
 const COLOR = /^#[0-9a-fA-F]{6}$/;
+
+const FONTS = ['classic', 'modern', 'strong', 'serif', 'mono', 'script'];
+const BGS = ['none', 'solid', 'soft'];
+const ALIGNS = ['left', 'center', 'right'];
+const PREVIEW_HOSTS = /^https:\/\/[a-z0-9.-]+\.(mzstatic\.com|itunes\.apple\.com)\//i;
+
+const parseJson = (value) => {
+  if (value && typeof value === 'object') return value;
+  if (typeof value !== 'string' || !value) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+};
+
+const readTextStyle = (raw) => {
+  const input = parseJson(raw);
+  if (!input) return undefined;
+  const size = parseFloat(input.size);
+  return {
+    font: FONTS.includes(input.font) ? input.font : 'modern',
+    size: Number.isFinite(size) ? Math.min(Math.max(size, 12), 72) : 28,
+    color: COLOR.test(input.color) ? input.color : '#FFFFFF',
+    bg: BGS.includes(input.bg) ? input.bg : 'soft',
+    align: ALIGNS.includes(input.align) ? input.align : 'center',
+  };
+};
+
+// Only song previews from Apple's own CDN are accepted so clients can't make
+// other viewers' phones fetch arbitrary URLs.
+const readMusic = (raw) => {
+  const input = parseJson(raw);
+  if (!input || typeof input.previewUrl !== 'string' || !PREVIEW_HOSTS.test(input.previewUrl)) return undefined;
+  const artwork = typeof input.artwork === 'string' && PREVIEW_HOSTS.test(input.artwork) ? input.artwork : '';
+  return {
+    title: cleanString(input.title, 120) || 'Unknown song',
+    artist: cleanString(input.artist, 120),
+    artwork,
+    previewUrl: input.previewUrl,
+  };
+};
+
+const FILTERS = ['none', 'warm', 'cool', 'rose', 'sunset', 'fade', 'night'];
+const STICKER_KINDS = ['emoji', 'mention', 'time'];
+const clamp = (value, min, max, fallback) => {
+  const n = parseFloat(value);
+  return Number.isFinite(n) ? Math.min(Math.max(n, min), max) : fallback;
+};
+
+const readStickers = (raw) => {
+  const input = parseJson(raw);
+  if (!Array.isArray(input)) return [];
+  return input
+    .filter((item) => item && STICKER_KINDS.includes(item.kind))
+    .slice(0, 20)
+    .map((item) => ({
+      kind: item.kind,
+      text: cleanString(item.text, 60),
+      userId: item.kind === 'mention' && isObjectId(String(item.userId)) ? item.userId : undefined,
+      x: clamp(item.x, 0, 1, 0.5),
+      y: clamp(item.y, 0, 1, 0.5),
+      scale: clamp(item.scale, 0.3, 6, 1),
+      rotation: clamp(item.rotation, -360, 360, 0),
+    }))
+    .filter((item) => item.text && (item.kind !== 'mention' || item.userId));
+};
+
+const readDrawing = (raw) => {
+  const input = parseJson(raw);
+  if (!Array.isArray(input)) return [];
+  return input
+    .slice(0, 60)
+    .map((stroke) => ({
+      color: COLOR.test(stroke?.color) ? stroke.color : '#FFFFFF',
+      width: clamp(stroke?.width, 0.002, 0.08, 0.01),
+      points: (Array.isArray(stroke?.points) ? stroke.points : [])
+        .slice(0, 800)
+        .map((n) => clamp(n, 0, 1, 0)),
+    }))
+    .filter((stroke) => stroke.points.length >= 2);
+};
 
 const serialize = (story, viewerId) => {
   const isOwner = story.user.toString() === viewerId;
@@ -20,6 +103,19 @@ const serialize = (story, viewerId) => {
     textColor: story.textColor,
     textX: story.textX ?? 0.5,
     textY: story.textY ?? 0.5,
+    stickers: (story.stickers || []).map((item) => ({
+      kind: item.kind,
+      text: item.text,
+      userId: item.userId ? item.userId.toString() : null,
+      x: item.x,
+      y: item.y,
+      scale: item.scale,
+      rotation: item.rotation,
+    })),
+    drawing: story.drawing || [],
+    filter: story.filter || 'none',
+    textStyle: story.textStyle?.font ? story.textStyle : null,
+    music: story.music?.previewUrl ? story.music : null,
     post: story.type === 'post' && story.post?.image
       ? {
           id: story.post.postId?.toString() || null,
@@ -56,6 +152,15 @@ export const createStory = async (req, res) => {
   try {
     let type = req.body?.type;
     const data = { user: userId, audience, expiresAt: new Date(Date.now() + DAY_MS) };
+    const textStyle = readTextStyle(req.body?.textStyle);
+    const music = readMusic(req.body?.music);
+    if (textStyle) data.textStyle = textStyle;
+    if (music) data.music = music;
+    if (type !== 'text') {
+      data.stickers = readStickers(req.body?.stickers);
+      data.drawing = readDrawing(req.body?.drawing);
+      data.filter = FILTERS.includes(req.body?.filter) ? req.body.filter : 'none';
+    }
 
     if (req.file?.buffer) {
       const isVideo = req.file.mimetype.startsWith('video/');
@@ -136,6 +241,24 @@ export const createStory = async (req, res) => {
     }
 
     const story = await Story.create(data);
+
+    const mentioned = [
+      ...new Set(story.stickers.filter((item) => item.kind === 'mention' && item.userId).map((item) => item.userId.toString())),
+    ]
+      .filter((id) => id !== String(userId))
+      .slice(0, 5);
+    for (const recipientId of mentioned) {
+      if (await isBlockedBetween(userId, recipientId)) continue;
+      await NotificationController.createNotification({
+        recipientId,
+        senderId: userId,
+        type: 'activity',
+        content: 'mentioned you in their story.',
+        relatedEntityId: userId,
+        relatedEntityType: 'User',
+        io: req.app.get('socketio'),
+      });
+    }
 
     const watchers = await getAudienceIds(userId);
     emitToUsers(req.app.get('socketio'), watchers, 'storiesChanged', { userId });
