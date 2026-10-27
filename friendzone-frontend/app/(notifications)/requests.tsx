@@ -182,7 +182,7 @@ export default function KnockRequestsScreen() {
 
         {loading && !refreshing ? (
           <ThemedView style={styles.initialLoadingContainer}>
-            <ActivityIndicator size="small" color={colors.primary} />
+            <ActivityIndicator size="small" color={colors.accent} />
             <ThemedText style={{ color: colors.textDim }}>
               Loading requests...
             </ThemedText>
@@ -210,7 +210,7 @@ export default function KnockRequestsScreen() {
               <AppRefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                tintColor={colors.primary}
+                tintColor={colors.accent}
               />
             }
           />

@@ -281,7 +281,7 @@ export default function HomeScreen() {
     return (
       <ActivityIndicator
         style={styles.activityIndicator}
-        color={colors.primary}
+        color={colors.accent}
         size="large"
       />
     );
@@ -347,13 +347,13 @@ export default function HomeScreen() {
                 setRefreshing(true);
                 fetchPosts(true);
               }}
-              tintColor={colors.primary}
+              tintColor={colors.accent}
             />
           }
           onEndReached={loadMorePosts}
           onEndReachedThreshold={0.6}
           ListFooterComponent={
-            loadingMore ? <ActivityIndicator style={{ marginVertical: 16 }} color={colors.primary} /> : null
+            loadingMore ? <ActivityIndicator style={{ marginVertical: 16 }} color={colors.accent} /> : null
           }
           ListHeaderComponent={
             <ThemedView>

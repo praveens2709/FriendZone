@@ -586,7 +586,7 @@ export default function PostsScreen() {
     if (isLoading && mediaAssets.length === 0) {
       return (
         <ThemedView style={styles.centered}>
-          <ActivityIndicator size="small" color={colors.primary} />
+          <ActivityIndicator size="small" color={colors.accent} />
         </ThemedView>
       );
     }
@@ -698,7 +698,7 @@ export default function PostsScreen() {
                   <ThemedText
                     style={[
                       styles.nextButtonText,
-                      { color: colors.primary, opacity: selected.length === 0 ? 0.4 : 1 },
+                      { color: colors.accent, opacity: selected.length === 0 ? 0.4 : 1 },
                     ]}
                   >
                     Next

@@ -67,7 +67,7 @@ export default function AccountPrivacyScreen() {
         >
           {isLoading ? (
             <ThemedView style={styles.invisibleLoadingContainer}>
-              <ActivityIndicator size="small" color={colors.primary} />
+              <ActivityIndicator size="small" color={colors.accent} />
             </ThemedView>
           ) : (
             <ThemedView

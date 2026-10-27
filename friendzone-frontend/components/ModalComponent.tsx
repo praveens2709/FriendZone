@@ -60,7 +60,7 @@ export default function ModalComponent({
       </TouchableOpacity>
 
       <ThemedModal visible={showModal} onClose={() => setShowModal(false)}>
-        <ThemedText style={[styles.modalTitle, { color: colors.primary }]}>
+        <ThemedText style={[styles.modalTitle, { color: colors.accent }]}>
           {label || placeholder}
         </ThemedText>
         <ThemedView style={styles.optionsView}>
@@ -80,7 +80,7 @@ export default function ModalComponent({
                   style={[
                     styles.optionText,
                     {
-                      color: value === item.value ? colors.primary : colors.textSecondary,
+                      color: value === item.value ? colors.accent : colors.textSecondary,
                       fontWeight: value === item.value ? "bold" : "normal",
                     },
                   ]}

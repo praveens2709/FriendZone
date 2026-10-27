@@ -100,7 +100,7 @@ export default function MeetingRecordingsScreen() {
 
                 {loading ? (
                     <View style={styles.center}>
-                        <ActivityIndicator size="large" color={colors.primary} />
+                        <ActivityIndicator size="large" color={colors.accent} />
                     </View>
                 ) : (
                     <ScrollView contentContainerStyle={styles.content}>
@@ -122,7 +122,7 @@ export default function MeetingRecordingsScreen() {
                                         onPress={() => handlePlay(rec.url, index)}
                                     >
                                         <View style={styles.iconContainer}>
-                                            <Ionicons name="play-circle" size={40} color={colors.primary} />
+                                            <Ionicons name="play-circle" size={40} color={colors.accent} />
                                         </View>
                                         <View style={styles.infoContainer}>
                                             <ThemedText style={[styles.recName, { color: colors.text }]}>

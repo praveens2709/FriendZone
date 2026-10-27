@@ -6,8 +6,8 @@ export default function AppRefreshControl(props: RefreshControlProps) {
   const { colors } = useTheme();
   return (
     <RefreshControl
-      tintColor={colors.primary}
-      colors={[colors.primary]}
+      tintColor={colors.accent}
+      colors={[colors.accent]}
       progressBackgroundColor={colors.backgroundSecondary}
       {...props}
     />

@@ -85,6 +85,8 @@ export default function CaptionScreen() {
     if (selectedTrack) formData.append("song", JSON.stringify(selectedTrack));
     startPostUpload(formData, selectedAssets[0].uri);
     markPostPublished();
+    // Leave the Posts tab on its gallery so coming back doesn't show the old caption screen.
+    router.dismissAll();
     router.replace("/(tabs)/home");
   };
 

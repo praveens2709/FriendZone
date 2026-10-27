@@ -266,7 +266,7 @@ export default function CircleScreen() {
 
   const renderSearch = () => {
     if (searching && results.length === 0) {
-      return <ActivityIndicator style={styles.loader} color={colors.primary} />;
+      return <ActivityIndicator style={styles.loader} color={colors.accent} />;
     }
     if (results.length === 0) {
       return (
@@ -456,14 +456,14 @@ export default function CircleScreen() {
                     setRefreshing(true);
                     load();
                   }}
-                  tintColor={colors.primary}
+                  tintColor={colors.accent}
                 />
               }
             >
               {isSearching ? (
                 <View>{renderSearch()}</View>
               ) : loading ? (
-                <ActivityIndicator style={styles.loader} color={colors.primary} />
+                <ActivityIndicator style={styles.loader} color={colors.accent} />
               ) : (
                 renderSections()
               )}

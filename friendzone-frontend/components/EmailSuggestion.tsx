@@ -16,7 +16,7 @@ export default function EmailSuggestion({ email, onApply }: EmailSuggestionProps
   return (
     <TouchableOpacity onPress={() => onApply(suggestion)} style={styles.wrap}>
       <ThemedText style={[styles.text, { color: colors.textDim }]}>
-        Did you mean <ThemedText style={[styles.text, { color: colors.primary, fontWeight: "700" }]}>{suggestion}</ThemedText>?
+        Did you mean <ThemedText style={[styles.text, { color: colors.accent, fontWeight: "700" }]}>{suggestion}</ThemedText>?
       </ThemedText>
     </TouchableOpacity>
   );

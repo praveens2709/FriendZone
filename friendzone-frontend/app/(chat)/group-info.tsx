@@ -160,7 +160,7 @@ export default function GroupInfoScreen() {
       <ScreenBackground>
         <ThemedSafeArea style={styles.safe}>
           <CommonHeader title="Group info" leftContent={<BackButton color={colors.text} />} />
-          <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
+          <ActivityIndicator style={{ marginTop: 40 }} color={colors.accent} />
         </ThemedSafeArea>
       </ScreenBackground>
     );
@@ -195,7 +195,7 @@ export default function GroupInfoScreen() {
                     style={[styles.nameInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
                   />
                   <TouchableOpacity onPress={saveName} style={styles.iconBtn}>
-                    <Ionicons name="checkmark-circle" size={30} color={colors.primary} />
+                    <Ionicons name="checkmark-circle" size={30} color={colors.accent} />
                   </TouchableOpacity>
                 </View>
               ) : (
@@ -285,7 +285,7 @@ export default function GroupInfoScreen() {
                     <Text style={[styles.pickName, { color: colors.text }]} numberOfLines={1}>
                       {item.name}
                     </Text>
-                    <Ionicons name={on ? "checkmark-circle" : "ellipse-outline"} size={24} color={on ? colors.primary : colors.textDim} />
+                    <Ionicons name={on ? "checkmark-circle" : "ellipse-outline"} size={24} color={on ? colors.accent : colors.textDim} />
                   </TouchableOpacity>
                 );
               }}

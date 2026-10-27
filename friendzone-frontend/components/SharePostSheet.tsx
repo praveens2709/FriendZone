@@ -224,7 +224,7 @@ const SheetContent = ({ post, onClose }: { post: Post; onClose: () => void }) =>
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           loading ? (
-            <ActivityIndicator style={styles.empty} color={colors.primary} />
+            <ActivityIndicator style={styles.empty} color={colors.accent} />
           ) : (
             <ThemedText style={[styles.emptyText, { color: colors.textDim }]}>
               {query ? "No one found." : "Lock in with people to share posts with them."}

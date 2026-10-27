@@ -382,7 +382,7 @@ export default function ProfileScreen() {
             <AppRefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              tintColor={colors.primary}
+              tintColor={colors.accent}
             />
           }
         >
@@ -573,7 +573,7 @@ export default function ProfileScreen() {
               <Ionicons
                 name="grid"
                 size={22}
-                color={activeTab === "posts" ? colors.primary : colors.textDim}
+                color={activeTab === "posts" ? colors.accent : colors.textDim}
               />
               {activeTab === "posts" && (
                 <View
@@ -592,7 +592,7 @@ export default function ProfileScreen() {
               <Ionicons
                 name="bookmark"
                 size={22}
-                color={activeTab === "saved" ? colors.primary : colors.textDim}
+                color={activeTab === "saved" ? colors.accent : colors.textDim}
               />
               {activeTab === "saved" && (
                 <View
@@ -608,7 +608,7 @@ export default function ProfileScreen() {
           <ThemedView style={styles.postsSection}>
             {loadingPosts ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color={colors.primary} />
+                <ActivityIndicator size="small" color={colors.accent} />
               </View>
             ) : postsForGrid.length > 0 ? (
               <PostGrid posts={postsForGrid} onPressPost={handlePressPost} />

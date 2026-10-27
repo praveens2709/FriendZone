@@ -69,7 +69,7 @@ export default function SavedPostsScreen() {
 
                 {loading ? (
                     <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="small" color={colors.primary} />
+                        <ActivityIndicator size="small" color={colors.accent} />
                     </View>
                 ) : displayedPosts.length > 0 ? (
                     <ThemedScrollView contentContainerStyle={styles.scrollContent}>

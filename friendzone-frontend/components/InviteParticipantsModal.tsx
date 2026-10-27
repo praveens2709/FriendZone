@@ -262,7 +262,7 @@ export default function InviteParticipantsModal({
             )}
 
             {(searchLoading || connectionsLoading) ? (
-                <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 20 }} />
+                <ActivityIndicator size="small" color={colors.accent} style={{ marginTop: 20 }} />
             ) : (
                 <FlatList
                     data={displayList}

@@ -41,7 +41,7 @@ export default function IndexScreen({ theme }: IndexScreenProps) {
             <AppLogo size={72} />
             <Text style={[styles.headline, { color: colors.text }]}>
               Your people.{"\n"}Your plans.{"\n"}
-              <Text style={{ color: colors.primary }}>Your zone.</Text>
+              <Text style={{ color: colors.accent }}>Your zone.</Text>
             </Text>
             <Text style={[styles.tagline, { color: colors.textDim }]}>
               FriendZone is for the people you actually hang out with.
@@ -52,7 +52,7 @@ export default function IndexScreen({ theme }: IndexScreenProps) {
             {FEATURES.map((feature) => (
               <Card key={feature.title} style={styles.feature}>
                 <View style={[styles.featureIcon, { backgroundColor: colors.primary + "1F" }]}>
-                  <Ionicons name={feature.icon} size={22} color={colors.primary} />
+                  <Ionicons name={feature.icon} size={22} color={colors.accent} />
                 </View>
                 <View style={styles.featureText}>
                   <Text style={[styles.featureTitle, { color: colors.text }]}>{feature.title}</Text>

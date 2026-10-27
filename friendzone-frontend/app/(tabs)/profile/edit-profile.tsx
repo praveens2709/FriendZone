@@ -200,7 +200,7 @@ export default function EditProfileScreen() {
   if (!user) {
     return (
       <ThemedSafeArea style={styles.centered}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={colors.accent} />
         <ThemedText style={{ marginTop: 16 }}>Loading profile...</ThemedText>
       </ThemedSafeArea>
     );
@@ -227,9 +227,9 @@ export default function EditProfileScreen() {
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator size="small" color={colors.primary} />
+              <ActivityIndicator size="small" color={colors.accent} />
             ) : (
-              <Ionicons name="checkmark" size={24} color={colors.primary} />
+              <Ionicons name="checkmark" size={24} color={colors.accent} />
             )}
           </TouchableOpacity>
         </ThemedView>
@@ -252,7 +252,7 @@ export default function EditProfileScreen() {
                 onPress={() => setShowPhotoModal(true)}
               >
                 <ThemedText
-                  style={[styles.changePhotoText, { color: colors.primary }]}
+                  style={[styles.changePhotoText, { color: colors.accent }]}
                 >
                   Edit Profile Photo
                 </ThemedText>

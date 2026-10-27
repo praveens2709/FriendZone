@@ -296,7 +296,7 @@ export default function MeetingsScreen() {
 
                     {loading ? (
                         <View style={styles.loadingContainer}>
-                            <ActivityIndicator size="large" color={colors.primary} />
+                            <ActivityIndicator size="large" color={colors.accent} />
                         </View>
                     ) : (
                         <FlatList
@@ -315,13 +315,13 @@ export default function MeetingsScreen() {
                             onEndReached={fetchNextPage}
                             onEndReachedThreshold={0.5}
                             ListFooterComponent={
-                                loadingMore ? <ActivityIndicator style={{ marginVertical: 16 }} color={colors.primary} /> : null
+                                loadingMore ? <ActivityIndicator style={{ marginVertical: 16 }} color={colors.accent} /> : null
                             }
                             refreshControl={
                                 <AppRefreshControl
                                     refreshing={refreshing}
                                     onRefresh={onRefresh}
-                                    tintColor={colors.primary}
+                                    tintColor={colors.accent}
                                 />
                             }
                             ListEmptyComponent={() => (
@@ -385,10 +385,10 @@ export default function MeetingsScreen() {
                                     textSectionTitleColor: colors.textDim,
                                     selectedDayBackgroundColor: colors.primary,
                                     selectedDayTextColor: colors.buttonText,
-                                    todayTextColor: colors.primary,
+                                    todayTextColor: colors.accent,
                                     dayTextColor: colors.text,
                                     textDisabledColor: colors.textDim,
-                                    arrowColor: colors.primary,
+                                    arrowColor: colors.accent,
                                     monthTextColor: colors.text,
                                 }}
                             />

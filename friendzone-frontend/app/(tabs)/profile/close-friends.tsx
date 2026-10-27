@@ -64,7 +64,7 @@ export default function CloseFriendsScreen() {
       <ThemedSafeArea style={styles.safe} edges={["top", "left", "right"]}>
         <CommonHeader title="Close friends" leftContent={<BackButton color={colors.text} />} />
         {loading ? (
-          <ActivityIndicator style={styles.loader} color={colors.primary} />
+          <ActivityIndicator style={styles.loader} color={colors.accent} />
         ) : (
           <>
             <FlatList
@@ -101,7 +101,7 @@ export default function CloseFriendsScreen() {
                     <Ionicons
                       name={on ? "checkmark-circle" : "ellipse-outline"}
                       size={26}
-                      color={on ? colors.primary : colors.textDim}
+                      color={on ? colors.accent : colors.textDim}
                     />
                   </TouchableOpacity>
                 );

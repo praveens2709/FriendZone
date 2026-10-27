@@ -440,7 +440,7 @@ export default function ChatsScreen() {
         <Ionicons
           name="checkmark-done"
           size={14}
-          color={colors.primary}
+          color={colors.accent}
           style={styles.readStatusIcon}
         />
       );
@@ -469,7 +469,7 @@ export default function ChatsScreen() {
             numberOfLines={1}
             style={[
               styles.chatLastMessage,
-              { color: colors.primary, fontStyle: "italic" },
+              { color: colors.accent, fontStyle: "italic" },
             ]}
           >
             Typing...
@@ -596,7 +596,7 @@ export default function ChatsScreen() {
             <Ionicons
               name={isSelected ? "checkmark" : "square-outline"}
               size={24}
-              color={isSelected ? colors.primary : colors.textDim}
+              color={isSelected ? colors.accent : colors.textDim}
             />
           </TouchableOpacity>
         )}
@@ -758,13 +758,13 @@ export default function ChatsScreen() {
             <AppRefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={colors.primary}
+              tintColor={colors.accent}
             />
           }
           ListFooterComponent={() =>
             !isLoading && hasMoreChats ? (
               <ThemedView style={styles.loadingMoreContainer}>
-                <ActivityIndicator size="small" color={colors.primary} />
+                <ActivityIndicator size="small" color={colors.accent} />
                 <ThemedText style={{ color: colors.textDim, marginTop: 5 }}>
                   Loading more chats...
                 </ThemedText>

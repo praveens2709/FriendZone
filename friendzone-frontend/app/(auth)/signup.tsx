@@ -246,7 +246,7 @@ export default function SignupScreen({
           <Ionicons
             name={agreed ? "checkbox" : "square-outline"}
             size={24}
-            color={agreeError ? colors.error : colors.primary}
+            color={agreeError ? colors.error : colors.accent}
           />
           <ThemedText style={[styles.agreeText, agreeError && { color: colors.error }]}>
             I'm 18 or older and I agree to the{" "}

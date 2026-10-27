@@ -85,7 +85,7 @@ export default function MeetingCard({ meeting, onJoin, onPress, onDelete }: Meet
                             {when} · {format(start, "h:mm a")}
                         </Text>
                         {!inactive && (
-                            <Text style={[styles.countdown, { color: isLive ? colors.red : colors.primary }]}>
+                            <Text style={[styles.countdown, { color: isLive ? colors.red : colors.accent }]}>
                                 · {planCountdown(meeting).replace("Live · ", "")}
                             </Text>
                         )}
@@ -133,7 +133,7 @@ export default function MeetingCard({ meeting, onJoin, onPress, onDelete }: Meet
                                 </Text>
                             </View>
                             <TouchableOpacity onPress={onJoin} disabled={isCancelled}>
-                                <Text style={[styles.action, { color: isCancelled ? colors.textDim : colors.primary }]}>
+                                <Text style={[styles.action, { color: isCancelled ? colors.textDim : colors.accent }]}>
                                     {actionLabel}
                                 </Text>
                             </TouchableOpacity>

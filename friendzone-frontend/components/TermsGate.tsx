@@ -42,7 +42,7 @@ export default function TermsGate() {
 
             <View style={styles.links}>
               <TouchableOpacity onPress={() => setOpen(open === "terms" ? null : "terms")}>
-                <Text style={[styles.link, { color: colors.primary }]}>
+                <Text style={[styles.link, { color: colors.accent }]}>
                   {open === "terms" ? "Hide" : "Read"} the Terms of Service
                 </Text>
               </TouchableOpacity>
@@ -55,7 +55,7 @@ export default function TermsGate() {
                 ))}
 
               <TouchableOpacity onPress={() => setOpen(open === "privacy" ? null : "privacy")}>
-                <Text style={[styles.link, { color: colors.primary }]}>
+                <Text style={[styles.link, { color: colors.accent }]}>
                   {open === "privacy" ? "Hide" : "Read"} the Privacy Policy
                 </Text>
               </TouchableOpacity>

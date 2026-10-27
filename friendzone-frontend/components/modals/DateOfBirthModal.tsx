@@ -46,7 +46,7 @@ export default function DateOfBirthModal({
           There is a limit to how many times you can change your date of birth.
           Please contact us in order to request a date of birth change.
           <ThemedText
-            style={[styles.linkText, { color: colors.primary }]}
+            style={[styles.linkText, { color: colors.accent }]}
             onPress={() => {
               onClose();
               router.push({ pathname: "/profile/help", params: { topic: "dob" } });

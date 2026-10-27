@@ -39,7 +39,7 @@ export default function RitualCard({
         </View>
         {streak > 0 && (
           <View style={[styles.streak, { backgroundColor: colors.primary + "1F" }]}>
-            <Ionicons name="flame" size={16} color={colors.primary} />
+            <Ionicons name="flame" size={16} color={colors.accent} />
             <Text style={[styles.streakText, { color: colors.text }]}>{streak}</Text>
           </View>
         )}

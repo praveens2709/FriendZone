@@ -96,7 +96,7 @@ export default function UserConnectionsScreen() {
                   setRefreshing(true);
                   load();
                 }}
-                tintColor={colors.primary}
+                tintColor={colors.accent}
               />
             }
             ListEmptyComponent={

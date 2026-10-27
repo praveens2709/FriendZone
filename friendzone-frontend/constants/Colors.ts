@@ -26,9 +26,10 @@ export interface AppColors {
   red: string;
   overlayLight: string;
   outline: string;
+  accent: string;
 }
 
-type BaseColors = Omit<AppColors, 'outline'>;
+type BaseColors = Omit<AppColors, 'outline' | 'accent'>;
 
 export const LightThemeColors: BaseColors = {
   background: '#FFFFFF',
@@ -900,16 +901,17 @@ const mix = (from: number[], to: number[], t: number) => from.map((v, i) => v + 
 const minContrast = (fg: number[], surfaces: number[][]) =>
   Math.min(...surfaces.map((s) => contrast(fg, s)));
 
-// Softly tinted strokes (dashed empty states, outlines) and dim text vanish on some
-// themes, so derive readable versions from each theme's own colours.
+// Palettes were picked by eye and several have icons, links or text that nearly match the
+// surface they sit on. Nudge only the colours that fail, using each theme's own colours.
 const withReadableColors = (theme: BaseColors): AppColors => {
   const bg = parseHex(theme.background);
-  const bgSecondary = parseHex(theme.backgroundSecondary);
-  const gradientStart = parseHex(theme.gradient[0]);
   const text = parseHex(theme.text);
-  if (!bg || !text) return { ...theme, outline: theme.border };
+  if (!bg || !text) return { ...theme, outline: theme.border, accent: theme.primary };
 
-  const screen = [bg, ...(gradientStart ? [gradientStart] : [])];
+  const gradient = theme.gradient.map(parseHex).filter((c): c is [number, number, number] => !!c);
+  const bgSecondary = parseHex(theme.backgroundSecondary);
+  // The first gradient stop is what sits behind most content; the far stop can be a different tone.
+  const screen = [bg, ...gradient.slice(0, 1)];
   const cards = [...screen, ...(bgSecondary ? [bgSecondary] : [])];
   const extremes = [text, [0, 0, 0], [255, 255, 255]];
 
@@ -932,11 +934,32 @@ const withReadableColors = (theme: BaseColors): AppColors => {
     return best;
   };
 
-  const dim = parseHex(theme.textDim);
+  const fix = (value: string, surfaces: (number[] | null)[], target: number) => {
+    const rgb = parseHex(value);
+    const against = surfaces.filter((s): s is number[] => !!s);
+    if (!rgb || !against.length) return value;
+    return toHex(readable(rgb, against, target));
+  };
+
+  // Themes with dark cards on a bright screen rely on `text` being readable on both, so keep
+  // the cards in the check whenever they currently work.
+  const textSurfaces = bgSecondary && contrast(text, bgSecondary) >= 4.5 ? [...screen, bgSecondary] : screen;
+  const textColor = fix(theme.text, textSurfaces, 3.5);
   return {
     ...theme,
-    textDim: dim ? toHex(readable(dim, cards, 4.5)) : theme.textDim,
-    outline: toHex(readable(parseHex(theme.border) ?? text, screen, 3)),
+    text: textColor,
+    textDim: fix(theme.textDim, cards, 4.5),
+    tabBarActive: fix(theme.tabBarActive, [parseHex(theme.tabBarBackground)], 3),
+    tabBarInactive: fix(theme.tabBarInactive, [parseHex(theme.tabBarBackground)], 3),
+    buttonText: fix(theme.buttonText, [parseHex(theme.primary)], 4.5),
+    buttonTextSecondary: fix(theme.buttonTextSecondary, [parseHex(theme.buttonBackgroundSecondary)], 4.5),
+    error: fix(theme.error, cards, 3),
+    success: fix(theme.success, cards, 3),
+    info: fix(theme.info, cards, 3),
+    outline: fix(theme.border, screen, 3),
+    // `primary` doubles as a fill colour and is often close to the background, so icons and
+    // links use this readable stand-in instead.
+    accent: fix(theme.primary, cards, 3),
   };
 };
 

@@ -234,7 +234,7 @@ export default function RecordingsListScreen() {
 
                 {loading && !refreshing ? (
                     <View style={styles.center}>
-                        <ActivityIndicator size="large" color={colors.primary} />
+                        <ActivityIndicator size="large" color={colors.accent} />
                     </View>
                 ) : (
                     <FlatList
@@ -246,7 +246,7 @@ export default function RecordingsListScreen() {
                                 refreshing={refreshing}
                                 onRefresh={onRefresh}
                                 tintColor={colors.text}
-                                colors={[colors.primary]}
+                                colors={[colors.accent]}
                             />
                         }
                         ListEmptyComponent={() => (
@@ -283,7 +283,7 @@ export default function RecordingsListScreen() {
                                                 color={isSelected ? "#EF4444" : colors.textDim}
                                             />
                                         ) : (
-                                            <Ionicons name="play" size={20} color={colors.primary} />
+                                            <Ionicons name="play" size={20} color={colors.accent} />
                                         )}
                                     </View>
                                     <View style={styles.info}>

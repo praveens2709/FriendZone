@@ -48,7 +48,7 @@ export default function BlockedAccountsScreen() {
       <ThemedSafeArea style={styles.container}>
         <CommonHeader title="Blocked accounts" leftContent={<BackButton color={colors.text} />} />
         {loading ? (
-          <ActivityIndicator style={styles.loader} color={colors.primary} />
+          <ActivityIndicator style={styles.loader} color={colors.accent} />
         ) : (
           <FlatList
             contentContainerStyle={{ paddingTop: 8 }}

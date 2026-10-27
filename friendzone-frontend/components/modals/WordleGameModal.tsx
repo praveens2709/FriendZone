@@ -404,7 +404,7 @@ const WordleGameModal: React.FC<WordleGameModalProps> = ({ visible, onClose }) =
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
+            <ActivityIndicator size="large" color={colors.accent} />
             <ThemedText style={styles.loadingText}>Loading game...</ThemedText>
           </View>
         ) : (
@@ -430,7 +430,7 @@ const WordleGameModal: React.FC<WordleGameModalProps> = ({ visible, onClose }) =
 
             {validating ? (
               <View style={styles.validatingContainer}>
-                <ActivityIndicator size="small" color={colors.primary} />
+                <ActivityIndicator size="small" color={colors.accent} />
                 <ThemedText style={[styles.validatingText, { color: colors.textDim }]}>
                   Validating word...
                 </ThemedText>

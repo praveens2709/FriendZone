@@ -590,7 +590,7 @@ export default function NotificationsScreen() {
           disabled={true}
         >
           <ThemedText
-            style={[styles.knockButtonText, { color: colors.primary }]}
+            style={[styles.knockButtonText, { color: colors.accent }]}
           >
             Requested
           </ThemedText>
@@ -660,7 +660,7 @@ export default function NotificationsScreen() {
           ]}
           disabled={true}
         >
-          <ThemedText style={[styles.knockButtonText, { color: colors.primary }]}>
+          <ThemedText style={[styles.knockButtonText, { color: colors.accent }]}>
             Accepted
           </ThemedText>
         </TouchableOpacity>
@@ -826,7 +826,7 @@ export default function NotificationsScreen() {
           {isKnockNotif && (
             <ThemedView style={styles.notificationActions}>
               {isLoadingAction ? (
-                <ActivityIndicator size="small" color={colors.primary} />
+                <ActivityIndicator size="small" color={colors.accent} />
               ) : (
                 renderKnockActionButton(item)
               )}
@@ -835,7 +835,7 @@ export default function NotificationsScreen() {
           {isMeetingInvite && (
             <ThemedView style={styles.notificationActions}>
               {isLoadingAction ? (
-                <ActivityIndicator size="small" color={colors.primary} />
+                <ActivityIndicator size="small" color={colors.accent} />
               ) : (
                 renderMeetingActionButtons(item)
               )}
@@ -957,13 +957,13 @@ export default function NotificationsScreen() {
                 <AppRefreshControl
                   refreshing={refreshing}
                   onRefresh={onRefresh}
-                  tintColor={colors.primary}
+                  tintColor={colors.accent}
                 />
               }
               ListFooterComponent={
                 hasMore && !loading && !refreshing ? (
                   <ThemedView style={styles.loadingMoreContainer}>
-                    <ActivityIndicator size="small" color={colors.primary} />
+                    <ActivityIndicator size="small" color={colors.accent} />
                     <ThemedText style={{ color: colors.textDim, marginTop: 5 }}>
                       Loading more...
                     </ThemedText>

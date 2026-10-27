@@ -187,7 +187,6 @@ const BottomControls = ({ onLeave, isHost, audioOnly }: { onLeave: () => void; i
 
     const toggleMic = async () => { if (call) await call.microphone.toggle(); };
     const toggleCam = async () => { if (call) await call.camera.toggle(); };
-    const flipCamera = async () => { if (call) await call.camera.flip(); };
 
     const toggleRecording = async () => {
         if (!call || recordingBusy) return;
@@ -230,11 +229,6 @@ const BottomControls = ({ onLeave, isHost, audioOnly }: { onLeave: () => void; i
             <TouchableOpacity style={[styles.roundButton, isCamOff && { backgroundColor: "white" }]} onPress={toggleCam}>
                 <Ionicons name={isCamOff ? "videocam-off" : "videocam"} size={24} color={isCamOff ? "black" : "white"} />
             </TouchableOpacity>
-            {!isCamOff && (
-                <TouchableOpacity style={styles.roundButton} onPress={flipCamera}>
-                    <Ionicons name="camera-reverse-outline" size={24} color="white" />
-                </TouchableOpacity>
-            )}
             <TouchableOpacity style={[styles.roundButton, { backgroundColor: "#FF3B30" }]} onPress={onLeave}>
                 <MaterialCommunityIcons name="phone-hangup" size={24} color="white" />
             </TouchableOpacity>
@@ -272,8 +266,11 @@ const TopRightControls = ({
     onAddParticipants: () => void;
     onEndForAll: () => void;
 }) => {
-    const { useIsCallRecordingInProgress } = useCallStateHooks();
+    const { useIsCallRecordingInProgress, useCameraState } = useCallStateHooks();
     const recording = useIsCallRecordingInProgress();
+    const call = useCall();
+    const { status: camStatus } = useCameraState();
+    const camOff = camStatus === "disabled";
     const [seconds, setSeconds] = useState(0);
 
     useEffect(() => {
@@ -296,6 +293,11 @@ const TopRightControls = ({
                 </View>
             )}
             <ScreenShareButton />
+            {!camOff && (
+                <TouchableOpacity style={styles.verticalButton} onPress={() => call?.camera.flip()}>
+                    <Ionicons name="camera-reverse-outline" size={24} color="white" />
+                </TouchableOpacity>
+            )}
             {isHost && (
                 <TouchableOpacity style={styles.verticalButton} onPress={onAddParticipants}>
                     <Ionicons name="person-add-outline" size={24} color="white" />
@@ -451,7 +453,7 @@ export default function LiveMeetingScreen() {
     if (loading) {
         return (
             <View style={[styles.center, { backgroundColor: colors.background }]}>
-                <ActivityIndicator size="large" color={colors.primary} />
+                <ActivityIndicator size="large" color={colors.accent} />
                 <ThemedText style={{ marginTop: 20 }}>Joining Meeting...</ThemedText>
             </View>
         );
@@ -567,7 +569,7 @@ const styles = StyleSheet.create({
     shareThumb: { width: 90, height: 120, borderRadius: 10, overflow: 'hidden', backgroundColor: '#1c1c1e' },
     waiting: {
         position: 'absolute',
-        top: 110,
+        top: 58,
         left: 0,
         right: 0,
         alignItems: 'center',
@@ -615,7 +617,7 @@ const styles = StyleSheet.create({
 
     bottomContainer: {
         position: "absolute",
-        bottom: 30,
+        bottom: 46,
         left: 0,
         right: 0,
         alignItems: "center",
@@ -642,7 +644,7 @@ const styles = StyleSheet.create({
         position: "absolute",
         top: 60,
         right: 20,
-        gap: 15,
+        gap: 8,
         zIndex: 200,
         alignItems: 'center',
     },
@@ -653,6 +655,5 @@ const styles = StyleSheet.create({
         backgroundColor: "rgba(0,0,0,0.6)",
         justifyContent: "center",
         alignItems: "center",
-        marginBottom: 5,
     },
 });

@@ -78,7 +78,7 @@ export default function ArchiveScreen() {
       <ThemedSafeArea style={styles.safe}>
         <CommonHeader title="Archive" leftContent={<BackButton color={colors.text} />} />
         {loading ? (
-          <ActivityIndicator style={styles.loader} color={colors.primary} />
+          <ActivityIndicator style={styles.loader} color={colors.accent} />
         ) : (
           <FlatList
             data={posts}

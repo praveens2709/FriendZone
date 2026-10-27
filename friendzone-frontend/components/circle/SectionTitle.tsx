@@ -19,7 +19,7 @@ export default function SectionTitle({
   return (
     <View style={styles.row}>
       <View style={[styles.iconWrap, { backgroundColor: colors.primary + "22" }]}>
-        <Ionicons name={icon} size={16} color={colors.primary} />
+        <Ionicons name={icon} size={16} color={colors.accent} />
       </View>
       <View style={styles.texts}>
         <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
@@ -27,7 +27,7 @@ export default function SectionTitle({
       </View>
       {action && (
         <TouchableOpacity onPress={action.onPress} hitSlop={8}>
-          <Text style={[styles.action, { color: colors.primary }]}>{action.label}</Text>
+          <Text style={[styles.action, { color: colors.accent }]}>{action.label}</Text>
         </TouchableOpacity>
       )}
     </View>

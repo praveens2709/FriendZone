@@ -260,7 +260,7 @@ export default function ChangePasswordModal({
           </ThemedView>
           <TouchableOpacity onPress={onForgotPassword}>
             <ThemedText
-              style={[styles.forgotPassword, { color: colors.primary }]}
+              style={[styles.forgotPassword, { color: colors.accent }]}
             >
               Forgotten your password?
             </ThemedText>

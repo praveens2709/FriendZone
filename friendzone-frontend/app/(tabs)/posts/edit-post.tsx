@@ -154,7 +154,7 @@ export default function EditPostScreen() {
         <ThemedSafeArea style={styles.safeArea}>
           <CommonHeader title="Edit Post" leftContent={<BackButton color={colors.text} />} />
           <ThemedView style={styles.centeredContainer}>
-            <ActivityIndicator size="small" color={colors.primary} />
+            <ActivityIndicator size="small" color={colors.accent} />
           </ThemedView>
         </ThemedSafeArea>
       </ScreenBackground>
@@ -200,7 +200,7 @@ export default function EditPostScreen() {
               <ThemedText
                 style={[
                   styles.nextButtonText,
-                  { color: colors.primary, opacity: isProcessing ? 0.4 : 1 },
+                  { color: colors.accent, opacity: isProcessing ? 0.4 : 1 },
                 ]}
               >
                 Next
@@ -388,7 +388,7 @@ export default function EditPostScreen() {
                   style={styles.changeSong}
                   activeOpacity={0.7}
                 >
-                  <ThemedText style={[styles.changeSongText, { color: colors.primary }]}>
+                  <ThemedText style={[styles.changeSongText, { color: colors.accent }]}>
                     Change song
                   </ThemedText>
                 </TouchableOpacity>

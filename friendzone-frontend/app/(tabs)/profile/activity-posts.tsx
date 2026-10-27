@@ -48,7 +48,7 @@ export default function ActivityPostsScreen() {
       <ThemedSafeArea style={styles.safe}>
         <CommonHeader title={isLikes ? "Likes" : "Comments"} leftContent={<BackButton color={colors.text} />} />
         {loading ? (
-          <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
+          <ActivityIndicator style={{ marginTop: 40 }} color={colors.accent} />
         ) : (
           <FlatList
             data={posts}

@@ -1299,7 +1299,7 @@ export default function ChatMessagesScreen() {
         ]}
       >
         <ThemedView style={styles.replyPreviewContent}>
-          <ThemedText style={[styles.replyPreviewSender, { color: colors.primary }]}>
+          <ThemedText style={[styles.replyPreviewSender, { color: colors.accent }]}>
             Editing message
           </ThemedText>
           <ThemedText
@@ -1337,7 +1337,7 @@ export default function ChatMessagesScreen() {
       >
         <ThemedView style={styles.replyPreviewContent}>
           <ThemedText
-            style={[styles.replyPreviewSender, { color: colors.primary }]}
+            style={[styles.replyPreviewSender, { color: colors.accent }]}
           >
             Replying to {replyToSenderName}
           </ThemedText>
@@ -1460,7 +1460,7 @@ export default function ChatMessagesScreen() {
                 page < totalPages &&
                 loadingMoreRef.current ? (
                   <ThemedView style={styles.loadingMoreContainer}>
-                    <ActivityIndicator size="small" color={colors.primary} />
+                    <ActivityIndicator size="small" color={colors.accent} />
                     <ThemedText style={{ color: colors.textDim, marginTop: 5 }}>
                       Loading older messages...
                     </ThemedText>

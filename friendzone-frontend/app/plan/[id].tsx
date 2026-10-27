@@ -176,7 +176,7 @@ export default function MeetingDetailsScreen() {
                 <ThemedSafeArea style={styles.safeArea}>
                     <CommonHeader title="Meeting Details" leftContent={<BackButton color={colors.text} />} />
                     <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color={colors.primary} />
+                        <ActivityIndicator size="large" color={colors.accent} />
                     </View>
                 </ThemedSafeArea>
             </ScreenBackground>
@@ -244,7 +244,7 @@ export default function MeetingDetailsScreen() {
                     {isInPerson && !!meeting.location && (
                         <ThemedView style={[styles.infoCard, { backgroundColor: colors.buttonBackgroundSecondary }]}>
                             <View style={styles.infoRow}>
-                                <Ionicons name="location-outline" size={20} color={colors.primary} />
+                                <Ionicons name="location-outline" size={20} color={colors.accent} />
                                 <View style={styles.infoTextContainer}>
                                     <ThemedText style={[styles.infoLabel, { color: colors.textDim }]}>Where</ThemedText>
                                     <ThemedText style={[styles.infoValue, { color: colors.text }]}>
@@ -257,7 +257,7 @@ export default function MeetingDetailsScreen() {
 
                     <ThemedView style={[styles.infoCard, { backgroundColor: colors.buttonBackgroundSecondary }]}>
                         <View style={styles.infoRow}>
-                            <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+                            <Ionicons name="calendar-outline" size={20} color={colors.accent} />
                             <View style={styles.infoTextContainer}>
                                 <ThemedText style={[styles.infoLabel, { color: colors.textDim }]}>Date</ThemedText>
                                 <ThemedText style={[styles.infoValue, { color: colors.text }]}>
@@ -269,7 +269,7 @@ export default function MeetingDetailsScreen() {
                             <>
                                 <View style={[styles.divider, { backgroundColor: colors.border }]} />
                                 <View style={styles.infoRow}>
-                                    <Ionicons name="time-outline" size={20} color={colors.primary} />
+                                    <Ionicons name="time-outline" size={20} color={colors.accent} />
                                     <View style={styles.infoTextContainer}>
                                         <ThemedText style={[styles.infoLabel, { color: colors.textDim }]}>Time</ThemedText>
                                         <ThemedText style={[styles.infoValue, { color: colors.text }]}>
@@ -290,7 +290,7 @@ export default function MeetingDetailsScreen() {
                                     {meeting.host.firstName} {meeting.host.lastName}
                                 </ThemedText>
                                 {isHost && (
-                                    <ThemedText style={[styles.youBadge, { color: colors.primary }]}>You</ThemedText>
+                                    <ThemedText style={[styles.youBadge, { color: colors.accent }]}>You</ThemedText>
                                 )}
                             </View>
                         </View>

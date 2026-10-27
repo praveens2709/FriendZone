@@ -71,7 +71,7 @@ export default function RecentlyDeletedScreen() {
       <ThemedSafeArea style={styles.safe}>
         <CommonHeader title="Recently deleted" leftContent={<BackButton color={colors.text} />} />
         {loading ? (
-          <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
+          <ActivityIndicator style={{ marginTop: 40 }} color={colors.accent} />
         ) : (
           <FlatList
             data={posts}

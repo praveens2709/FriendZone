@@ -271,7 +271,7 @@ export default function NewChatScreen() {
           <Ionicons
             name="chatbubble-outline"
             size={24}
-            color={colors.primary}
+            color={colors.accent}
           />
         }
       />
@@ -326,7 +326,7 @@ export default function NewChatScreen() {
             {isSearching && (
               <ActivityIndicator
                 size="small"
-                color={colors.primary}
+                color={colors.accent}
                 style={styles.searchLoading}
               />
             )}
@@ -396,7 +396,7 @@ export default function NewChatScreen() {
                 <AppRefreshControl
                   refreshing={refreshing}
                   onRefresh={onRefresh}
-                  tintColor={colors.primary}
+                  tintColor={colors.accent}
                 />
               }
             />

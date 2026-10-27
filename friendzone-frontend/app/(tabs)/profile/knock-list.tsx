@@ -177,7 +177,7 @@ export default function KnockListScreen() {
         />
         {loading && listData.length === 0 ? (
           <ThemedView style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color={colors.primary} />
+            <ActivityIndicator size="small" color={colors.accent} />
             <ThemedText style={[styles.loadingText, { color: colors.textDim }]}>
               Loading...
             </ThemedText>
@@ -192,7 +192,7 @@ export default function KnockListScreen() {
               <AppRefreshControl
                 refreshing={loading}
                 onRefresh={refreshData}
-                tintColor={colors.primary}
+                tintColor={colors.accent}
               />
             }
             ListEmptyComponent={() => (

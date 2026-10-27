@@ -117,9 +117,9 @@ const CommentInput = React.memo(
         disabled={isCommentSending}
       >
         {isCommentSending ? (
-          <ActivityIndicator size="small" color={colors.primary} />
+          <ActivityIndicator size="small" color={colors.accent} />
         ) : (
-          <Feather name="send" size={24} color={colors.primary} />
+          <Feather name="send" size={24} color={colors.accent} />
         )}
       </TouchableOpacity>
     </ThemedView>
@@ -514,7 +514,7 @@ const PostComponent = ({
             { backgroundColor: colors.backgroundSecondary },
           ]}
         >
-          <ActivityIndicator size="small" color={colors.primary} />
+          <ActivityIndicator size="small" color={colors.accent} />
         </View>
       )}
       <ThemedView style={styles.postHeader}>

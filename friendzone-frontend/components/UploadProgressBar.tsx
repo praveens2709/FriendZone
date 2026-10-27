@@ -46,16 +46,16 @@ export default function UploadProgressBar() {
         {failed ? (
           <View style={styles.actions}>
             <TouchableOpacity onPress={retry} hitSlop={8}>
-              <ThemedText style={[styles.action, { color: colors.primary }]}>Retry</ThemedText>
+              <ThemedText style={[styles.action, { color: colors.accent }]}>Retry</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity onPress={dismiss} hitSlop={8}>
               <Ionicons name="close" size={20} color={colors.textDim} />
             </TouchableOpacity>
           </View>
         ) : finished ? (
-          <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
+          <Ionicons name="checkmark-circle" size={22} color={colors.accent} />
         ) : status === "processing" ? (
-          <ActivityIndicator size="small" color={colors.primary} />
+          <ActivityIndicator size="small" color={colors.accent} />
         ) : (
           <ThemedText style={[styles.percent, { color: colors.textDim }]}>
             {Math.round(progress * 100)}%

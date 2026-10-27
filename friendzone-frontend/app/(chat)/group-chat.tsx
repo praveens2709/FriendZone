@@ -338,7 +338,7 @@ export default function GroupChatScreen() {
           <Ionicons
             name={selected ? "checkmark-circle" : "chatbubble-outline"}
             size={24}
-            color={selected ? colors.primary : colors.textDim}
+            color={selected ? colors.accent : colors.textDim}
           />
         }
       />
@@ -451,7 +451,7 @@ export default function GroupChatScreen() {
             {isSearching && (
               <ActivityIndicator
                 size="small"
-                color={colors.primary}
+                color={colors.accent}
                 style={styles.searchLoading}
               />
             )}
@@ -493,7 +493,7 @@ export default function GroupChatScreen() {
                 <AppRefreshControl
                   refreshing={refreshing}
                   onRefresh={onRefresh}
-                  tintColor={colors.primary}
+                  tintColor={colors.accent}
                 />
               }
             />
